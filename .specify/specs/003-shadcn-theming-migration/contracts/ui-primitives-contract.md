@@ -44,7 +44,7 @@ export interface BrandLogoProps {
 | `/login` Header | Inline Instagram SVG + custom text | `<BrandLogo size="default" />` |
 | `/login` Card | `<div className="w-full max-w-md bg-slate-900/90 border border-slate-800 ...">` | `<Card className="w-full max-w-md ...">` |
 | `/login` Inputs | Raw `<input className="bg-slate-950/80 border-slate-700/80 ...">` | `<Input type="text" ... />` |
-| `/login` Submit | Raw `<button className="bg-gradient-to-r from-purple-600 ...">` | `<Button variant="brand" size="lg" className="w-full">` |
+| `/login` Submit | Raw `<button className="bg-gradient-to-r from-purple-600 ...">` | `<Button variant="default" size="lg" className="w-full">` |
 | `/` Dashboard Header | `<svg viewBox="0 0 76 65"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />` | `<BrandLogo size="sm" />` |
 | `/` Language Switcher | Raw `<button className="bg-white/15 ...">` | `<Button variant={active ? "default" : "ghost"} size="sm">` |
 | `/backoffice` Header | Raw link with custom arrow | `<BrandLogo size="sm" />` with unified back-navigation |

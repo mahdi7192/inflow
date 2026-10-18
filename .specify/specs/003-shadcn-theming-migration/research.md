@@ -56,7 +56,7 @@ Re-export these from `src/components/ui/primitives.tsx` during migration to guar
 
 ### Decision
 Standardize on the inFlow official brand mark:
-- Rounded squircle container with Instagram sunset gradient (`from-purple-600 via-indigo-600 to-pink-500`).
-- White automation icon / Instagram camera glyph.
-- High-contrast typography `inFlow` in font-semibold with subtle tracking.
+- Minimalist rounded squircle container in monochrome black (`bg-zinc-900 text-white`).
+- Clean white automation / Instagram glyph.
+- High-contrast typography `inFlow` in font-semibold (`text-zinc-950`).
 - Completely remove the Vercel triangle (`▲`) from the dashboard header.

@@ -5,32 +5,31 @@
 
 ## 1. Design Token Schema (CSS Variables in `globals.css`)
 
-The design system is parameterized by standard CSS custom properties defined in `:root`:
+The design system is parameterized by standard shadcn/ui CSS custom properties defined in `:root` (Zinc Light Mode):
 
-| Token Name | Default Value (Dark Mode) | Purpose |
+| Token Name | Default Value (Light Mode) | Purpose |
 | :--- | :--- | :--- |
-| `--background` | `#050505` | Primary canvas background (deep OLED dark) |
-| `--foreground` | `#ededed` | Primary text color |
-| `--card` | `#0c0c0e` | Card container background |
-| `--card-hover` | `#121215` | Card hover state background |
-| `--card-foreground`| `#ededed` | Text inside card containers |
-| `--popover` | `#0d0d10` | Dropdown and popover container background |
-| `--popover-foreground` | `#ededed` | Popover text color |
-| `--primary` | `#9333ea` (`rgb(147 51 234)`) | Brand primary color (Purple 600) |
-| `--primary-hover` | `#a855f7` (`rgb(168 85 247)`) | Primary button hover state (Purple 500) |
-| `--primary-foreground` | `#ffffff` | Text/icons on primary surfaces |
-| `--secondary` | `#18181b` | Secondary surface background (Zinc 900) |
-| `--secondary-foreground` | `#fafafa` | Secondary text |
-| `--muted` | `#27272a` | Muted background (Zinc 800) |
-| `--muted-foreground` | `#a1a1aa` | Muted / secondary text (Zinc 400) |
-| `--accent` | `#2e1065` | Subtle purple accent background |
-| `--accent-foreground` | `#d8b4fe` | Accent text |
+| `--background` | `#ffffff` | Primary canvas background (pure white) |
+| `--foreground` | `#09090b` | Primary text color (Zinc 950) |
+| `--card` | `#ffffff` | Card container background |
+| `--card-foreground`| `#09090b` | Text inside card containers |
+| `--popover` | `#ffffff` | Dropdown and popover container background |
+| `--popover-foreground` | `#09090b` | Popover text color |
+| `--primary` | `#18181b` | Primary element color (Zinc 900) |
+| `--primary-hover` | `#27272a` | Primary button hover state (Zinc 800) |
+| `--primary-foreground` | `#fafafa` | Text/icons on primary surfaces (Zinc 50) |
+| `--secondary` | `#f4f4f5` | Secondary surface background (Zinc 100) |
+| `--secondary-foreground` | `#18181b` | Secondary text (Zinc 900) |
+| `--muted` | `#f4f4f5` | Muted background (Zinc 100) |
+| `--muted-foreground` | `#71717a` | Muted / secondary text (Zinc 500) |
+| `--accent` | `#f4f4f5` | Subtle accent background (Zinc 100) |
+| `--accent-foreground` | `#18181b` | Accent text (Zinc 900) |
 | `--destructive` | `#ef4444` | Error / danger state (Red 500) |
-| `--destructive-foreground` | `#ffffff` | Destructive text |
-| `--border` | `rgba(255, 255, 255, 0.08)` | Default subtle border |
-| `--input` | `rgba(255, 255, 255, 0.12)` | Form field border |
-| `--ring` | `#9333ea` | Keyboard focus ring color |
-| `--radius` | `0.75rem` (`12px`) | Standard border radius |
+| `--destructive-foreground` | `#fafafa` | Destructive text |
+| `--border` | `#e4e4e7` | Standard border (Zinc 200) |
+| `--input` | `#e4e4e7` | Form field border (Zinc 200) |
+| `--ring` | `#18181b` | Keyboard focus ring color (Zinc 900) |
+| `--radius` | `0.5rem` (`8px`) | Standard border radius |
 
 ---
 
@@ -38,22 +37,23 @@ The design system is parameterized by standard CSS custom properties defined in 
 
 ### `Button` (via `class-variance-authority`)
 * **Variants**:
-  * `default`: `bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm`
-  * `secondary`: `bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border`
-  * `outline`: `border border-border bg-transparent hover:bg-white/5 text-foreground`
-  * `ghost`: `bg-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground`
-  * `destructive`: `bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25`
-  * `brand`: `bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-600/20 hover:opacity-95`
+  * `default`: `bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs`
+  * `secondary`: `bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50`
+  * `outline`: `border border-border bg-background hover:bg-muted text-foreground shadow-xs`
+  * `ghost`: `hover:bg-muted text-foreground`
+  * `destructive`: `bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xs`
+  * `brand`: `bg-zinc-900 text-white hover:bg-zinc-800 shadow-xs`
+  * `emerald`: `bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs`
 * **Sizes**:
-  * `sm`: `h-7 px-2.5 text-xs rounded-md`
+  * `sm`: `h-8 px-3 text-xs rounded-md`
   * `default`: `h-9 px-4 py-2 text-xs rounded-lg`
-  * `lg`: `h-11 px-6 text-sm rounded-xl`
+  * `lg`: `h-10 px-6 text-sm rounded-lg`
   * `icon`: `h-9 w-9 p-0 rounded-lg flex items-center justify-center`
 
 ### `Input`
 * **Attributes**: `HTMLInputElement` standard props
-* **Styling**: `h-10 w-full rounded-xl border border-input bg-background/80 px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring transition-colors disabled:cursor-not-allowed disabled:opacity-50`
+* **Styling**: `h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`
 
 ### `Card`
 * Composite parts: `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`
-* Default styling: `rounded-2xl border border-border bg-card text-card-foreground shadow-sm`
+* Default styling: `rounded-xl border border-border bg-card text-card-foreground shadow-xs`

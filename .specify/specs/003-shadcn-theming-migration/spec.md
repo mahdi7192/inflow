@@ -42,7 +42,7 @@ As a developer or AI coding agent implementing or maintaining features, I have a
 
 ### User Story 3 - Official inFlow Brand Mark & Header Consistency (Priority: P2)
 
-As a user on any screen in the platform, I see the official inFlow brand mark (an Instagram automation-inspired gradient icon with sleek typography) in the top navigation, completely replacing mismatched icons or the default Next.js/Vercel triangle logo.
+As a user on any screen in the platform, I see the official inFlow brand mark (a minimalist monochrome black squircle with sleek typography) in the top navigation, completely replacing mismatched icons or the default Next.js/Vercel triangle logo.
 
 **Why this priority**: Elevates inFlow from a generic boilerplate to a distinct, professional SaaS platform.
 

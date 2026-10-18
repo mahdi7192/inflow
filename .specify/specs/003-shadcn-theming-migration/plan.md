@@ -24,7 +24,7 @@ Migrate inFlow's user interface to a standardized, token-driven `shadcn/ui` arch
 
 **Performance Goals**: Sub-second Turbopack compile times, zero client runtime CSS-in-JS overhead, smooth 60fps animations and transitions
 
-**Constraints**: Deep OLED dark canvas (`#050505`), native RTL bidirectional support with Vazirmatn font, strict adherence to Constitution Principle X
+**Constraints**: Authentic shadcn/ui Light Mode (pure white `#ffffff` surfaces, `#fafafa` canvas, `#e4e4e7` zinc borders, `#18181b` primary buttons), native RTL bidirectional support with Vazirmatn font, strict adherence to Constitution Principle X
 
 **Scale/Scope**: 3 core route layouts (`/login`, `/`, `/backoffice`), 6 core UI primitives, 1 centralized stylesheet
 

@@ -39,7 +39,7 @@ inFlow is strictly designed as a **Control Plane**:
 | **Package Manager** | `pnpm` (v11+) | Strict lockfile (`pnpm-lock.yaml`) |
 | **Framework** | Next.js 16 (App Router) | Turbopack enabled |
 | **Database** | SQLite via `better-sqlite3` | Stored in `data/inflow.db` (WAL mode enabled) |
-| **Styling & UI** | Tailwind CSS v4 + shadcn/ui primitives | Dark mode default, Vazirmatn font for Persian/Arabic |
+| **Styling & UI** | Tailwind CSS v4 + shadcn/ui primitives | Light mode default (pure shadcn zinc theme), Vazirmatn font for Persian/Arabic |
 | **Typography** | `Vazirmatn`, `Geist`, `Geist Mono` | RTL / LTR bidirectional support |
 
 ### Key Developer Commands
@@ -212,10 +212,11 @@ Enforces Constitution Principle VI: one Instagram account belongs to at most one
    * Multi-language keys are maintained in `src/lib/i18n.ts`.
 4. **Idempotency Over Everything:**
    * Never bypass or remove `comment_id` unique constraints. Double-replying on Instagram leads to shadowbanning.
-5. **Unified Design System & shadcn/ui Standard:**
+5. **Unified Design System & shadcn/ui Light Mode Standard:**
    * All UI components must strictly use or extend `src/components/ui/` primitives.
+   * Default and canonical theme is **shadcn/ui Light Mode** (pure white `#ffffff` cards, subtle `#fafafa` canvas, `#e4e4e7` zinc borders, solid `#18181b` primary buttons/badges). Dark mode, glowing purple/neon gradients, and ambient blur blobs are strictly prohibited.
    * Ad-hoc inline color styling across routes is prohibited; brand theming is centrally driven by CSS variables in `globals.css`.
-   * Official inFlow brand mark must remain consistent across all screens (no rogue Vercel triangle logos).
+   * Official inFlow brand mark must remain consistent across all screens (minimalist monochrome squircle icon, no rogue Vercel triangle logos).
 
 ---
 

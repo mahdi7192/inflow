@@ -19,9 +19,9 @@ This guide outlines end-to-end verification of the design system migration acros
 4. Verify the header height and background blur are consistent.
 
 ### Scenario 2: Token Centralization Test
-1. Temporarily modify `--primary: #9333ea;` to `--primary: #2563eb;` in `src/app/globals.css`.
+1. Temporarily modify `--primary: #18181b;` to `--primary: #2563eb;` in `src/app/globals.css`.
 2. Verify that primary buttons on both `/login` and `/` instantly change color without manual component edits.
-3. Revert `--primary` back to `#9333ea`.
+3. Revert `--primary` back to `#18181b`.
 
 ### Scenario 3: RTL & BiDi Validation
 1. Click the language switcher in the header and toggle between `FA`, `AR`, and `EN`.
