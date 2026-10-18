@@ -240,7 +240,7 @@ export function SidebarNav({
       </div>
 
       {/* Sync Action Area */}
-      <div className="p-3 border-t border-border shrink-0 space-y-2">
+      <div className="p-3 border-t border-border shrink-0">
         <Button
           variant="secondary"
           size="default"
@@ -251,14 +251,6 @@ export function SidebarNav({
           <RotateCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
           <span>{syncing ? t("syncing") : t("navSync")}</span>
         </Button>
-
-        {/* Live Bot Polling Indicator */}
-        <div className="px-2 py-1.5 rounded-lg bg-emerald-50/70 border border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800">
-          <div className="flex items-center gap-1.5 truncate">
-            <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse shrink-0" />
-            <span className="truncate">{t("liveSession")}</span>
-          </div>
-        </div>
       </div>
 
       {/* Bottom User Profile & Logout Footer */}

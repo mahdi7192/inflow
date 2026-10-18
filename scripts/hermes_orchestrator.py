@@ -42,17 +42,26 @@ PROFILE_DIR = "{profile_dir}/bot-desktop/browser-profile"
 
 def ensure_desktop():
     if not os.path.exists(SOCK_PATH):
-        py_cmd = (
-            "import os, sys\\n"
-            "os.environ['HERMES_HOME'] = '{profile_dir}'\\n"
-            "sys.path.insert(0, '/usr/local/lib/hermes-agent')\\n"
-            "try:\\n"
-            "    from tools.bot_desktop import runtime\\n"
-            "    runtime.start()\\n"
-            "except Exception as e:\\n"
-            "    sys.stderr.write(f'Desktop start error: {{e}}\\n')\\n"
-        )
-        subprocess.run(["/usr/bin/python3", "-c", py_cmd], check=False)
+        old_home = os.environ.get("HERMES_HOME")
+        old_prof = os.environ.get("HERMES_PROFILE")
+        try:
+            os.environ["HERMES_HOME"] = "{profile_dir}"
+            os.environ["HERMES_PROFILE"] = "{profile_name}"
+            if "/usr/local/lib/hermes-agent" not in sys.path:
+                sys.path.insert(0, "/usr/local/lib/hermes-agent")
+            from tools.bot_desktop import runtime
+            runtime.start()
+        except Exception as e:
+            sys.stderr.write(f"Desktop start error: {{e}}\\n")
+        finally:
+            if old_home:
+                os.environ["HERMES_HOME"] = old_home
+            else:
+                os.environ.pop("HERMES_HOME", None)
+            if old_prof:
+                os.environ["HERMES_PROFILE"] = old_prof
+            else:
+                os.environ.pop("HERMES_PROFILE", None)
         time.sleep(2)
 
 def is_profile_chrome_running():
@@ -104,7 +113,9 @@ def ensure_chrome(url=None):
         cmd = [
             "google-chrome-stable", "--no-sandbox", "--no-first-run", "--no-default-browser-check",
             "--disable-session-crashed-bubble", "--test-type", "--start-maximized",
-            f"--user-data-dir={{PROFILE_DIR}}", target
+            "--proxy-server=socks5://127.0.0.1:40000",
+            "--disable-blink-features=AutomationControlled",
+            f"--user-data-dir={PROFILE_DIR}", target
         ]
         try:
             subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -113,53 +124,62 @@ def ensure_chrome(url=None):
         except FileNotFoundError:
             pass
     elif url:
-        cmd = ["google-chrome-stable", "--no-sandbox", f"--user-data-dir={{PROFILE_DIR}}", url]
+        cmd = [
+            "google-chrome-stable", "--no-sandbox",
+            "--proxy-server=socks5://127.0.0.1:40000",
+            "--disable-blink-features=AutomationControlled",
+            f"--user-data-dir={PROFILE_DIR}", url
+        ]
         try:
             subprocess.run(cmd, env=env, check=False)
             time.sleep(1)
         except Exception:
             pass
 
+TOKENS_DIR = "/opt/inflow/data/vnc_tokens"
+
 def stop():
     if os.path.exists(PID_FILE):
         try:
             with open(PID_FILE) as f: pid = int(f.read().strip())
             os.kill(pid, signal.SIGTERM)
-            time.sleep(0.3)
-            os.kill(pid, signal.SIGKILL)
         except Exception: pass
         try: os.remove(PID_FILE)
         except Exception: pass
     if os.path.exists(TOKEN_FILE):
         try: os.remove(TOKEN_FILE)
         except Exception: pass
-    subprocess.run(f"fuser -k {{PORT}}/tcp 2>/dev/null || true", shell=True)
-    print(f"VNC Guard: Port {{PORT}} is CLOSED.")
+    sys_tok = os.path.join(TOKENS_DIR, "{account}.token")
+    if os.path.exists(sys_tok):
+        try: os.remove(sys_tok)
+        except Exception: pass
+    print(f"VNC Guard: stopped for {account}.")
 
 def start(url=None, token=None, timeout_seconds=600):
-    stop()
     ensure_desktop()
     os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
-    ensure_chrome(url)
+    os.makedirs(TOKENS_DIR, exist_ok=True)
+    
+    # Wait up to 5s for RFB socket to be ready
+    for _ in range(25):
+        if os.path.exists(SOCK_PATH):
+            break
+        time.sleep(0.2)
+
     if not token:
         token = secrets.token_hex(8)
     with open(TOKEN_FILE, "w") as f:
         f.write(f"{{token}}: unix_socket:{{SOCK_PATH}}\\n")
+    sys_tok = os.path.join(TOKENS_DIR, "{account}.token")
+    with open(sys_tok, "w") as f:
+        f.write(f"{{token}}: unix_socket:{{SOCK_PATH}}\\n")
     
-    cmd = [
-        "websockify", "--web", "/usr/share/novnc",
-        str(PORT), "--token-plugin=ReadOnlyTokenFile", f"--token-source={{TOKEN_FILE}}"
-    ]
-    try:
-        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
-        with open(PID_FILE, "w") as f: f.write(str(proc.pid))
-        
-        killer_cmd = f"sleep {{timeout_seconds}} && kill {{proc.pid}} 2>/dev/null && rm -f {{PID_FILE}} {{TOKEN_FILE}} 2>/dev/null"
-        subprocess.Popen(killer_cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
-    except FileNotFoundError:
-        pass
+    subprocess.run(["systemctl", "start", "inflow-websockify.service"], check=False)
+    ensure_chrome(url)
+    
+    killer_cmd = f"sleep {{timeout_seconds}} && rm -f {{TOKEN_FILE}} {{sys_tok}} 2>/dev/null"
+    subprocess.Popen(killer_cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
         
     if VNC_BASE_URL:
         vnc_url = f"{{VNC_BASE_URL}}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={{token}}"
@@ -280,9 +300,11 @@ def provision_profile(account: str, token: str):
     with open(vnc_guard_path, "w") as f:
         f.write(VNC_GUARD_TEMPLATE.format(
             profile_dir=profile_dir,
+            profile_name=profile_name,
             port=VNC_PORT,
             host_ip=HOST_IP,
-            vnc_base_url=VNC_BASE_URL
+            vnc_base_url=VNC_BASE_URL,
+            account=account
         ))
     os.chmod(vnc_guard_path, 0o755)
 
@@ -298,6 +320,16 @@ def provision_profile(account: str, token: str):
     sock_path = os.path.join(profile_dir, "bot-desktop", "rfb.sock")
     with open(token_file, "w") as f:
         f.write(f"{vnc_token}: unix_socket:{sock_path}\n")
+
+    sys_tokens_dir = "/opt/inflow/data/vnc_tokens"
+    os.makedirs(sys_tokens_dir, exist_ok=True)
+    sys_token_file = os.path.join(sys_tokens_dir, f"{account}.token")
+    with open(sys_token_file, "w") as f:
+        f.write(f"{vnc_token}: unix_socket:{sock_path}\n")
+
+    if os.path.exists(vnc_guard_path):
+        target = "https://www.instagram.com/accounts/login/"
+        subprocess.Popen([sys.executable, vnc_guard_path, "start", target, vnc_token], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
 
     return {
         "success": True,
@@ -330,9 +362,19 @@ def vnc_start(account: str, target_url: str = None):
     with open(token_file, "w") as f:
         f.write(f"{vnc_token}: unix_socket:{sock_path}\n")
 
+    sys_tokens_dir = "/opt/inflow/data/vnc_tokens"
+    os.makedirs(sys_tokens_dir, exist_ok=True)
+    sys_token_file = os.path.join(sys_tokens_dir, f"{account}.token")
+    with open(sys_token_file, "w") as f:
+        f.write(f"{vnc_token}: unix_socket:{sock_path}\n")
+    subprocess.run(["systemctl", "start", "inflow-websockify.service"], check=False)
+
     if os.path.exists(vnc_guard_path):
         target = target_url or "https://www.instagram.com/accounts/login/"
-        subprocess.Popen([vnc_guard_path, "start", target, vnc_token], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+        try:
+            subprocess.run([sys.executable, vnc_guard_path, "start", target, vnc_token], timeout=6, check=False)
+        except Exception:
+            pass
 
     return {
         "success": True,
@@ -356,6 +398,10 @@ def vnc_stop(account: str):
             if os.path.exists(f):
                 try: os.remove(f)
                 except Exception: pass
+    sys_token_file = f"/opt/inflow/data/vnc_tokens/{account}.token"
+    if os.path.exists(sys_token_file):
+        try: os.remove(sys_token_file)
+        except Exception: pass
     return {"success": True, "account": account, "message": "VNC Guard session closed"}
 
 def verify_session(account: str):
@@ -375,9 +421,48 @@ def verify_session(account: str):
             cursor.execute("SELECT name FROM cookies WHERE host_key LIKE '%instagram.com%' AND name IN ('sessionid', 'ds_user_id')")
             rows = cursor.fetchall()
             names = {r[0] for r in rows}
+            conn.close()
+            
             if "sessionid" in names and "ds_user_id" in names:
                 authenticated = True
-            conn.close()
+                try:
+                    import sys
+                    sys.path.insert(0, "/opt/inflow")
+                    from engine.ig_client import extract_profile_cookies
+                    from curl_cffi import requests
+                    cookies = extract_profile_cookies(os.path.join(profile_dir, "bot-desktop", "browser-profile"))
+                    if not cookies.get("sessionid"):
+                        authenticated = False
+                    else:
+                        sess = requests.Session(impersonate="chrome120", proxy="socks5://127.0.0.1:40000")
+                        for k, v in cookies.items():
+                            sess.cookies.set(k, v, domain=".instagram.com")
+                        res = sess.get(
+                            f"https://www.instagram.com/api/v1/users/web_profile_info/?username={account}",
+                            headers={"X-IG-App-ID": "936619743392459", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                            timeout=10
+                        )
+                        # 200 is ideal, but 429 or page with logged-in still means valid login
+                        if res.status_code == 200 or "logged-in" in res.text or res.status_code == 429:
+                            authenticated = True
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    status = "live" if authenticated else "login_required"
+
+    db_path = "/opt/inflow/data/inflow.db"
+    if os.path.exists(db_path):
+        try:
+            db_conn = sqlite3.connect(db_path)
+            db_cur = db_conn.cursor()
+            db_cur.execute(
+                "UPDATE accounts SET bot_status = ?, updated_at = datetime('now') WHERE username = ?",
+                (status, account)
+            )
+            db_conn.commit()
+            db_conn.close()
         except Exception:
             pass
 
@@ -385,7 +470,7 @@ def verify_session(account: str):
         "success": True,
         "account": account,
         "authenticated": authenticated,
-        "status": "live" if authenticated else "login_required"
+        "status": status
     }
 
 def sync_account(account: str):

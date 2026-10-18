@@ -14,6 +14,7 @@ import {
   FolderOpen,
   Menu,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
@@ -128,6 +129,12 @@ export function InflowDashboard({
       if (data.success && data.agent_status) {
         setAgentStatus(data.agent_status);
       }
+
+      const botRes = await fetch(`/api/bot/status?account=${encodeURIComponent(accountName)}`);
+      const botData = await botRes.json();
+      if (botData.success && botData.bot_status) {
+        setBotStatus(botData.bot_status);
+      }
     } catch {
       // Ignore network errors
     }
@@ -229,6 +236,11 @@ export function InflowDashboard({
         fetchPosts(currentAccount, true);
       }
       checkAgentStatus(currentAccount);
+
+      const interval = setInterval(() => {
+        checkAgentStatus(currentAccount);
+      }, 10000);
+      return () => clearInterval(interval);
     }
   }, [currentAccount, profile, fetchPosts, checkAgentStatus]);
 
@@ -495,38 +507,8 @@ export function InflowDashboard({
             </div>
           </div>
 
-          {/* Clean Right Actions: Agent Status Badge & Unified Language Dropdown */}
+          {/* Clean Right Actions: Unified Bot Indicator & Language Dropdown */}
           <div className="flex items-center gap-2">
-            {agentStatus && (
-              <span
-                className={cn(
-                  "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
-                  agentStatus.is_online
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-zinc-100 text-zinc-600 border-zinc-200"
-                )}
-                title={
-                  agentStatus.sse_connected
-                    ? "اتصال استریم فعال با ایجنت"
-                    : agentStatus.is_online
-                    ? "هارت‌بیت فعال"
-                    : "ایجنت در دسترس نیست"
-                }
-              >
-                <span
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full shrink-0",
-                    agentStatus.is_online
-                      ? "bg-emerald-500 animate-pulse"
-                      : "bg-zinc-400"
-                  )}
-                />
-                <span>
-                  {agentStatus.is_online ? "ایجنت متصل (MCP)" : "ایجنت آفلاین"}
-                </span>
-              </span>
-            )}
-
             {currentAccount && (
               <BotToolbarButton
                 account={currentAccount}
@@ -587,7 +569,7 @@ export function InflowDashboard({
             }}
             onOpenLogs={(sc) => setLogsShortcode(sc)}
           />
-        ) : !loading && (botStatus === "unprovisioned" || botStatus === "provisioning" || botStatus === "login_required") ? (
+        ) : !loading && botStatus === "unprovisioned" && posts.length === 0 ? (
           <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
             <BotSetupWizard
               account={currentAccount}
@@ -604,6 +586,27 @@ export function InflowDashboard({
           </div>
         ) : (
           <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+            {botStatus === "login_required" && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs">{I18N[lang]?.botLoginAlertTitle || "نشست اینستاگرام نیازمند ورود مجدد است"}</h4>
+                    <p className="text-[11px] text-amber-800/90 mt-0.5">{I18N[lang]?.botLoginAlertDesc || "برای ادامه پاسخگویی خودکار، نیاز به ورود مجدد به حساب دارید. پست‌ها و اتوماسیون‌های شما حفظ شده‌اند."}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenVnc}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>{I18N[lang]?.botLoginVncBtn || "ورود مجدد با دسکتاپ مجازی"}</span>
+                </button>
+              </div>
+            )}
             {botStatus === "checkpoint_required" && (
               <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3">
@@ -618,7 +621,7 @@ export function InflowDashboard({
                 <button
                   type="button"
                   onClick={handleOpenVnc}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg shrink-0 cursor-pointer"
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer"
                 >
                   {I18N[lang]?.botResolveCheckpointBtn || "حل چالش در مرورگر"}
                 </button>
@@ -653,13 +656,6 @@ export function InflowDashboard({
                       {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
                     </p>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>{t("liveSession")}</span>
-                  </span>
                 </div>
               </div>
 
@@ -826,12 +822,12 @@ export function InflowDashboard({
                         {/* Content Snippet */}
                         <div className="space-y-1.5 flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-semibold text-foreground">
+                            <span className="font-mono text-xs font-semibold text-foreground truncate max-w-[130px] sm:max-w-none">
                               {p.shortcode}
                             </span>
                             <span
                               className={cn(
-                                "inline-block w-2 h-2 rounded-full",
+                                "inline-block w-2 h-2 rounded-full shrink-0",
                                 isActive ? "bg-emerald-500" : "bg-zinc-300"
                               )}
                             />
@@ -979,7 +975,7 @@ export function InflowDashboard({
                       <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs font-semibold text-foreground">
+                            <span className="font-mono text-xs font-semibold text-foreground truncate max-w-[130px] sm:max-w-none">
                               {p.shortcode}
                             </span>
                           </div>
@@ -1053,6 +1049,7 @@ export function InflowDashboard({
         account={currentAccount}
         botStatus={botStatus}
         lang={lang}
+        agentStatus={agentStatus}
         onOpenVnc={handleOpenVnc}
         onStatusChange={(status) => {
           setBotStatus(status);
@@ -1070,7 +1067,7 @@ export function InflowDashboard({
         lang={lang}
         onSessionVerified={() => {
           setBotStatus("live");
-          fetchPosts(currentAccount);
+          handleSync();
         }}
       />
     </div>

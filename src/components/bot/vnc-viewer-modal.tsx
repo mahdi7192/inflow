@@ -184,7 +184,7 @@ export function VncViewerModal({
             </div>
           ) : (
             <>
-              {/* Actual noVNC iframe or interactive simulation */}
+              {/* Actual noVNC iframe */}
               <iframe
                 src={vncUrl}
                 className="w-full h-full border-0"
@@ -194,27 +194,37 @@ export function VncViewerModal({
                 onError={() => setIframeError(true)}
               />
 
-              {/* Dev/Simulation Fallback Overlay (Active if server VNC port 6080 is unreachable locally) */}
-              {(!iframeLoaded || iframeError) && (
-                <div className="absolute inset-0 bg-zinc-900/90 flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
+              {/* Connecting Overlay */}
+              {!iframeLoaded && !iframeError && (
+                <div className="absolute inset-0 bg-zinc-950/80 flex flex-col items-center justify-center p-6 text-center text-white space-y-3 z-10 pointer-events-none">
+                  <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-zinc-300">در حال برقراری اتصال به دسکتاپ مجازی ربات...</p>
+                </div>
+              )}
+
+              {/* Error Fallback */}
+              {iframeError && (
+                <div className="absolute inset-0 bg-zinc-900/90 flex flex-col items-center justify-center p-6 text-center text-white space-y-4 z-10">
                   <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                    <Monitor className="w-7 h-7 text-emerald-400" />
+                    <Monitor className="w-7 h-7 text-rose-400" />
                   </div>
                   <div className="space-y-1 max-w-lg">
-                    <h4 className="font-bold text-base">نمایشگر مجازی ربات در حال اجرا است</h4>
+                    <h4 className="font-bold text-base">خطا در بارگذاری نمایشگر مجازی</h4>
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      در سرور لینوکس، صفحه رسمی کروم روی اینستاگرام باز است. در محیط لوکال، می‌توانید با زدن دکمه زیر ورود به اکانت را شبیه‌سازی کنید.
+                      بارگذاری صفحه VNC با خطا مواجه شد. می‌توانید مجدداً تلاش کنید یا آن را در تب جدید مرورگر باز نمایید.
                     </p>
                   </div>
                   <div className="flex items-center gap-3 pt-2">
                     <Button
                       size="sm"
                       className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
-                      onClick={handleVerifyLogin}
-                      disabled={isVerifying}
+                      onClick={() => {
+                        setIframeError(false);
+                        setIframeLoaded(false);
+                      }}
                     >
-                      <CheckCircle className="w-4 h-4 me-1.5" />
-                      شبیه‌سازی ورود موفق و فعال‌سازی لایو
+                      <RefreshCw className="w-4 h-4 me-1.5" />
+                      تلاش مجدد
                     </Button>
                     <Button
                       variant="outline"

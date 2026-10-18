@@ -9,9 +9,11 @@ import {
   Play,
   RefreshCw,
   ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { I18N, Lang, isRTL } from "@/lib/i18n";
 import { BotStatus } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -32,6 +34,10 @@ interface BotMonitorDrawerProps {
   lang: Lang;
   onOpenVnc: () => void;
   onStatusChange: (status: BotStatus) => void;
+  agentStatus?: {
+    is_online: boolean;
+    sse_connected: boolean;
+  } | null;
 }
 
 export function BotMonitorDrawer({
@@ -42,6 +48,7 @@ export function BotMonitorDrawer({
   lang,
   onOpenVnc,
   onStatusChange,
+  agentStatus,
 }: BotMonitorDrawerProps) {
   const [profileName, setProfileName] = useState<string>(`inflow_${account}`);
   const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
@@ -171,7 +178,38 @@ export function BotMonitorDrawer({
                 Display :20
               </span>
             </div>
+
+            {agentStatus && (
+              <div className="flex items-center justify-between border-t border-zinc-200/60 pt-2.5">
+                <span className="text-xs text-muted-foreground">اتصال هوش مصنوعی (MCP)</span>
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border",
+                  agentStatus.is_online
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-zinc-100 text-zinc-600 border-zinc-200"
+                )}>
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    agentStatus.is_online ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"
+                  )} />
+                  <span>{agentStatus.is_online ? (agentStatus.sse_connected ? "آنلاین (SSE فعال)" : "متصل") : "آفلاین"}</span>
+                </span>
+              </div>
+            )}
           </div>
+
+          {/* Login Required Notice */}
+          {botStatus === "login_required" && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-2">
+              <div className="flex items-center gap-2 text-amber-900 font-semibold text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>نیاز به ورود مجدد به حساب</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                نشست اینستاگرام شما منقضی شده است. دکمه «مشاهده دسکتاپ مجازی» زیر را بزنید و در صفحه بازشده وارد اکانت شوید.
+              </p>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="space-y-2">

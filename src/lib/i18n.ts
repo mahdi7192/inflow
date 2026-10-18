@@ -247,14 +247,14 @@ export const I18N: Record<Lang, Record<string, string>> = {
     deletePageConfirmBody: "آیا از حذف این پیج مطمئن هستید؟ با این کار تمام پست‌ها، کامنت‌لاگ‌ها و اتصالات هرمس مربوط به این پیج برای همیشه پاک می‌شوند.",
 
     // Dedicated Bot Lifecycle & VNC Guard
-    botToolbarTitle: "ربات اختصاصی",
-    botStatusUnprovisioned: "راه‌اندازی نشده",
-    botStatusProvisioning: "در حال راه‌اندازی...",
-    botStatusLoginRequired: "در انتظار ورود به اینستاگرام",
-    botStatusLive: "لایو و فعال",
-    botStatusCheckpointRequired: "چالش امنیتی اینستاگرام",
-    botStatusPaused: "متوقف شده",
-    botStatusError: "خطا در اتصال",
+    botToolbarTitle: "ربات",
+    botStatusUnprovisioned: "غیرفعال",
+    botStatusProvisioning: "در حال راه‌اندازی",
+    botStatusLoginRequired: "نیازمند لاگین",
+    botStatusLive: "متصل",
+    botStatusCheckpointRequired: "چک‌پوینت امنیتی",
+    botStatusPaused: "متوقف",
+    botStatusError: "خطای سشن",
 
     botSetupTitle: "راه‌اندازی ربات اختصاصی اینستاگرام",
     botSetupSubtitle: "ربات هوشمند شما برای اجرای خودکار پاسخ‌ها و دایرکت‌ها آماده راه‌اندازی است.",
@@ -292,6 +292,9 @@ export const I18N: Record<Lang, Record<string, string>> = {
     botCheckpointAlertTitle: "توجه: اینستاگرام نیازمند تایید هویت است",
     botCheckpointAlertDesc: "برای ادامه فعالیت ربات، لطفاً صفحه مرورگر را باز کرده و کد تایید ارسالی توسط اینستاگرام را وارد نمایید.",
     botResolveCheckpointBtn: "حل چالش در مرورگر",
+    botLoginAlertTitle: "نشست اینستاگرام نیازمند ورود مجدد است",
+    botLoginAlertDesc: "برای ادامه ارسال پاسخ‌های خودکار، لطفاً وارد اکانت شوید. پست‌ها و قوانین شما فعال و ذخیره هستند.",
+    botLoginVncBtn: "ورود مجدد با دسکتاپ مجازی",
   },
   en: {
     platformName: "inFlow",
@@ -534,14 +537,14 @@ export const I18N: Record<Lang, Record<string, string>> = {
     deletePageConfirmBody: "Are you sure you want to delete this page? All associated posts, logs, and Hermes bindings will be permanently deleted.",
 
     // Dedicated Bot Lifecycle & VNC Guard
-    botToolbarTitle: "Dedicated Bot",
-    botStatusUnprovisioned: "Not Provisioned",
-    botStatusProvisioning: "Provisioning...",
+    botToolbarTitle: "Bot",
+    botStatusUnprovisioned: "Inactive",
+    botStatusProvisioning: "Provisioning",
     botStatusLoginRequired: "Login Required",
-    botStatusLive: "Live & Active",
-    botStatusCheckpointRequired: "Instagram Checkpoint",
+    botStatusLive: "Connected",
+    botStatusCheckpointRequired: "Checkpoint",
     botStatusPaused: "Paused",
-    botStatusError: "Connection Error",
+    botStatusError: "Session Error",
 
     botSetupTitle: "Provision Dedicated Instagram Bot",
     botSetupSubtitle: "Your intelligent agent is ready to automate comment replies and direct messages.",
@@ -579,6 +582,9 @@ export const I18N: Record<Lang, Record<string, string>> = {
     botCheckpointAlertTitle: "Notice: Instagram Checkpoint Detected",
     botCheckpointAlertDesc: "Instagram requires identity verification. Please open the browser monitor to enter the verification code.",
     botResolveCheckpointBtn: "Resolve in Browser",
+    botLoginAlertTitle: "Instagram Session Expired",
+    botLoginAlertDesc: "Please log in to your account to continue auto-responses. Your posts and rules are preserved.",
+    botLoginVncBtn: "Re-login with Virtual Desktop",
   },
   ar: {
     platformName: "inFlow",
@@ -810,14 +816,14 @@ export const I18N: Record<Lang, Record<string, string>> = {
     deletePageConfirmBody: "هل أنت متأكد من حذف هذا البيج؟ سيتم حذف جميع المنشورات والسجلات وروابط هيرميس نهائياً.",
 
     // Dedicated Bot Lifecycle & VNC Guard
-    botToolbarTitle: "البوت المخصص",
-    botStatusUnprovisioned: "غير مهيأ",
-    botStatusProvisioning: "جارٍ التهيئة...",
-    botStatusLoginRequired: "تسجيل الدخول مطلوب",
-    botStatusLive: "نشط ومباشر",
-    botStatusCheckpointRequired: "تأكيد هوية إنستغرام",
-    botStatusPaused: "متوقف مؤقتاً",
-    botStatusError: "خطأ في الاتصال",
+    botToolbarTitle: "البوت",
+    botStatusUnprovisioned: "غير نشط",
+    botStatusProvisioning: "قيد الإعداد",
+    botStatusLoginRequired: "مطلوب تسجيل الدخول",
+    botStatusLive: "متصل",
+    botStatusCheckpointRequired: "نقطة تفتيش",
+    botStatusPaused: "متوقف",
+    botStatusError: "خطأ الجلسة",
 
     botSetupTitle: "تهيئة بوت إنستغرام المخصص",
     botSetupSubtitle: "البوت الذكي جاهز لأتمتة الردود على التعليقات والرسائل الخاصة.",
@@ -855,6 +861,9 @@ export const I18N: Record<Lang, Record<string, string>> = {
     botCheckpointAlertTitle: "تنبيه: إنستغرام يتطلب التحقق من الهوية",
     botCheckpointAlertDesc: "لمتابعة نشاط البوت، يرجى فتح المتصفح وإدخال رمز التحقق المطلوب.",
     botResolveCheckpointBtn: "حل التحدي في المتصفح",
+    botLoginAlertTitle: "انتهت جلسة إنستغرام",
+    botLoginAlertDesc: "يرجى تسجيل الدخول إلى حسابك لمتابعة الردود التلقائية. منشوراتك وقواعدك محفوظة.",
+    botLoginVncBtn: "إعادة تسجيل الدخول بالسطح الافتراضي",
   },
 };
 
