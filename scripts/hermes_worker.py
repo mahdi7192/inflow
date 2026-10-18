@@ -65,6 +65,10 @@ def run_agent_cycle(base_url, account):
         print("[-] API returned failure:", data)
         return
 
+    if data.get("paused"):
+        print(f"[*] Account @{account} is currently PAUSED. Skipping comment evaluation.")
+        return
+
     active_posts = data.get("active_posts", [])
     print(f"[+] Heartbeat updated. Found {len(active_posts)} active post(s) with auto_reply=1.")
 

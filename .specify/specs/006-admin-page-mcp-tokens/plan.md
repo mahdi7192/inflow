@@ -1,113 +1,126 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: Admin Page Management, Dedicated Per-Page Tokens & Hermes MCP Configuration
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Branch**: `006-admin-page-mcp-tokens` | **Date**: 2026-10-18 | **Spec**: [.specify/specs/006-admin-page-mcp-tokens/spec.md](file:///Users/mahdi.ketabdar/dev/inFlow/.specify/specs/006-admin-page-mcp-tokens/spec.md)
 
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/speckit-plan` command; its definition describes the execution workflow.
+**Input**: Feature specification from `.specify/specs/006-admin-page-mcp-tokens/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Implement the Back-Office administration suite for Instagram Pages and Hermes MCP profile integration according to **Constitution v1.4.0**:
+1. **Minimalist Page Provisioning**: Enable Superadmins to register an Instagram page simply by typing its handle/ID (`username`), with automatic, non-blocking generation of a dedicated, high-entropy API token (`inf_...`) and bot profile binding (`hermes-<username>`).
+2. **Hermes MCP Config Snippet Generator**: Provide a modal in Back-Office displaying ready-to-copy Hermes MCP configuration JSON/YAML blocks and raw token details with 1-click clipboard actions, along with instant token rotation/regeneration.
+3. **Tenancy Assignment & Ownership**: Enable Superadmins to assign/reassign registered pages to platform users, enforcing strict 1-to-N user-to-page ownership.
+4. **Strict Zero-Technical-Leakage**: Guarantee that standard tenant users never see or receive API tokens, MCP server settings, or execution-plane internals anywhere in the UI or API payloads.
+5. **Lazy Profile Metadata Enrichment**: Allow worker agents to update auxiliary profile fields (display name, bio, avatar, follower counts) during normal polling or sync cycles.
+
+---
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
+**Language/Version**: TypeScript 5+ / Node.js 20+ (ESM native)
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
+**Primary Dependencies**: Next.js 16 (App Router), `better-sqlite3`, Tailwind CSS v4, shadcn/ui primitives, lucide-react
 
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
+**Storage**: SQLite (`data/inflow.db` with WAL mode enabled), managing `accounts`, `account_bot_bindings`, `user_accounts`, and `users`
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Testing**: cURL test scripts, REST API route checks, UI modal verification via `quickstart.md`
 
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
+**Target Platform**: Linux server & macOS local development environment
 
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: Full-Stack SaaS Control Plane (Next.js web application + Back-Office administration plane)
 
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+**Performance Goals**:
+- Page registration and token generation < 100ms
+- Hermes MCP configuration snippet rendering < 50ms
+- Token regeneration and instant invalidation propagation < 50ms
 
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
+**Constraints**:
+- Strict Control Plane isolation per Constitution Principle II (no browser automation inside Next.js)
+- Multi-tenant 1-to-N isolation per Constitution Principle VI (1 user owns N pages; 1 page owned by at most 1 user)
+- Dedicated per-page token binding per Constitution Principle VIII (token belongs to the page, not the user)
+- Absolute zero-technical-leakage for standard tenants per Constitution Principle IX
+- Unified shadcn/ui Light Mode and Vazirmatn RTL compliance per Constitution Principles V and X
 
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
+**Scale/Scope**: Multi-tenant, multi-page platform with isolated Hermes execution profiles
 
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+---
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*GATE: All 10 principles validated against Constitution v1.4.0. Zero violations.*
 
-[Gates determined based on constitution file]
+| Principle | Status | Justification / Validation |
+| :--- | :--- | :--- |
+| **I. Spec-Driven Development** | PASS | Rigorously follows Spec-Kit workflow (`/speckit-specify` -> `/speckit-plan` -> `/speckit-tasks` -> `/speckit-implement`). |
+| **II. Control Plane Isolation** | PASS | inFlow only manages page metadata, tokens, and MCP configurations. Hermes bots execute in the isolated Execution Plane. |
+| **III. Absolute Idempotency & Safety** | PASS | Preserved on all comment interactions and log reporting. |
+| **IV. Package & Runtime Standards** | PASS | Strictly uses `pnpm`, Next.js 16 App Router, and `better-sqlite3` in WAL mode. |
+| **V. RTL Typography & BiDi Architecture** | PASS | Back-Office UI tabs, modals, and tables use `Vazirmatn` font, native RTL layout, and proper BiDi spacing for code snippets. |
+| **VI. Multi-Tenant User Authentication & Minimalist Page Entity** | PASS | Minimalist page creation requires only `username`; 1-to-N tenancy ownership is strictly enforced in `user_accounts`. |
+| **VII. Strict 1-to-1 Page-to-Bot Binding** | PASS | Every registered page is automatically bound to exactly one isolated bot profile (`hermes-<username>`). |
+| **VIII. Per-Page Scoped Tokens & Direct MCP Connection** | PASS | Tokens and MCP connections belong strictly to the page, never to the user. Hermes profile MCP is configured with page's dedicated key. |
+| **IX. Back-Office Exclusivity & Zero-Leakage Tenant Abstraction** | PASS | Standard tenants have 0% visibility into tokens, MCP, or APIs. All management is exclusively isolated to Superadmin Back-Office. |
+| **X. Unified Design System & shadcn/ui Light Mode** | PASS | Clean `#ffffff` surfaces, `#fafafa` canvas, `#e4e4e7` zinc borders, solid `#18181b` primary elements, and monochrome squircle brand mark. |
+
+---
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit-plan command output)
-├── research.md          # Phase 0 output (/speckit-plan command)
-├── data-model.md        # Phase 1 output (/speckit-plan command)
-├── quickstart.md        # Phase 1 output (/speckit-plan command)
-├── contracts/           # Phase 1 output (/speckit-plan command)
-└── tasks.md             # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
+.specify/specs/006-admin-page-mcp-tokens/
+├── plan.md                              # This implementation plan
+├── research.md                          # Phase 0 architectural decisions and research
+├── data-model.md                        # Phase 1 schema, state transitions, and entities
+├── quickstart.md                        # Phase 1 runnable validation scenarios
+├── checklists/
+│   └── requirements.md                  # Quality requirements checklist
+└── contracts/
+    ├── admin-pages-api.md               # Back-Office page CRUD and assignment APIs
+    ├── page-token-mcp-api.md            # Per-page token inspection and regeneration APIs
+    └── hermes-mcp-config-schema.md      # Hermes agent profile configuration schemas
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+### Source Code Layout
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
 src/
-├── models/
-├── services/
-├── cli/
+├── app/
+│   ├── api/
+│   │   ├── backoffice/
+│   │   │   ├── accounts/
+│   │   │   │   ├── route.ts             # GET (list pages) & POST (minimalist page creation)
+│   │   │   │   └── [username]/
+│   │   │   │       ├── route.ts         # DELETE (remove page)
+│   │   │   │       ├── assignment/
+│   │   │   │       │   └── route.ts     # PUT (assign/reassign page to user)
+│   │   │   │       └── token/
+│   │   │   │           └── route.ts     # GET (inspect & MCP config) & POST (regenerate)
+│   │   │   └── users/                   # Existing user management APIs
+│   │   ├── agent/poll/route.ts          # Bearer token validation against account_bot_bindings
+│   │   ├── mcp/route.ts                 # Bearer token validation for MCP tool calls
+│   │   └── sync/route.ts                # Lazy profile metadata ingestion
+│   └── backoffice/
+│       ├── page.tsx                     # Back-Office server page with Superadmin guard
+│       └── backoffice-client.tsx        # Multi-tab view: "Users" & "Pages & MCP Tokens"
+├── components/
+│   └── backoffice/
+│       ├── account-table.tsx            # Table listing pages, owner, token preview, and actions
+│       ├── create-account-modal.tsx     # Minimalist dialog (enter username + optional user)
+│       ├── hermes-mcp-modal.tsx         # Modal displaying token & copyable Hermes MCP config
+│       ├── user-table.tsx               # Existing user table
+│       ├── create-user-modal.tsx        # Existing user creation dialog
+│       └── assign-accounts-modal.tsx    # User-centric account assignment dialog
 └── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+    ├── db.ts                            # Core SQLite queries & helpers for accounts/bindings
+    └── i18n.ts                          # Persian/Arabic/English translations for new UI strings
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+---
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| :--- | :--- | :--- |
+| *None* | All architecture conforms 100% to Constitution v1.4.0. | N/A |

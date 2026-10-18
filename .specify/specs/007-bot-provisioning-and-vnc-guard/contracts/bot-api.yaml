@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: inFlow Dedicated Bot Lifecycle & VNC Guard API
+  version: 1.0.0
+  description: Endpoints for bot provisioning, lifecycle management, and dynamic on-demand VNC Guard sessions.
+
+paths:
+  /api/bot/provision:
+    post:
+      summary: Initiate dedicated Hermes profile provisioning for an account
+      description: Dispatches profile creation and Bot Screen setup to the server orchestrator.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - account
+              properties:
+                account:
+                  type: string
+                  example: "r9spoort1"
+      responses:
+        '200':
+          description: Provisioning successfully started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: "provisioning"
+                  message:
+                    type: string
+                    example: "ربات اختصاصی پیج در حال راه‌اندازی است."
+        '403':
+          description: Unauthorized tenancy access
+        '400':
+          description: Invalid request or bot already provisioned
+
+  /api/bot/status:
+    get:
+      summary: Query current bot status and telemetry
+      parameters:
+        - name: account
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "r9spoort1"
+      responses:
+        '200':
+          description: Current bot telemetry and state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  account:
+                    type: string
+                    example: "r9spoort1"
+                  bot_profile_name:
+                    type: string
+                    example: "inflow_r9spoort1"
+                  bot_status:
+                    type: string
+                    enum: [unprovisioned, provisioning, login_required, live, checkpoint_required, paused, error]
+                    example: "live"
+                  bot_vnc_active:
+                    type: boolean
+                    example: false
+                  vnc_expires_in_sec:
+                    type: integer
+                    example: 0
+                  last_heartbeat_at:
+                    type: string
+                    example: "2026-10-18 19:15:00"
+                  bot_last_error:
+                    type: string
+                    nullable: true
+
+  /api/bot/vnc-session:
+    post:
+      summary: Request on-demand VNC Guard session for human browser interaction
+      description: Starts websockify/noVNC on the server with a one-time token valid for 10 minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - account
+              properties:
+                account:
+                  type: string
+                  example: "r9spoort1"
+                target_url:
+                  type: string
+                  nullable: true
+                  example: "https://www.instagram.com/accounts/login/"
+      responses:
+        '200':
+          description: VNC Guard session launched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  vnc_url:
+                    type: string
+                    example: "http://185.120.40.10:6080/vnc.html?autoconnect=true&resize=scale&path=websockify/?token=a1b2c3d4e5f6"
+                  expires_at:
+                    type: string
+                    example: "2026-10-18T19:25:00.000Z"
+                  timeout_seconds:
+                    type: integer
+                    example: 600
+
+    delete:
+      summary: Terminate an active VNC Guard session
+      description: Closes the websockify port and revokes the one-time token immediately.
+      parameters:
+        - name: account
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "r9spoort1"
+      responses:
+        '200':
+          description: VNC Guard session stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "پورت مانیتور بسته شد."
+
+  /api/bot/session-harvested:
+    post:
+      summary: Report successful Instagram login and harvested session
+      description: Invoked by worker or orchestrator when authentic Instagram session is verified.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - account
+              properties:
+                account:
+                  type: string
+                  example: "r9spoort1"
+                verified:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Bot status updated to live
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: "live"
+
+  /api/bot/state:
+    post:
+      summary: Update bot state (pause, resume, retry)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - account
+                - action
+              properties:
+                account:
+                  type: string
+                  example: "r9spoort1"
+                action:
+                  type: string
+                  enum: [pause, resume, retry]
+                  example: "pause"
+      responses:
+        '200':
+          description: State updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: "paused"

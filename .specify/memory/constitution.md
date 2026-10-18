@@ -1,12 +1,10 @@
 <!--
 Sync Impact Report:
-- Version Change: 1.3.0 -> 1.4.0 (MINOR: Clarified per-page token binding, direct MCP-to-page architecture, minimalist page identity, and strict zero-leakage tenant abstraction)
+- Version Change: 1.4.0 -> 1.5.0 (MINOR: Added Principle XI for Bot Lifecycle, Self-Service Provisioning, and Dynamic VNC Guard; expanded Principle VII with Hermes Isolated Bot architecture)
 - Modified Principles:
-  - Principle VI: Multi-Tenant User Authentication, Account Ownership & Minimalist Page Entity (added minimalist page identity rule: page is fundamentally an ID; auxiliary data is lazily populated by agent)
-  - Principle VII: Strict 1-to-1 Page-to-Bot Binding & Isolated Hermes Profiles (reaffirmed dedicated Hermes profile per page)
-  - Principle VIII: Per-Page Scoped Tokens & Direct MCP Connection Architecture (tokens and MCP connections are strictly per-page, not per-user; Hermes profile MCP configured with page's unique key)
-  - Principle IX: Back-Office Exclusivity & Zero-Leakage Tenant Abstraction (standard users never see tokens/MCP configs/APIs; Superadmin back-office handles user creation, page assignment, and token/MCP visibility)
-- Added Principles / Sections: None
+  - Principle VII: Strict 1-to-1 Page-to-Bot Binding & Isolated Hermes Profiles (formalized dedicated Bot Screen virtual display, headed Chrome user-data-dir, API-first session harvesting, and process boundaries based on hermes-isolated-bot standard)
+- Added Principles / Sections:
+  - Principle XI: Bot Lifecycle, Dynamic Self-Service Provisioning & On-Demand VNC Guard (NON-NEGOTIABLE) (codified bot lifecycle states, admin creation vs tenant activation, ephemeral tokenized VNC Guard, persistent top-toolbar bot monitor, and UI security transparency)
 - Removed Sections: None
 - Deferred TODOs: None
 -->
@@ -55,7 +53,11 @@ No direct, unplanned code modifications are permitted for new features or struct
 ### VII. Strict 1-to-1 Page-to-Bot Binding & Isolated Hermes Profiles
 * Each connected Instagram account MUST be bound to exactly one dedicated Hermes bot profile (or worker instance).
 * Each Hermes bot profile MUST handle exactly one Instagram account.
-* Bot credentials, browser cookies, local sessions, and scraper states must remain isolated per profile on the server.
+* **Hermes Isolated Bot Architecture**:
+  1. **Isolated Data Directory**: Each profile has its own filesystem boundary (`~/.hermes/profiles/<profile_name>/`), maintaining its own memory (`hermes.db`), system prompt (`SOUL.md`), and profile configuration (`config.yaml`).
+  2. **Dedicated Virtual Display (Bot Screen)**: Each profile operates in a virtual desktop environment (e.g. TigerVNC/Xfce on dedicated display ports) running official Google Chrome with an isolated `--user-data-dir`. Headless browsers are strictly prohibited for Instagram sessions to prevent automated bot fingerprinting and premature session termination.
+  3. **API-First Session Harvesting**: Dedicated Chrome instances are utilized exclusively for initial human authentication, 2FA checkpoints, CAPTCHA bypass, and token extraction. Subsequent high-throughput automation (comment checking, polling, replying) MUST convert authenticated cookies/tokens into lightweight worker executions (`curl_cffi` / `httpx`) to preserve server memory and CPU.
+  4. **Process & Socket Isolation**: Profile locks (`SingletonLock`), Xauthority tokens, and Unix RFB sockets must remain strictly isolated per account.
 * The mapping between `account_username` and `bot_profile_id` is an immutable, system-level association maintained in the Control Plane database.
 
 ### VIII. Per-Page Scoped Tokens & Direct MCP Connection Architecture
@@ -82,6 +84,28 @@ No direct, unplanned code modifications are permitted for new features or struct
 * Visual identity and the inFlow official brand mark MUST remain consistent across all routes (Login, Dashboard, Back-Office) as a minimalist monochrome squircle with sleek typography. Rogue icons (such as Vercel triangle logos) or mismatched page headers MUST NOT be used.
 * All components in `src/components/ui/` MUST natively adhere to Principle V (RTL typography, Vazirmatn font, and bidirectional spacing).
 
+### XI. Bot Lifecycle, Dynamic Self-Service Provisioning & On-Demand VNC Guard (NON-NEGOTIABLE)
+* **Deterministic Bot Lifecycle**: Every connected account tracks its dedicated bot state machine through explicit states:
+  - `unprovisioned`: The page exists in Back-Office and is assigned to a user, but no isolated Hermes profile or virtual screen has been provisioned on the execution server.
+  - `provisioning`: Profile creation, virtual display setup, and browser initialization are underway on the server.
+  - `login_required`: Profile is ready; headed Chrome is navigated to Instagram login, awaiting user authentication or 2FA/CAPTCHA resolution.
+  - `live`: Instagram session is authenticated, session tokens are harvested, and polling/auto-reply cycles are active.
+  - `checkpoint_required`: Instagram triggered an identity check, phone/email verification, or CAPTCHA requiring human intervention.
+  - `error` / `paused`: Profile execution encountered a fatal error or was paused by user/admin.
+* **Tenant Self-Service Activation**:
+  - Superadmin provisions the page handle in Back-Office and assigns it to a user.
+  - When the tenant user selects an `unprovisioned` page, the dashboard displays a clear, confidence-inspiring Setup & Provisioning Wizard (hiding inactive post feeds).
+  - Clicking "راه‌اندازی ربات اختصاصی" dispatches an authenticated provisioning request to the default Hermes agent/server orchestrator to initialize the profile and open Instagram in its dedicated headed browser.
+* **On-Demand VNC Guard for Human Intervention**:
+  - Raw VNC ports (RFB/websockify) MUST NEVER remain exposed or unauthenticated on the server.
+  - When human interaction is required (initial login or checkpoint resolution), the server launches a temporary VNC Guard session (`vnc_guard.py`) secured by an ephemeral cryptographically random token and an automatic timeout killer (e.g., 10 minutes).
+  - The Control Plane displays the secure noVNC session directly within the UI, allowing the user to safely authenticate into their Instagram account without exposing server infrastructure.
+* **Persistent Top-Toolbar Bot Monitor**:
+  - The main dashboard navigation header MUST feature a persistent Bot Status button with dynamic state badges (e.g., `لایو`, `در انتظار لاگین`, `راه‌اندازی نشده`, `خطا`).
+  - Clicking the bot button opens a slide-over drawer or dialog displaying real-time bot telemetry, heartbeat, recent execution logs, and an on-demand button to open the live browser screen via VNC Guard.
+* **Security & Sandboxing Transparency**:
+  - The onboarding UI MUST explicitly educate tenants that their bot operates on a dedicated virtual computer with its own sandboxed browser, dedicated IP, and zero cross-tenant contamination.
+
 ## Governance
 
 This Constitution supersedes all ad-hoc coding practices in the repository. AI agents (Hermes, Claude, Cursor, Copilot) must verify compliance with this Constitution before proposing or merging code changes.
@@ -94,4 +118,4 @@ Amendments to this Constitution require:
    - **MINOR**: Addition of new principles or material expansions of existing guidance.
    - **PATCH**: Textual clarifications, wording improvements, and typo corrections.
 
-**Version**: 1.4.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.5.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18

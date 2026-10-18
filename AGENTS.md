@@ -71,6 +71,12 @@ Stores Instagram pages connected to the platform.
 * `status` (TEXT) — `active` | `paused`
 * `agent_interval_sec` (INTEGER) — default `120` (2 minutes)
 * `last_heartbeat_at` (TEXT) — Timestamp of the last polling query by the agent
+* `bot_profile_name` (TEXT) — Isolated Hermes profile name (e.g. `inflow_r9spoort1`)
+* `bot_status` (TEXT) — `unprovisioned` | `provisioning` | `login_required` | `live` | `checkpoint_required` | `paused` | `error`
+* `bot_vnc_active` (INTEGER) — `0` or `1`
+* `bot_vnc_token` (TEXT) — One-time 10-minute token for VNC Guard
+* `bot_vnc_expires_at` (TEXT) — Expiration timestamp
+* `bot_last_error` (TEXT) — Last error or checkpoint details
 * `updated_at`, `created_at` (TEXT)
 
 #### 2. `posts` (1-to-1 Post / Reel Mapping)
@@ -134,6 +140,16 @@ Enforces Constitution Principle VI: one Instagram account belongs to at most one
 * `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
 * `user_id` (INTEGER NOT NULL REFERENCES users(id))
 * `account_username` (TEXT UNIQUE NOT NULL REFERENCES accounts(username))
+* `created_at` (TEXT)
+
+#### 7. `bot_lifecycle_logs` (Audit & Timeline)
+Records historical state transitions, audit details, and errors for dedicated bots.
+* `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+* `account_username` (TEXT NOT NULL REFERENCES accounts(username))
+* `from_status` (TEXT)
+* `to_status` (TEXT NOT NULL)
+* `message` (TEXT NOT NULL)
+* `actor` (TEXT NOT NULL) — `'system'` | `'user'` | `'agent'`
 * `created_at` (TEXT)
 
 ---

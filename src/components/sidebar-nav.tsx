@@ -156,18 +156,22 @@ export function SidebarNav({
                   );
                 })}
               </div>
-              <div className="h-px bg-border my-1" />
-              <button
-                type="button"
-                onClick={() => {
-                  setAccountDropdownOpen(false);
-                  onOpenAddAccount();
-                }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-secondary transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{t("addAccount")}</span>
-              </button>
+              {currentUser?.role === "superadmin" && (
+                <>
+                  <div className="h-px bg-border my-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountDropdownOpen(false);
+                      onOpenAddAccount();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{t("addAccount")}</span>
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -193,21 +197,23 @@ export function SidebarNav({
           <span className="flex-1 truncate">{t("navCatalog")}</span>
         </button>
 
-        {/* Hermes Agent API Trigger */}
-        <button
-          type="button"
-          onClick={() => {
-            onOpenAgentApi();
-            if (onCloseMobileDrawer) onCloseMobileDrawer();
-          }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors cursor-pointer text-start"
-        >
-          <Terminal className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span className="flex-1 truncate">{t("navAgentApi")}</span>
-          <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-emerald-700 bg-emerald-50 border-emerald-200">
-            Active
-          </Badge>
-        </button>
+        {/* Hermes Agent API Trigger (Superadmin Only) */}
+        {currentUser?.role === "superadmin" && (
+          <button
+            type="button"
+            onClick={() => {
+              onOpenAgentApi();
+              if (onCloseMobileDrawer) onCloseMobileDrawer();
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors cursor-pointer text-start"
+          >
+            <Terminal className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span className="flex-1 truncate">{t("navAgentApi")}</span>
+            <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-emerald-700 bg-emerald-50 border-emerald-200">
+              Active
+            </Badge>
+          </button>
+        )}
 
         {/* Back-Office Link (Superadmin Only) */}
         {currentUser?.role === "superadmin" && (

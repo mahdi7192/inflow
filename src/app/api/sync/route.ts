@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, updateAccountProfileFromAgent } from "@/lib/db";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { authenticateMcpRequest } from "@/lib/mcp/auth-guard";
 import { AgentStreamManager } from "@/lib/mcp/sse-manager";
@@ -44,6 +44,17 @@ export async function POST(req: NextRequest) {
         },
         { status: 403 }
       );
+    }
+
+    // Lazy Profile Metadata Enrichment from Agent
+    if (body.profile && typeof body.profile === "object" && accountUsername) {
+      const p = body.profile as Record<string, string | undefined>;
+      updateAccountProfileFromAgent(accountUsername, {
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        bio: p.bio,
+        followers_text: p.followers_text,
+      });
     }
 
     // Case 1: If worker pushes an array of scraped posts during sync

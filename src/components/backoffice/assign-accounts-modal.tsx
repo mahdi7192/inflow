@@ -120,7 +120,7 @@ export function AssignAccountsModal({
           <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
             {availableAccounts.length === 0 ? (
               <div className="p-4 text-center text-xs text-muted-foreground bg-secondary/50 rounded-xl border border-border">
-                هیچ پیج اینستاگرامی ثبت نشده است.
+                {t("noAccountsAssignedTitle")}
               </div>
             ) : (
               availableAccounts.map((acc) => {
@@ -137,15 +137,25 @@ export function AssignAccountsModal({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-xs font-mono">
-                        @{acc.username.slice(0, 2)}
+                      <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-xs font-mono overflow-hidden">
+                        {acc.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={acc.avatar_url} alt={acc.username} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>@{acc.username.slice(0, 2)}</span>
+                        )}
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-foreground">
-                          @{acc.username}
+                        <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <span>@{acc.username}</span>
+                          {!acc.display_name && (
+                            <span className="px-1.5 py-0.2 text-[9px] font-sans rounded bg-amber-50 text-amber-700 border border-amber-200">
+                              {lang === "fa" ? "مینیمال" : "Minimal"}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
-                          {acc.display_name || acc.username}
+                          {acc.display_name || `@${acc.username}`}
                         </div>
                       </div>
                     </div>

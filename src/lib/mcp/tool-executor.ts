@@ -1,4 +1,4 @@
-import { getDb, AccountRow, PostRow } from "../db";
+import { getDb, AccountRow, PostRow, updateAccountProfileFromAgent } from "../db";
 import { McpAuthContext, canAccessAccount } from "./auth-guard";
 import { McpToolCallResult } from "./types";
 
@@ -239,6 +239,17 @@ export async function executeMcpTool(
           { error: `Forbidden: Unauthorized access to account '${accountUsername}'` },
           true
         );
+      }
+
+      // Lazy Profile Metadata Enrichment from Agent
+      if (args.profile && typeof args.profile === "object") {
+        const p = args.profile as Record<string, string | undefined>;
+        updateAccountProfileFromAgent(accountUsername, {
+          display_name: p.display_name,
+          avatar_url: p.avatar_url,
+          bio: p.bio,
+          followers_text: p.followers_text,
+        });
       }
 
       const upsertPost = db.prepare(`

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { getDb } from "./db";
 import {
   SESSION_COOKIE_NAME,
@@ -100,3 +101,36 @@ export function hasAccountAccess(user: SafeUser, accountUsername: string): boole
   }
   return user.assigned_accounts.includes(accountUsername);
 }
+
+/**
+ * Validates that the current request has an authenticated session with superadmin privileges.
+ * Returns { user, errorResponse: null } if authorized, or { user: null, errorResponse } if rejected.
+ */
+export async function requireSuperadmin(): Promise<
+  | { user: SafeUser; errorResponse: null }
+  | { user: null; errorResponse: NextResponse }
+> {
+  const user = await getSessionUser();
+  if (!user) {
+    return {
+      user: null,
+      errorResponse: NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (user.role !== "superadmin") {
+    return {
+      user: null,
+      errorResponse: NextResponse.json(
+        { success: false, error: "Forbidden: Superadmin role required" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { user, errorResponse: null };
+}
+

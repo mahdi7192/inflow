@@ -13,18 +13,23 @@ import {
   UserCheck,
   FolderOpen,
   Menu,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { I18N, Lang } from "@/lib/i18n";
-import type { AccountRow, PostRow } from "@/lib/db";
+import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 import { EmptyTenancyView } from "./empty-tenancy-view";
 import { PostDetailView } from "./post-detail-view";
 import { LogsModal } from "./modals/logs-modal";
 import { AgentApiModal } from "./modals/agent-api-modal";
 import { AddAccountModal } from "./modals/create-modals";
+import { BotSetupWizard } from "./bot/bot-setup-wizard";
+import { BotToolbarButton } from "./bot/bot-toolbar-button";
+import { BotMonitorDrawer } from "./bot/bot-monitor-drawer";
+import { VncViewerModal } from "./bot/vnc-viewer-modal";
 import { cn } from "@/lib/utils";
 
 export function InflowDashboard({
@@ -69,6 +74,33 @@ export function InflowDashboard({
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
   const [agentApiOpen, setAgentApiOpen] = useState(false);
   const [addAccountOpen, setAddAccountOpen] = useState(false);
+
+  // Dedicated Bot Lifecycle & VNC Guard States
+  const [botStatus, setBotStatus] = useState<BotStatus>("unprovisioned");
+  const [botDrawerOpen, setBotDrawerOpen] = useState(false);
+  const [vncModalOpen, setVncModalOpen] = useState(false);
+  const [vncUrl, setVncUrl] = useState("");
+  const [vncExpiresInSec, setVncExpiresInSec] = useState(600);
+
+  const handleOpenVnc = async () => {
+    try {
+      const res = await fetch("/api/bot/vnc-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account: currentAccount }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVncUrl(data.vnc_url);
+        setVncExpiresInSec(data.timeout_seconds || 600);
+        setVncModalOpen(true);
+      } else {
+        alert("خطا در باز کردن نشست مانیتور: " + data.error);
+      }
+    } catch (err: unknown) {
+      alert("خطا در ارتباط با سرور: " + (err as Error).message);
+    }
+  };
 
   const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
 
@@ -150,6 +182,11 @@ export function InflowDashboard({
       const data = await res.json();
       if (data.success) {
         setProfile(data.profile);
+        if (data.profile?.bot_status) {
+          setBotStatus(data.profile.bot_status);
+        } else {
+          setBotStatus("unprovisioned");
+        }
         setPosts(data.posts || []);
       }
     } catch (e) {
@@ -469,6 +506,15 @@ export function InflowDashboard({
               </span>
             )}
 
+            {currentAccount && (
+              <BotToolbarButton
+                account={currentAccount}
+                botStatus={botStatus}
+                lang={lang}
+                onClick={() => setBotDrawerOpen(true)}
+              />
+            )}
+
             <LanguageDropdown
               currentLang={lang}
               onLangChange={handleSetLang}
@@ -520,8 +566,43 @@ export function InflowDashboard({
             }}
             onOpenLogs={(sc) => setLogsShortcode(sc)}
           />
+        ) : !loading && (botStatus === "unprovisioned" || botStatus === "provisioning" || botStatus === "login_required") ? (
+          <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
+            <BotSetupWizard
+              account={currentAccount}
+              botStatus={botStatus}
+              lang={lang}
+              onOpenVnc={handleOpenVnc}
+              onStatusChange={(newStatus) => {
+                setBotStatus(newStatus);
+                if (newStatus === "live") {
+                  fetchPosts(currentAccount);
+                }
+              }}
+            />
+          </div>
         ) : (
           <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+            {botStatus === "checkpoint_required" && (
+              <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs">{I18N[lang]?.botCheckpointAlertTitle || "توجه: اینستاگرام نیازمند تایید هویت است"}</h4>
+                    <p className="text-[11px] text-red-800/90 mt-0.5">{I18N[lang]?.botCheckpointAlertDesc || "برای ادامه فعالیت ربات، لطفاً صفحه مرورگر را باز کرده و کد تایید ارسالی توسط اینستاگرام را وارد نمایید."}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenVnc}
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg shrink-0 cursor-pointer"
+                >
+                  {I18N[lang]?.botResolveCheckpointBtn || "حل چالش در مرورگر"}
+                </button>
+              </div>
+            )}
             {/* Account Meta & KPI Metrics Strip */}
             <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -927,6 +1008,34 @@ export function InflowDashboard({
         onCreated={(username) => {
           fetchAccounts();
           handleSelectAccount(username);
+        }}
+      />
+
+      {/* Bot Monitor Drawer */}
+      <BotMonitorDrawer
+        isOpen={botDrawerOpen}
+        onClose={() => setBotDrawerOpen(false)}
+        account={currentAccount}
+        botStatus={botStatus}
+        lang={lang}
+        onOpenVnc={handleOpenVnc}
+        onStatusChange={(status) => {
+          setBotStatus(status);
+          if (status === "live") fetchPosts(currentAccount);
+        }}
+      />
+
+      {/* VNC Viewer Modal */}
+      <VncViewerModal
+        isOpen={vncModalOpen}
+        onClose={() => setVncModalOpen(false)}
+        account={currentAccount}
+        vncUrl={vncUrl}
+        initialExpiresInSeconds={vncExpiresInSec}
+        lang={lang}
+        onSessionVerified={() => {
+          setBotStatus("live");
+          fetchPosts(currentAccount);
         }}
       />
     </div>

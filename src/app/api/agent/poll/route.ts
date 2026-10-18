@@ -13,10 +13,50 @@ export async function GET(req: NextRequest) {
     const account = searchParams.get("account");
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
 
+    // Validate Authorization Bearer token if provided
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7).trim();
+      const binding = db
+        .prepare("SELECT * FROM account_bot_bindings WHERE api_token = ?")
+        .get(token) as { id: number; account_username: string } | undefined;
+
+      if (!binding) {
+        return NextResponse.json(
+          { success: false, error: "Invalid or revoked API token" },
+          { status: 401 }
+        );
+      }
+
+      if (account && binding.account_username !== account) {
+        return NextResponse.json(
+          { success: false, error: "Token not authorized for this account" },
+          { status: 403 }
+        );
+      }
+
+      db.prepare("UPDATE account_bot_bindings SET last_heartbeat_at = ? WHERE id = ?").run(
+        now,
+        binding.id
+      );
+    }
+
     if (account) {
       db.prepare(
         "UPDATE accounts SET last_heartbeat_at = ? WHERE username = ?"
       ).run(now, account);
+
+      const acc = db.prepare("SELECT status, bot_status FROM accounts WHERE username = ?").get(account) as { status: string; bot_status: string } | undefined;
+      if (acc && (acc.status === "paused" || acc.bot_status === "paused")) {
+        return NextResponse.json({
+          success: true,
+          polled_at: now,
+          paused: true,
+          active_count: 0,
+          active_posts: [],
+          message: "اتوماسیون برای این اکانت متوقف است.",
+        });
+      }
     } else {
       db.prepare("UPDATE accounts SET last_heartbeat_at = ?").run(now);
     }
