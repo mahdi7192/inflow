@@ -1,10 +1,10 @@
 <!--
 Sync Impact Report:
-- Version Change: 1.4.0 -> 1.5.0 (MINOR: Added Principle XI for Bot Lifecycle, Self-Service Provisioning, and Dynamic VNC Guard; expanded Principle VII with Hermes Isolated Bot architecture)
+- Version Change: 1.5.0 -> 1.6.0 (MINOR: Added Principle XII for Canonical @username URL Scoping and Zero-Flash Account Routing)
 - Modified Principles:
-  - Principle VII: Strict 1-to-1 Page-to-Bot Binding & Isolated Hermes Profiles (formalized dedicated Bot Screen virtual display, headed Chrome user-data-dir, API-first session harvesting, and process boundaries based on hermes-isolated-bot standard)
+  - Principle VI: Expanded to emphasize URL-driven tenancy scoping alongside minimalist page entity.
 - Added Principles / Sections:
-  - Principle XI: Bot Lifecycle, Dynamic Self-Service Provisioning & On-Demand VNC Guard (NON-NEGOTIABLE) (codified bot lifecycle states, admin creation vs tenant activation, ephemeral tokenized VNC Guard, persistent top-toolbar bot monitor, and UI security transparency)
+  - Principle XII: Canonical @username URL Scoping & Zero-Flash Account Selection (NON-NEGOTIABLE) (codified root-level account selector at `/`, deterministic `/@username` workspace routes, and strict zero-flash route-driven hydration)
 - Removed Sections: None
 - Deferred TODOs: None
 -->
@@ -106,6 +106,20 @@ No direct, unplanned code modifications are permitted for new features or struct
 * **Security & Sandboxing Transparency**:
   - The onboarding UI MUST explicitly educate tenants that their bot operates on a dedicated virtual computer with its own sandboxed browser, dedicated IP, and zero cross-tenant contamination.
 
+### XII. Canonical @username URL Scoping & Zero-Flash Account Selection (NON-NEGOTIABLE)
+* **Root Path Account Selector (`/`)**:
+  - The default root route (`/`) serves strictly as the Account Selector / Page Selection Hub for authenticated users.
+  - When landing on `/`, tenants are presented with an uncluttered, responsive dashboard of all Instagram accounts assigned to them, displaying real-time bot status, profile avatar, follower count, and a direct action to open that page's workspace.
+  - If a user has no assigned accounts, the Empty Tenancy state is shown.
+* **Deterministic `@username` Workspace Routing (`/@[account]`)**:
+  - Every individual account workspace is deterministically scoped under its own path segment prefixed with `@`: `/@{username}` (e.g. `/@mahdiketabdar`, `/@r9spoort1`).
+  - Next.js dynamic routing MUST handle `@` notation via `/@{account}` or dynamic segments without path conflict.
+  - Deep linking, query parameters (such as `?post={shortcode}`), and modals function relative to that account's canonical URL.
+* **Zero-Flash Route Synchronization**:
+  - Workspace components MUST derive their initial and active account synchronously from the route parameter (`params`), completely eliminating hardcoded defaults, hydration flashes, or race conditions where another account is briefly loaded before switching.
+  - Hard page refreshes on `/@username` MUST immediately fetch and display only that account's data.
+  - Switching accounts via the sidebar selector MUST immediately transition the URL route to `/@{new_username}`.
+
 ## Governance
 
 This Constitution supersedes all ad-hoc coding practices in the repository. AI agents (Hermes, Claude, Cursor, Copilot) must verify compliance with this Constitution before proposing or merging code changes.
@@ -118,4 +132,4 @@ Amendments to this Constitution require:
    - **MINOR**: Addition of new principles or material expansions of existing guidance.
    - **PATCH**: Textual clarifications, wording improvements, and typo corrections.
 
-**Version**: 1.5.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.6.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18

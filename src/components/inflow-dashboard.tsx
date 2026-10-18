@@ -34,8 +34,10 @@ import { cn } from "@/lib/utils";
 
 export function InflowDashboard({
   currentUser,
+  initialAccount,
 }: {
   currentUser?: SafeUser | null;
+  initialAccount?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,7 +45,7 @@ export function InflowDashboard({
 
   const [lang, setLang] = useState<Lang>("fa");
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
-  const [currentAccount, setCurrentAccount] = useState<string>("r9spoort1");
+  const [currentAccount, setCurrentAccount] = useState<string>(initialAccount || "");
   const [profile, setProfile] = useState<AccountRow | null>(null);
   const [posts, setPosts] = useState<PostRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,10 +160,12 @@ export function InflowDashboard({
         setAccounts(data.accounts);
         if (data.accounts.length > 0) {
           const names = data.accounts.map((a: AccountRow) => a.username);
-          if (accountParam && names.includes(accountParam)) {
+          if (initialAccount && names.includes(initialAccount)) {
+            setCurrentAccount(initialAccount);
+          } else if (accountParam && names.includes(accountParam)) {
             setCurrentAccount(accountParam);
-          } else {
-            setCurrentAccount((prev) => (names.includes(prev) ? prev : data.accounts[0].username));
+          } else if (!currentAccount || !names.includes(currentAccount)) {
+            setCurrentAccount(data.accounts[0].username);
           }
         } else {
           setCurrentAccount("");
@@ -172,7 +176,7 @@ export function InflowDashboard({
     } catch (e) {
       console.error(e);
     }
-  }, [accountParam]);
+  }, [accountParam, initialAccount, currentAccount]);
 
   // Fetch posts for the current account
   const fetchPosts = useCallback(async (account: string) => {
@@ -248,12 +252,8 @@ export function InflowDashboard({
   };
 
   const handleSelectAccount = (username: string) => {
-    setCurrentAccount(username);
     setSelectedShortcode(null);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("post");
-    params.set("account", username);
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`/@${username}`);
   };
 
   // Sync action with real-time job polling

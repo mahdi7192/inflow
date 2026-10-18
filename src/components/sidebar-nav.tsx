@@ -86,9 +86,9 @@ export function SidebarNav({
     <aside className="w-64 h-full flex flex-col bg-card border-e border-border select-none">
       {/* Top Header: Brand Logo & Mobile Close */}
       <div className="h-14 px-4 flex items-center justify-between border-b border-border shrink-0">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-85 transition-opacity" title="مرکز انتخاب پیج‌ها">
           <BrandLogo size="default" />
-        </div>
+        </Link>
         {onCloseMobileDrawer && (
           <button
             type="button"
@@ -156,6 +156,15 @@ export function SidebarNav({
                   );
                 })}
               </div>
+              <div className="h-px bg-border my-1" />
+              <Link
+                href="/"
+                onClick={() => setAccountDropdownOpen(false)}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>همه پیج‌ها</span>
+              </Link>
               {currentUser?.role === "superadmin" && (
                 <>
                   <div className="h-px bg-border my-1" />
