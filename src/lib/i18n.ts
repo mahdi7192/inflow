@@ -1,0 +1,379 @@
+export type Lang = "fa" | "en" | "ar";
+
+export const I18N: Record<Lang, Record<string, string>> = {
+  fa: {
+    platformName: "inFlow",
+    navSection: "پاسخ خودکار",
+    sync: "سینک",
+    syncing: "در حال سینک...",
+    addPost: "ثبت پست / ریلز",
+    addAccount: "افزودن پیج جدید",
+    agentApiBtn: "API ایجنت هرمس",
+    liveSession: "ایجنت متصل (هر ۲ دقیقه)",
+    totalPosts: "کل پست‌ها",
+    activeAutomations: "اتوماسیون‌های فعال",
+    configuredRules: "قوانین تنظیم‌شده",
+    totalActions: "تعاملات ثبت‌شده",
+    searchPlaceholder: "جستجو در کپشن، کد پست، کلمات کلیدی یا قوانین...",
+    filterAll: "همه پست‌ها",
+    filterActive: "روشن",
+    filterInactive: "خاموش",
+    filterReels: "ریلزها",
+    filterPosts: "پست‌ها",
+    noPostsMatch: "هیچ پستی با فیلتر شما مطابقت ندارد.",
+    statusOn: "روشن",
+    statusOff: "خاموش",
+    noCaption: "کپشنی ثبت نشده است",
+    backToPosts: "بازگشت به لیست پست‌ها",
+    openInInstagram: "مشاهده در اینستاگرام",
+    originalCaptionTitle: "کپشن اصلی پست",
+    readOnlyBadge: "فقط خواندنی",
+    aiNoticeTitle: "کپشن قبلاً در حافظه هوش مصنوعی ایجنت قرار دارد:",
+    aiNoticeBody:
+      "هنگام تعامل کاربر، ایجنت متن کامل این کپشن را به صورت خودکار به عنوان کانتکس پایه می‌خواند. نیازی به تکرار موارد موجود در کپشن نیست؛ در فیلدهای زیر فقط اطلاعات مازاد یا شرایط خاص را بنویسید.",
+    masterSwitchTitle: "پاسخ خودکار این پست",
+    masterSwitchSubtitleOn:
+      "در حالت روشن، پاسخ‌های کامنت و پیام‌های دایرکت طبق قوانین زیر برای کامنت‌گذاران این پست در گردش‌های ۲ دقیقه‌ای ایجنت اجرا می‌شوند.",
+    masterSwitchSubtitleOff:
+      "در حالت خاموش، کامنت‌های این پست نادیده گرفته می‌شوند. برای فعال‌سازی ریپلای کامنت و دایرکت روشن کنید.",
+    offBannerText:
+      "پاسخ خودکار برای این پست خاموش است. برای مشاهده و تنظیم قوانین، کلید بالا را روشن کنید.",
+
+    // Trigger Section
+    triggerSectionTitle: "۱. شرط فعال‌سازی (Trigger)",
+    triggerSectionSubtitle:
+      "مشخص کنید این اتوماسیون با چه کامنت‌هایی فعال شود.",
+    triggerAllTitle: "همه کامنت‌ها",
+    triggerAllDesc: "هر کامنت جدیدی ثبت شود، اکشن‌ها فعال می‌شوند.",
+    triggerKeywordsTitle: "کلمات کلیدی مشخص",
+    triggerKeywordsDesc:
+      "فقط وقتی کامنت شامل یکی از کلمات کلیدی شما باشد فعال می‌شود.",
+    triggerAiTitle: "تشخیص هوشمند با کانتکس (AI)",
+    triggerAiDesc:
+      "فقط کامنت‌هایی که مفهوم یا کانتکس خاصی دارند توسط هوش مصنوعی انتخاب می‌شوند.",
+    triggerKeywordsLabel: "کلمات کلیدی محرک (با ویرگول جدا کنید)",
+    triggerKeywordsPlaceholder: "مثال: قیمت, لینک, سایز, تخفیف, چند",
+    triggerContextLabel: "کانتکس یا موضوع مورد نظر برای تشخیص",
+    triggerContextHint: "تحلیل با هوش مصنوعی",
+    triggerContextTip:
+      "موضوع یا شرایطی که هوش مصنوعی باید در کامنت کاربر شناسایی کند را بنویسید (مثلاً: سوال درباره قیمت یا سایز).",
+    triggerContextPlaceholder:
+      "مثال: فقط کاربرانی که درباره قیمت، سایزبندی، شرایط ارسال یا موجودی رنگ‌ها سوال می‌پرسند.",
+
+    // Comment Action Section
+    commentActionTitle: "۲. اکشن پاسخ به کامنت (Comment Reply)",
+    commentActionSubtitle:
+      "پاسخی که به صورت عمومی زیر کامنت کاربر در اینستاگرام ریپلای می‌شود.",
+    actionNone: "غیرفعال",
+    actionDirect: "متن مستقیم و ثابت",
+    actionAi: "پاسخ هوشمند با AI",
+    commentNoneNote: "هیچ پاسخی در بخش کامنت‌ها ریپلای نخواهد شد.",
+    commentDirectLabel: "متن پاسخ مستقیم کامنت",
+    commentDirectHint: "ارسال عین متن",
+    commentDirectTip:
+      "این متن دقیقاً به عنوان ریپلای زیر کامنت کاربر ثبت خواهد شد.",
+    commentDirectPlaceholder:
+      "مثال: پاسخ را در دایرکت برایتان ارسال کردیم 📩 یا لطفاً دایرکت خود را چک کنید",
+    commentAiLabel: "کانتکس و دستورالعمل هوش مصنوعی برای ریپلای کامنت",
+    commentAiHint: "تولید داینامیک",
+    commentAiTip:
+      "دستورالعمل تولید پاسخ عمومی برای هوش مصنوعی (لحن، اشاره به دایرکت، تشکر و ...).",
+    commentAiPlaceholder:
+      "مثال: با لحن محترمانه و کوتاه پاسخ بده، تشکر کن و بگو جزئیات در دایرکت ارسال شد.",
+
+    // DM Action Section
+    dmActionTitle: "۳. اکشن ارسال دایرکت (Direct Message)",
+    dmActionSubtitle:
+      "پیامی که به صندوق پیام‌های خصوصی (دایرکت) کاربر ارسال خواهد شد.",
+    dmNoneNote: "هیچ پیامی در دایرکت فرستاده نخواهد شد.",
+    dmDirectLabel: "متن مستقیم پیام دایرکت",
+    dmDirectHint: "ارسال عین پیام",
+    dmDirectTip: "این پیام ثابت به دایرکت کاربر فرستاده خواهد شد.",
+    dmDirectPlaceholder:
+      "مثال: سلام دوست عزیز! قیمت محصول ۲۵ هزار دینار است و سایزهای M تا XL موجود است. جهت سفارش لطفاً آدرس و شماره ارسال کنید 🤍",
+    dmAiLabel: "کانتکس و دستورالعمل هوش مصنوعی برای دایرکت",
+    dmAiHint: "تولید داینامیک",
+    dmAiTip:
+      "اطلاعات مازاد محصول (سایز، قیمت، موجودی، لینک، شرایط ارسال) و دستور تولید پیام دایرکت.",
+    dmAiPlaceholder:
+      "مثال: ست ورزشی مشکی ناموجود است. رنگ سفید در سایزهای M, L موجود است. قیمت ۲۵ هزار دینار. ارسال فوری. با لحن صمیمی پاسخ بده.",
+
+    // Follow Requirement
+    followReqTitle: "شرط فالو داشتن پیج برای دریافت دایرکت",
+    followReqSubtitle:
+      "اگر کاربر پیج را فالو نکرده باشد، ابتدا از او خواسته می‌شود پیج را فالو کند و سپس دایرکت ارسال می‌شود.",
+
+    // Tag Badges
+    tagTriggerAll: "همه کامنت‌ها",
+    tagTriggerKeywords: "کلمات کلیدی",
+    tagTriggerAi: "تریگر هوشمند",
+    tagCommentDirect: "ریپلای مستقیم",
+    tagCommentAi: "ریپلای AI",
+    tagDmDirect: "دایرکت مستقیم",
+    tagDmAi: "دایرکت AI",
+    tagRequireFollow: "شرط فالو",
+
+    saveConfig: "ذخیره تنظیمات اتوماسیون",
+    viewLogs: "لاگ و قفل‌ها",
+    modalLogsTitle: "گزارش لاگ‌ها و قفل کامنت‌های پست",
+    statTotalComments: "کل کامنت‌های بررسی‌شده",
+    statMatched: "تطابق تریگر",
+    statReplies: "ریپلای کامنت",
+    statDms: "دایرکت ارسالی",
+    logTriggerMatched: "تطابق تریگر",
+    logTriggerFiltered: "فیلتر شده (عدم تطابق)",
+    logCommentReply: "ریپلای ثبت‌شده روی کامنت",
+    logDmSent: "پیام دایرکت ارسالی",
+    logPendingFollow: "در انتظار فالو کردن پیج",
+    noLogsYet: "هنوز تعامل یا کامنتی برای این پست توسط ایجنت ثبت نشده است.",
+    logCommentLabel: "کامنت کاربر",
+    simulateCommentBtn: "تست و شبیه‌سازی کامنت جدید",
+    toastSaved: "تنظیمات با موفقیت ذخیره شد",
+    toastTurnedOff: "پاسخ خودکار پست خاموش شد",
+    toastTurnedOn: "پاسخ خودکار پست روشن شد",
+    toastSyncSuccess: "{count} پست پیج با موفقیت سینک شد",
+  },
+  en: {
+    platformName: "inFlow",
+    navSection: "Auto-Response",
+    sync: "Sync",
+    syncing: "Syncing...",
+    addPost: "Add Post / Reel",
+    addAccount: "Add Instagram Page",
+    agentApiBtn: "Hermes Agent API",
+    liveSession: "Agent Connected (2m Poll)",
+    totalPosts: "Total Posts",
+    activeAutomations: "Active Automations",
+    configuredRules: "Configured Rules",
+    totalActions: "Logged Actions",
+    searchPlaceholder: "Search caption, shortcode, keywords, or rules...",
+    filterAll: "All Posts",
+    filterActive: "ON",
+    filterInactive: "OFF",
+    filterReels: "Reels",
+    filterPosts: "Posts",
+    noPostsMatch: "No posts match your filter criteria.",
+    statusOn: "ON",
+    statusOff: "OFF",
+    noCaption: "No caption provided",
+    backToPosts: "Back to Posts",
+    openInInstagram: "Open in Instagram",
+    originalCaptionTitle: "Original Post Caption",
+    readOnlyBadge: "READ-ONLY",
+    aiNoticeTitle: "Caption is already in Agent AI memory:",
+    aiNoticeBody:
+      "Whenever a user interacts with this post, the agent reads this full caption as base context. Use the fields below only for extra instructions or rules.",
+    masterSwitchTitle: "Post Auto-Response",
+    masterSwitchSubtitleOn:
+      "When ON, automated comment replies and DMs are actively processed every 2 minutes by the agent.",
+    masterSwitchSubtitleOff:
+      "When OFF, incoming comments are ignored. Turn ON to configure reply and DM actions.",
+    offBannerText:
+      "Auto-response is OFF for this post. Turn ON the switch above to configure rules.",
+
+    triggerSectionTitle: "1. Activation Condition (Trigger)",
+    triggerSectionSubtitle:
+      "Specify which comments should trigger this automation.",
+    triggerAllTitle: "All Comments",
+    triggerAllDesc: "Any new comment will trigger the configured actions.",
+    triggerKeywordsTitle: "Specific Keywords",
+    triggerKeywordsDesc:
+      "Triggered only when the comment contains one of your keywords.",
+    triggerAiTitle: "Smart Filter by Context (AI)",
+    triggerAiDesc:
+      "Triggered only when the comment matches a specific topic/intent.",
+    triggerKeywordsLabel: "Trigger Keywords (comma-separated)",
+    triggerKeywordsPlaceholder: "e.g. price, link, size, discount",
+    triggerContextLabel: "Target Context / Topic for AI Detection",
+    triggerContextHint: "AI Analysis",
+    triggerContextTip:
+      "Describe what topic or intent the AI should detect in the user's comment.",
+    triggerContextPlaceholder:
+      "e.g. Only users asking about price, available sizes, delivery, or colors.",
+
+    commentActionTitle: "2. Comment Reply Action",
+    commentActionSubtitle:
+      "Public reply posted beneath the user's comment on Instagram.",
+    actionNone: "Disabled",
+    actionDirect: "Direct Static Text",
+    actionAi: "Smart AI Reply",
+    commentNoneNote: "No public comment reply will be published.",
+    commentDirectLabel: "Direct Comment Reply Text",
+    commentDirectHint: "Exact text",
+    commentDirectTip:
+      "This exact text will be published as a reply under the user's comment.",
+    commentDirectPlaceholder: "e.g. Sent you a DM with full details! 📩",
+    commentAiLabel: "AI Instructions for Comment Reply",
+    commentAiHint: "Dynamic output",
+    commentAiTip:
+      "Instructions for AI on how to formulate the public comment reply.",
+    commentAiPlaceholder:
+      "e.g. Reply politely and briefly, thank the user, and mention that details were sent to their DM.",
+
+    dmActionTitle: "3. Direct Message (DM) Action",
+    dmActionSubtitle:
+      "Message sent directly to the commenter's Instagram inbox.",
+    dmNoneNote: "No direct message will be sent.",
+    dmDirectLabel: "Direct DM Message Text",
+    dmDirectHint: "Exact text",
+    dmDirectTip:
+      "This exact message will be dispatched to the commenter's direct inbox.",
+    dmDirectPlaceholder:
+      "e.g. Hello! Product price is $25, available sizes M-XL. Here is the order link...",
+    dmAiLabel: "AI Context & Instructions for Direct Message",
+    dmAiHint: "Dynamic output",
+    dmAiTip:
+      "Extra product knowledge (sizes, pricing, links, stock) and instructions for formulating the DM.",
+    dmAiPlaceholder:
+      "e.g. Black tracksuit is out of stock. White available in M, L. Price: 25,000 IQD.",
+
+    followReqTitle: "Require Following to Receive DM",
+    followReqSubtitle:
+      "If user is not following the page, prompt them to follow first before sending DM.",
+
+    tagTriggerAll: "All Comments",
+    tagTriggerKeywords: "Keywords",
+    tagTriggerAi: "AI Trigger",
+    tagCommentDirect: "Direct Reply",
+    tagCommentAi: "AI Reply",
+    tagDmDirect: "Direct DM",
+    tagDmAi: "AI DM",
+    tagRequireFollow: "Follow Req",
+
+    saveConfig: "Save Automation Config",
+    viewLogs: "Logs & Locks",
+    modalLogsTitle: "Activity Logs & Comment Locks",
+    statTotalComments: "Total Comments",
+    statMatched: "Matched Trigger",
+    statReplies: "Comment Replies",
+    statDms: "DMs Delivered",
+    logTriggerMatched: "Matched Trigger",
+    logTriggerFiltered: "Filtered (No Match)",
+    logCommentReply: "Public Comment Reply",
+    logDmSent: "Direct Message (DM)",
+    logPendingFollow: "Waiting for Follow",
+    noLogsYet: "No comments or actions logged for this post yet.",
+    logCommentLabel: "User Comment",
+    simulateCommentBtn: "Simulate Incoming Comment",
+    toastSaved: "Configuration saved successfully",
+    toastTurnedOff: "Auto-response turned OFF",
+    toastTurnedOn: "Auto-response turned ON",
+    toastSyncSuccess: "Synced {count} posts successfully",
+  },
+  ar: {
+    platformName: "inFlow",
+    navSection: "الرد التلقائي",
+    sync: "مزامنة",
+    syncing: "جارٍ المزامنة...",
+    addPost: "إضافة منشور / ريلز",
+    addAccount: "إضافة بيج جديد",
+    agentApiBtn: "واجهة Agent API",
+    liveSession: "الوكيل متصل (كل دقيقتين)",
+    totalPosts: "إجمالي المنشورات",
+    activeAutomations: "الردود النشطة",
+    configuredRules: "القواعد المضبوطة",
+    totalActions: "التفاعلات المسجلة",
+    searchPlaceholder: "ابحث في الشرح، الكود، أو القواعد...",
+    filterAll: "كل المنشورات",
+    filterActive: "مفعّل",
+    filterInactive: "معطّل",
+    filterReels: "ريلز",
+    filterPosts: "منشورات",
+    noPostsMatch: "لا توجد منشورات مطابقة لمعايير التصفية.",
+    statusOn: "مفعّل",
+    statusOff: "معطّل",
+    noCaption: "لا يوجد شرح للمنشور",
+    backToPosts: "العودة للمنشورات",
+    openInInstagram: "فتح في إنستغرام",
+    originalCaptionTitle: "الشرح الأصلي للمنشور",
+    readOnlyBadge: "للقراءة فقط",
+    aiNoticeTitle: "الشرح معروف مسبقاً للذكاء الاصطناعي:",
+    aiNoticeBody:
+      "عند تفاعل أي زبون، يقرأ الذكاء الاصطناعي هذا الشرح كاملاً كسياق أساسي تلقائياً. استخدم الحقول أدناه فقط للبيانات الإضافية أو الشروط الخاصة.",
+    masterSwitchTitle: "الرد التلقائي لهذا المنشور",
+    masterSwitchSubtitleOn:
+      "عند التفعيل، يتم إرسال الردود التلقائية ورسائل الخاص للزبائن المعلقين وفق القواعد المحددة أدناه.",
+    masterSwitchSubtitleOff:
+      "عند التعطيل، يتم تجاهل التعليقات الواردة. قم بالتفعيل لتشغيل الردود التلقائية ورسائل الخاص.",
+    offBannerText:
+      "الرد التلقائي معطّل لهذا المنشور. قم بتشغيل المفتاح أعلاه لعرض الحقول وتعيين القواعد.",
+
+    triggerSectionTitle: "١. شرط التفعيل (Trigger)",
+    triggerSectionSubtitle: "حدد متى يتم تشغيل هذا الرد التلقائي وفق التعليقات.",
+    triggerAllTitle: "جميع التعليقات",
+    triggerAllDesc: "يتم تفعيل الإجراءات فوراً مع أي تعليق جديد.",
+    triggerKeywordsTitle: "كلمات مفتاحية محددة",
+    triggerKeywordsDesc: "يعمل فقط عند وجود إحدى الكلمات المفتاحية في التعليق.",
+    triggerAiTitle: "فرز ذكي حسب السياق (AI)",
+    triggerAiDesc: "يتم التفعيل فقط للتعليقات المطابقة لسياق محدد يحلله الذكاء الاصطناعي.",
+    triggerKeywordsLabel: "الكلمات المفتاحية (مفصولة بفاصلة)",
+    triggerKeywordsPlaceholder: "مثال: السعر, القياس, توصيل, رابط",
+    triggerContextLabel: "سياق أو موضوع الفرز المطلوب",
+    triggerContextHint: "تحليل الذكاء الاصطناعي",
+    triggerContextTip:
+      "اكتب الموضوع أو الشروط التي يجب أن يكتشفها الذكاء الاصطناعي في تعليق الزبون.",
+    triggerContextPlaceholder:
+      "مثال: فقط الزبائن الذين يسألون عن السعر، المقاسات، الشحن، أو توفر الألوان.",
+
+    commentActionTitle: "٢. إجراء الرد على التعليق",
+    commentActionSubtitle: "الرد الذي يُنشر علناً أسفل تعليق الزبون على إنستغرام.",
+    actionNone: "معطّل",
+    actionDirect: "نص مباشر ومحدد",
+    actionAi: "رد ذكي بالذكاء الاصطناعي",
+    commentNoneNote: "لن يتم نشر أي رد على التعليق في العام.",
+    commentDirectLabel: "نص رد التعليق المباشر",
+    commentDirectHint: "نص محدد",
+    commentDirectTip: "سيتم نشر هذا النص كما هو كـ رد أسفل تعليق الزبون.",
+    commentDirectPlaceholder: "مثال: تم إرسال التفاصيل على الخاص 📩",
+    commentAiLabel: "تعليمات الذكاء الاصطناعي للرد على التعليق",
+    commentAiHint: "توليد تلقائي",
+    commentAiTip: "كيفية صياغة الرد العام (الأسلوب، الإشارة للخاص، الشكر...).",
+    commentAiPlaceholder:
+      "مثال: رد بأسلوب لطيف ومختصر وأخبر الزبون بأن التفاصيل أُرسلت في الخاص.",
+
+    dmActionTitle: "٣. إجراء رسالة الخاص (Direct Message)",
+    dmActionSubtitle: "الرسالة التي تُرسل مباشرة إلى صندوق رسائل الزبون.",
+    dmNoneNote: "لن يتم إرسال أي رسالة في الخاص.",
+    dmDirectLabel: "نص رسالة الخاص المباشرة",
+    dmDirectHint: "نص محدد",
+    dmDirectTip: "سيتم إرسال هذه الرسالة الثابتة إلى خاص الزبون.",
+    dmDirectPlaceholder: "مثال: أهلاً بك! سعر المنتج ٢٥ ألف دينار والقياسات المتوفرة M-XL...",
+    dmAiLabel: "سياق وتعليمات الذكاء الاصطناعي لرسالة الخاص",
+    dmAiHint: "توليد تلقائي",
+    dmAiTip: "معلومات إضافية عن المنتج (القياس، السعر، التوفر، التوصيل).",
+    dmAiPlaceholder: "مثال: التراك الأسود نفد. الأبيض متوفر M و L. السعر ٢٥ ألف دينار.",
+
+    followReqTitle: "شرط متابعة البيج لاستلام رسالة الخاص",
+    followReqSubtitle:
+      "إذا لم يكن الزبون متابعاً للبيج، يُطلب منه المتابعة أولاً قبل إرسال التفاصيل.",
+
+    tagTriggerAll: "كل التعليقات",
+    tagTriggerKeywords: "كلمات مفتاحية",
+    tagTriggerAi: "فرز ذكي",
+    tagCommentDirect: "تعليق مباشر",
+    tagCommentAi: "تعليق AI",
+    tagDmDirect: "خاص مباشر",
+    tagDmAi: "خاص AI",
+    tagRequireFollow: "شرط المتابعة",
+
+    saveConfig: "حفظ الإعدادات",
+    viewLogs: "السجل والأقفال",
+    modalLogsTitle: "سجل نشاط وتفاعل المنشور",
+    statTotalComments: "إجمالي التعليقات",
+    statMatched: "تطابق الشرط",
+    statReplies: "ردود التعليقات",
+    statDms: "رسائل الخاص",
+    logTriggerMatched: "مطابق للشرط",
+    logTriggerFiltered: "تم الفرز (غير مطابق)",
+    logCommentReply: "الرد العام على التعليق",
+    logDmSent: "رسالة الخاص المرسلة",
+    logPendingFollow: "بانتظار متابعة البيج",
+    noLogsYet: "لا توجد تعليقات أو تفاعلات مسجلة لهذا المنشور بعد.",
+    logCommentLabel: "تعليق الزبون",
+    simulateCommentBtn: "محاكاة تعليق جديد",
+    toastSaved: "تم حفظ الإعدادات بنجاح",
+    toastTurnedOff: "تم تعطيل الرد التلقائي",
+    toastTurnedOn: "تم تفعيل الرد التلقائي",
+    toastSyncSuccess: "تمت مزامنة {count} منشور بنجاح",
+  },
+};

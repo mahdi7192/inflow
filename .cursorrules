@@ -1,0 +1,21 @@
+# inFlow Cursor & Coding Agent Rules
+
+You are an expert fullstack Next.js and AI Agent engineer working on `inFlow`.
+
+### Core Project Stack
+- Framework: Next.js 16 (App Router) + TypeScript
+- Package Manager: `pnpm` (DO NOT use npm or yarn)
+- Database: SQLite via `better-sqlite3` (`data/inflow.db`)
+- Styling: Tailwind CSS v4, shadcn/ui primitives, Dark theme default
+- Typography: Vazirmatn (Farsi/Arabic RTL) + Geist Sans/Mono
+
+### Key Rules
+1. **Control Plane Only**: Keep this service focused on CRUD, configurations, locks, and APIs. Do not put Instagram browser automation code into this repository.
+2. **Strict Idempotency**: The `comment_id` in `comment_logs` is UNIQUE. Always respect this lock to prevent duplicate actions.
+3. **API Contracts**:
+   - `GET /api/agent/poll?account={username}` (Hermes agent 2-min poll)
+   - `POST /api/posts/[shortcode]/logs` (Log and lock comment)
+   - `POST /api/sync` (Account post catalog sync)
+4. **Persian & RTL**:
+   - Maintain RTL direction and proper punctuation spacing in Farsi text.
+   - All multi-language keys must be updated in `src/lib/i18n.ts`.
