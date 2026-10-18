@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import seedData from "./seed-data.json";
+import { hashPassword } from "./auth";
 
 export interface AccountRow {
   id: number;
@@ -63,7 +63,6 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "inflow.db");
 
 declare global {
-  // eslint-disable-next-line no-var
   var __inflowDb: Database.Database | undefined;
 }
 
@@ -86,6 +85,7 @@ export function getDb(): Database.Database {
 
   initSchema(db);
   seedIfEmpty(db);
+  seedUsersIfEmpty(db);
 
   global.__inflowDb = db;
   return db;
@@ -154,7 +154,56 @@ function initSchema(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_logs_shortcode ON comment_logs(shortcode);
     CREATE INDEX IF NOT EXISTS idx_logs_account ON comment_logs(account_username);
+
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      display_name TEXT NOT NULL DEFAULT '',
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'tenant' CHECK(role IN ('superadmin', 'tenant')),
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'suspended')),
+      last_login_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_token TEXT UNIQUE NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(session_token);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON user_sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS user_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      account_username TEXT UNIQUE NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_accounts_user_id ON user_accounts(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_user_accounts_account ON user_accounts(account_username);
   `);
+}
+
+function getSeedData() {
+  const seedPath = path.join(process.cwd(), "src", "lib", "seed-data.json");
+  if (fs.existsSync(seedPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(seedPath, "utf-8"));
+    } catch {
+      return { accounts: [], posts: [], logs: [] };
+    }
+  }
+  return { accounts: [], posts: [], logs: [] };
 }
 
 function seedIfEmpty(db: Database.Database) {
@@ -164,6 +213,7 @@ function seedIfEmpty(db: Database.Database) {
 
   if (countRow.count > 0) return;
 
+  const seedData = getSeedData();
   const now = nowTimestamp();
 
   const insertAccount = db.prepare(`
@@ -267,3 +317,34 @@ function seedIfEmpty(db: Database.Database) {
 
   seedTx();
 }
+
+function seedUsersIfEmpty(db: Database.Database) {
+  const userCountRow = db
+    .prepare("SELECT COUNT(*) as count FROM users")
+    .get() as { count: number };
+
+  if (userCountRow.count > 0) return;
+
+  const initialPassword = process.env.INITIAL_ADMIN_PASSWORD || "Admin@inFlow2026!";
+  const passwordHash = hashPassword(initialPassword);
+  const now = nowTimestamp();
+
+  const insertUser = db.prepare(`
+    INSERT INTO users (username, display_name, password_hash, role, status, created_at, updated_at)
+    VALUES (?, ?, ?, 'superadmin', 'active', ?, ?)
+  `);
+  const info = insertUser.run("admin", "Platform Administrator", passwordHash, now, now);
+  const adminId = Number(info.lastInsertRowid);
+
+  // Assign existing seed accounts to admin so demo works out of the box
+  const accounts = db.prepare("SELECT username FROM accounts").all() as { username: string }[];
+  const assignStmt = db.prepare(`
+    INSERT OR IGNORE INTO user_accounts (user_id, account_username, created_at)
+    VALUES (?, ?, ?)
+  `);
+
+  for (const acc of accounts) {
+    assignStmt.run(adminId, acc.username, now);
+  }
+}
+

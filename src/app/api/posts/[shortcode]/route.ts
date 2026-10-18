@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, PostRow } from "@/lib/db";
+import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ shortcode: string }> }
 ) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const { shortcode } = await context.params;
     const db = getDb();
     const post = db
@@ -16,6 +25,16 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "پست یافت نشد" },
         { status: 404 }
+      );
+    }
+
+    if (!hasAccountAccess(user, post.account_username)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: You do not have access to this Instagram account",
+        },
+        { status: 403 }
       );
     }
 
@@ -33,6 +52,14 @@ async function handleUpdate(
   context: { params: Promise<{ shortcode: string }> }
 ) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const { shortcode } = await context.params;
     const body = await req.json();
     const db = getDb();
@@ -45,6 +72,16 @@ async function handleUpdate(
       return NextResponse.json(
         { success: false, error: "پست یافت نشد" },
         { status: 404 }
+      );
+    }
+
+    if (!hasAccountAccess(user, existing.account_username)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: You do not have access to this Instagram account",
+        },
+        { status: 403 }
       );
     }
 
@@ -140,8 +177,30 @@ export async function DELETE(
   context: { params: Promise<{ shortcode: string }> }
 ) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const { shortcode } = await context.params;
     const db = getDb();
+    const existing = db
+      .prepare("SELECT account_username FROM posts WHERE shortcode = ?")
+      .get(shortcode) as { account_username: string } | undefined;
+
+    if (existing && !hasAccountAccess(user, existing.account_username)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: You do not have access to this Instagram account",
+        },
+        { status: 403 }
+      );
+    }
+
     db.prepare("DELETE FROM posts WHERE shortcode = ?").run(shortcode);
     return NextResponse.json({ success: true });
   } catch (error) {

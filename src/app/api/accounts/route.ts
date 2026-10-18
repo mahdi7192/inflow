@@ -1,22 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, AccountRow } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth-guard";
 
 export async function GET() {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const db = getDb();
-    const accounts = db
-      .prepare(`
-        SELECT 
-          a.*,
-          (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username) as total_posts,
-          (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username AND p.auto_reply = 1) as active_posts,
-          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username) as total_logs,
-          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.dm_status = 'sent') as total_dms,
-          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.comment_reply_status = 'sent') as total_replies
-        FROM accounts a
-        ORDER BY a.id ASC
-      `)
-      .all();
+    let accounts: unknown[] = [];
+
+    if (user.role === "superadmin") {
+      accounts = db
+        .prepare(`
+          SELECT 
+            a.*,
+            (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username) as total_posts,
+            (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username AND p.auto_reply = 1) as active_posts,
+            (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username) as total_logs,
+            (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.dm_status = 'sent') as total_dms,
+            (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.comment_reply_status = 'sent') as total_replies
+          FROM accounts a
+          ORDER BY a.id ASC
+        `)
+        .all();
+    } else {
+      // Filter strictly by user's assigned accounts
+      accounts = db
+        .prepare(`
+          SELECT 
+            a.*,
+            (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username) as total_posts,
+            (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username AND p.auto_reply = 1) as active_posts,
+            (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username) as total_logs,
+            (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.dm_status = 'sent') as total_dms,
+            (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.comment_reply_status = 'sent') as total_replies
+          FROM accounts a
+          JOIN user_accounts ua ON a.username = ua.account_username
+          WHERE ua.user_id = ?
+          ORDER BY a.id ASC
+        `)
+        .all(user.id);
+    }
 
     return NextResponse.json({ success: true, accounts });
   } catch (error) {
@@ -29,6 +59,22 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Only superadmin can create/provision new Instagram accounts
+    if (user.role !== "superadmin") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Superadmin role required" },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const rawUsername = String(body.username || "")
       .trim()

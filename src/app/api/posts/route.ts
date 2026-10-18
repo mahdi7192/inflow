@@ -1,19 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, AccountRow, PostRow } from "@/lib/db";
+import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const db = getDb();
     const { searchParams } = new URL(req.url);
     const accountParam = searchParams.get("account");
     const activeOnly = searchParams.get("active_only") === "1";
 
     let targetAccount = accountParam;
+
     if (!targetAccount) {
-      const firstAcc = db
-        .prepare("SELECT username FROM accounts ORDER BY id ASC LIMIT 1")
-        .get() as { username: string } | undefined;
-      targetAccount = firstAcc?.username || "r9spoort1";
+      if (user.assigned_accounts.length > 0) {
+        targetAccount = user.assigned_accounts[0];
+      } else {
+        return NextResponse.json({
+          success: true,
+          profile: null,
+          posts: [],
+        });
+      }
+    }
+
+    // Tenancy barrier: verify user has access to targetAccount
+    if (!hasAccountAccess(user, targetAccount)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: You do not have access to this Instagram account",
+        },
+        { status: 403 }
+      );
     }
 
     const profile =
@@ -58,13 +84,40 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const db = getDb();
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
 
-    const accountUsername = String(body.account_username || "r9spoort1")
+    const accountUsername = String(body.account_username || "")
       .trim()
       .replace(/^@/, "");
+
+    if (!accountUsername) {
+      return NextResponse.json(
+        { success: false, error: "نام کاربری پیج الزامی است" },
+        { status: 400 }
+      );
+    }
+
+    // Tenancy barrier
+    if (!hasAccountAccess(user, accountUsername)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: You do not have access to this Instagram account",
+        },
+        { status: 403 }
+      );
+    }
+
     let shortcode = String(body.shortcode || "").trim();
 
     // Extract shortcode if full Instagram URL was provided

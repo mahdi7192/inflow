@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import {
   RotateCw,
   Search,
   Plus,
   Terminal,
   Clock,
-  Layers,
   LayoutGrid,
   List,
   Sparkles,
@@ -16,20 +16,26 @@ import {
   UserCheck,
   ChevronDown,
   Check,
-  Film,
-  Camera,
   FolderOpen,
+  ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { Button, Badge, Switch } from "@/components/ui/primitives";
 import { I18N, Lang } from "@/lib/i18n";
 import type { AccountRow, PostRow } from "@/lib/db";
+import type { SafeUser } from "@/lib/auth";
+import { EmptyTenancyView } from "./empty-tenancy-view";
 import { PostDetailView } from "./post-detail-view";
 import { LogsModal } from "./modals/logs-modal";
 import { AgentApiModal } from "./modals/agent-api-modal";
 import { AddPostModal, AddAccountModal } from "./modals/create-modals";
 
-export function InflowDashboard() {
+export function InflowDashboard({
+  currentUser,
+}: {
+  currentUser?: SafeUser | null;
+}) {
   const [lang, setLang] = useState<Lang>("fa");
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [currentAccount, setCurrentAccount] = useState<string>("r9spoort1");
@@ -66,13 +72,29 @@ export function InflowDashboard() {
     }
   };
 
-  // Fetch accounts list
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
+  // Fetch accounts list (tenancy scoped by server)
   const fetchAccounts = useCallback(async () => {
     try {
       const res = await fetch("/api/accounts");
       const data = await res.json();
       if (data.success && Array.isArray(data.accounts)) {
         setAccounts(data.accounts);
+        if (data.accounts.length > 0) {
+          const names = data.accounts.map((a: AccountRow) => a.username);
+          setCurrentAccount((prev) => (names.includes(prev) ? prev : data.accounts[0].username));
+        } else {
+          setCurrentAccount("");
+          setProfile(null);
+          setPosts([]);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -356,11 +378,52 @@ export function InflowDashboard() {
               {syncing ? t("syncing") : t("sync")}
             </span>
           </Button>
+
+          {/* Back-Office Portal Link for Superadmins */}
+          {currentUser?.role === "superadmin" && (
+            <Link
+              href="/backoffice"
+              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-medium transition-all"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>{t("backofficeBtn")}</span>
+            </Link>
+          )}
+
+          {/* User Profile & Logout Button */}
+          {currentUser && (
+            <div className="flex items-center gap-2 pl-2 border-l border-white/10 rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-2">
+              <div className="hidden sm:flex flex-col text-end rtl:text-start leading-tight">
+                <span className="text-xs font-medium text-white truncate max-w-[120px]">
+                  {currentUser.display_name || currentUser.username}
+                </span>
+                <span className="text-[10px] text-zinc-400">
+                  {currentUser.role === "superadmin"
+                    ? t("roleSuperadmin")
+                    : t("roleTenant")}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title={t("logoutButton")}
+                className="p-1.5 rounded-lg border border-white/10 bg-zinc-950 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       {/* Main Content Area */}
-      {selectedShortcode && activeDetailPost ? (
+      {!loading && accounts.length === 0 && currentUser?.role === "tenant" ? (
+        <EmptyTenancyView
+          user={currentUser}
+          lang={lang}
+          onLogout={handleLogout}
+        />
+      ) : selectedShortcode && activeDetailPost ? (
         <PostDetailView
           post={activeDetailPost}
           lang={lang}

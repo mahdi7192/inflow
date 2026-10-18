@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
+    }
+
     const db = getDb();
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
 
@@ -13,7 +22,20 @@ export async function POST(req: NextRequest) {
       body = {};
     }
 
-    const accountUsername = String(body.account || body.account_username || "").trim();
+    const accountUsername = String(
+      body.account || body.account_username || ""
+    ).trim();
+
+    // Verify tenancy if target account specified
+    if (accountUsername && !hasAccountAccess(user, accountUsername)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: You do not have access to this Instagram account",
+        },
+        { status: 403 }
+      );
+    }
 
     // If agent pushes an array of scraped posts during sync:
     if (Array.isArray(body.posts) && body.posts.length > 0) {
@@ -42,7 +64,9 @@ export async function POST(req: NextRequest) {
             media_id: String(item.media_id || ""),
             url: String(item.url || `https://www.instagram.com/${acc}/p/${sc}/`),
             post_type: item.post_type === "post" ? "post" : "reel",
-            thumbnail_url: String(item.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"),
+            thumbnail_url: String(
+              item.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"
+            ),
             caption: String(item.caption || ""),
             synced_at: now,
             updated_at: now,
@@ -59,15 +83,16 @@ export async function POST(req: NextRequest) {
         "UPDATE accounts SET last_heartbeat_at = ?, updated_at = ? WHERE username = ?"
       ).run(now, now, accountUsername);
     } else {
-      db.prepare("UPDATE accounts SET last_heartbeat_at = ?, updated_at = ?").run(
-        now,
-        now
-      );
+      db.prepare(
+        "UPDATE accounts SET last_heartbeat_at = ?, updated_at = ?"
+      ).run(now, now);
     }
 
     const countRow = accountUsername
       ? (db
-          .prepare("SELECT COUNT(*) as total FROM posts WHERE account_username = ?")
+          .prepare(
+            "SELECT COUNT(*) as total FROM posts WHERE account_username = ?"
+          )
           .get(accountUsername) as { total: number })
       : (db.prepare("SELECT COUNT(*) as total FROM posts").get() as {
           total: number;
