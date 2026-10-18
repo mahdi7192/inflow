@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { I18N, Lang } from "@/lib/i18n";
-import { Lock, User, LogIn, AlertCircle, Globe, ShieldCheck } from "lucide-react";
+import { Lock, User, LogIn, AlertCircle, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { LanguageDropdown } from "@/components/ui/language-dropdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -88,24 +88,11 @@ export default function LoginPage() {
         <BrandLogo size="default" />
 
         {/* Language Switcher */}
-        <div className="flex items-center gap-1 bg-secondary border border-border rounded-lg p-0.5 text-xs">
-          <Globe className="w-3.5 h-3.5 text-muted-foreground mx-1" />
-          {(["fa", "ar", "en"] as const).map((l) => (
-            <Button
-              key={l}
-              type="button"
-              variant={lang === l ? "default" : "ghost"}
-              size="sm"
-              onClick={() => handleLangChange(l)}
-              className={cn(
-                "h-6 px-2.5 text-xs font-medium",
-                lang === l ? "bg-white text-foreground shadow-xs hover:bg-white" : "text-muted-foreground"
-              )}
-            >
-              {l === "fa" ? "فارسی" : l === "ar" ? "العربية" : "EN"}
-            </Button>
-          ))}
-        </div>
+        <LanguageDropdown
+          currentLang={lang}
+          onLangChange={handleLangChange}
+          size="sm"
+        />
       </header>
 
       {/* Main Login Card */}

@@ -1,12 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
-  RotateCw,
   Search,
-  Plus,
-  Terminal,
   Clock,
   LayoutGrid,
   List,
@@ -14,15 +11,12 @@ import {
   MessageSquare,
   Send,
   UserCheck,
-  ChevronDown,
-  Check,
   FolderOpen,
-  ShieldCheck,
-  LogOut,
+  Menu,
 } from "lucide-react";
-import { InstagramIcon } from "@/components/ui/icons";
-import { BrandLogo } from "@/components/ui/brand-logo";
-import { Button, Badge, Switch, Input } from "@/components/ui/primitives";
+import { Badge, Switch, Input } from "@/components/ui/primitives";
+import { LanguageDropdown } from "@/components/ui/language-dropdown";
+import { SidebarNav } from "@/components/sidebar-nav";
 import { I18N, Lang } from "@/lib/i18n";
 import type { AccountRow, PostRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
@@ -30,13 +24,18 @@ import { EmptyTenancyView } from "./empty-tenancy-view";
 import { PostDetailView } from "./post-detail-view";
 import { LogsModal } from "./modals/logs-modal";
 import { AgentApiModal } from "./modals/agent-api-modal";
-import { AddPostModal, AddAccountModal } from "./modals/create-modals";
+import { AddAccountModal } from "./modals/create-modals";
+import { cn } from "@/lib/utils";
 
 export function InflowDashboard({
   currentUser,
 }: {
   currentUser?: SafeUser | null;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
   const [lang, setLang] = useState<Lang>("fa");
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [currentAccount, setCurrentAccount] = useState<string>("r9spoort1");
@@ -44,6 +43,17 @@ export function InflowDashboard({
   const [posts, setPosts] = useState<PostRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [agentStatus, setAgentStatus] = useState<{
+    is_online: boolean;
+    sse_connected: boolean;
+  } | null>(null);
+  const [syncAlert, setSyncAlert] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+
+  // Responsive mobile drawer state
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Filters & Views
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,11 +68,32 @@ export function InflowDashboard({
   // Modals
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
   const [agentApiOpen, setAgentApiOpen] = useState(false);
-  const [addPostOpen, setAddPostOpen] = useState(false);
   const [addAccountOpen, setAddAccountOpen] = useState(false);
-  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
   const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
+
+  const checkAgentStatus = useCallback(async (accountName: string) => {
+    if (!accountName) return;
+    try {
+      const res = await fetch(`/api/sync/status?account=${encodeURIComponent(accountName)}`);
+      const data = await res.json();
+      if (data.success && data.agent_status) {
+        setAgentStatus(data.agent_status);
+      }
+    } catch {
+      // Ignore network errors
+    }
+  }, []);
+
+  // Sync saved language from localStorage if present
+  useEffect(() => {
+    const saved = localStorage.getItem("inflow_lang") as Lang | null;
+    if (saved && (saved === "fa" || saved === "en" || saved === "ar")) {
+      setLang(saved);
+      document.documentElement.dir = saved === "en" ? "ltr" : "rtl";
+      document.documentElement.lang = saved;
+    }
+  }, []);
 
   // Change HTML dir and lang
   const handleSetLang = (l: Lang) => {
@@ -70,6 +101,7 @@ export function InflowDashboard({
     if (typeof document !== "undefined") {
       document.documentElement.dir = l === "en" ? "ltr" : "rtl";
       document.documentElement.lang = l;
+      localStorage.setItem("inflow_lang", l);
     }
   };
 
@@ -81,6 +113,10 @@ export function InflowDashboard({
     }
   };
 
+  // URL deep-link search parameter synchronization
+  const postParam = searchParams.get("post");
+  const accountParam = searchParams.get("account");
+
   // Fetch accounts list (tenancy scoped by server)
   const fetchAccounts = useCallback(async () => {
     try {
@@ -90,7 +126,11 @@ export function InflowDashboard({
         setAccounts(data.accounts);
         if (data.accounts.length > 0) {
           const names = data.accounts.map((a: AccountRow) => a.username);
-          setCurrentAccount((prev) => (names.includes(prev) ? prev : data.accounts[0].username));
+          if (accountParam && names.includes(accountParam)) {
+            setCurrentAccount(accountParam);
+          } else {
+            setCurrentAccount((prev) => (names.includes(prev) ? prev : data.accounts[0].username));
+          }
         } else {
           setCurrentAccount("");
           setProfile(null);
@@ -100,7 +140,7 @@ export function InflowDashboard({
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [accountParam]);
 
   // Fetch posts for the current account
   const fetchPosts = useCallback(async (account: string) => {
@@ -126,10 +166,60 @@ export function InflowDashboard({
   useEffect(() => {
     if (currentAccount) {
       fetchPosts(currentAccount);
+      checkAgentStatus(currentAccount);
     }
-  }, [currentAccount, fetchPosts]);
+  }, [currentAccount, fetchPosts, checkAgentStatus]);
 
-  // Sync action
+  // Synchronize URL query parameter with selectedShortcode state (Deep Linking)
+  useEffect(() => {
+    if (postParam) {
+      if (posts.length > 0) {
+        const found = posts.some((p) => p.shortcode === postParam);
+        if (found) {
+          setSelectedShortcode(postParam);
+        } else if (!loading) {
+          // Graceful fallback for non-existent shortcode in URL (T011)
+          console.warn(`Post with shortcode "${postParam}" not found. Falling back to catalog.`);
+          setSelectedShortcode(null);
+          const params = new URLSearchParams(searchParams.toString());
+          params.delete("post");
+          const q = params.toString();
+          router.replace(q ? `${pathname}?${q}` : pathname);
+        }
+      } else if (loading) {
+        setSelectedShortcode(postParam);
+      }
+    } else {
+      setSelectedShortcode(null);
+    }
+  }, [postParam, posts, loading, pathname, router, searchParams]);
+
+  // Navigation handlers that update browser history and URL
+  const handleSelectPost = (shortcode: string) => {
+    setSelectedShortcode(shortcode);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("post", shortcode);
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handleBackToList = () => {
+    setSelectedShortcode(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("post");
+    const q = params.toString();
+    router.push(q ? `${pathname}?${q}` : pathname);
+  };
+
+  const handleSelectAccount = (username: string) => {
+    setCurrentAccount(username);
+    setSelectedShortcode(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("post");
+    params.set("account", username);
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  // Sync action with real-time job polling
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -140,6 +230,31 @@ export function InflowDashboard({
       });
       const data = await res.json();
       if (data.success) {
+        if (data.job_id) {
+          // Poll job status until completed or max attempts (15 seconds)
+          let attempts = 0;
+          const maxAttempts = 10;
+          while (attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            attempts++;
+            try {
+              const statusRes = await fetch(
+                `/api/sync/status?account=${currentAccount}&job_id=${data.job_id}`
+              );
+              const statusData = await statusRes.json();
+              if (
+                statusData.job &&
+                (statusData.job.status === "completed" ||
+                  statusData.job.status === "failed" ||
+                  statusData.job.status === "timed_out")
+              ) {
+                break;
+              }
+            } catch {
+              // Ignore polling network glitches
+            }
+          }
+        }
         await fetchPosts(currentAccount);
         await fetchAccounts();
       }
@@ -217,359 +332,508 @@ export function InflowDashboard({
   ).length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50/50 text-foreground">
-      {/* inFlow Header Navigation */}
-      <header className="sticky top-0 z-40 h-14 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Official Brand Logo */}
-          <BrandLogo size="sm" />
-
-          <span className="text-zinc-300">/</span>
-
-          {/* Account Switcher Dropdown */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-lg hover:bg-secondary text-xs font-medium text-foreground border border-transparent hover:border-border transition-all cursor-pointer"
-            >
-              <InstagramIcon className="w-3.5 h-3.5 text-zinc-700" />
-              <span>@{currentAccount}</span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </button>
-
-            {accountDropdownOpen && (
-              <div
-                className="absolute top-full start-0 mt-1.5 w-60 rounded-xl border border-border bg-popover shadow-lg p-1.5 z-50 animate-in fade-in zoom-in-95"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  پیج‌های متصل به پلتفرم
-                </div>
-                {accounts.map((acc) => (
-                  <button
-                    key={acc.username}
-                    type="button"
-                    onClick={() => {
-                      setCurrentAccount(acc.username);
-                      setSelectedShortcode(null);
-                      setAccountDropdownOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer ${
-                      acc.username === currentAccount
-                        ? "bg-secondary text-foreground font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="truncate">@{acc.username}</span>
-                    </div>
-                    {acc.username === currentAccount && (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    )}
-                  </button>
-                ))}
-                <div className="h-px bg-border my-1" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccountDropdownOpen(false);
-                    setAddAccountOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{t("addAccount")}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Header Actions */}
-        <div className="flex items-center gap-2">
-          {/* Language Selector */}
-          <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary text-xs">
-            {(["fa", "en", "ar"] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => handleSetLang(l)}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-                  lang === l
-                    ? "bg-white text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="hidden sm:flex items-center p-0.5 rounded-lg border border-border bg-secondary">
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === "cards"
-                  ? "bg-white text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Card View"
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === "grid"
-                  ? "bg-white text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              title="Grid View"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Agent API Modal Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAgentApiOpen(true)}
-            className="hidden md:inline-flex"
-          >
-            <Terminal className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{t("agentApiBtn")}</span>
-          </Button>
-
-          {/* Add Post Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setAddPostOpen(true)}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t("addPost")}</span>
-          </Button>
-
-          {/* Sync Button */}
-          <Button
-            variant="default"
-            size="sm"
-            disabled={syncing}
-            onClick={handleSync}
-          >
-            <RotateCw
-              className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`}
-            />
-            <span className="hidden sm:inline">
-              {syncing ? t("syncing") : t("sync")}
-            </span>
-          </Button>
-
-          {/* Back-Office Portal Link for Superadmins */}
-          {currentUser?.role === "superadmin" && (
-            <Link
-              href="/backoffice"
-              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-all shadow-2xs"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-foreground" />
-              <span>{t("backofficeBtn")}</span>
-            </Link>
-          )}
-
-          {/* User Profile & Logout Button */}
-          {currentUser && (
-            <div className="flex items-center gap-2 pl-2 border-l border-border rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-2">
-              <div className="hidden sm:flex flex-col text-end rtl:text-start leading-tight">
-                <span className="text-xs font-medium text-foreground truncate max-w-[120px]">
-                  {currentUser.display_name || currentUser.username}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {currentUser.role === "superadmin"
-                    ? t("roleSuperadmin")
-                    : t("roleTenant")}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                title={t("logoutButton")}
-                className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10 transition-colors cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      {!loading && accounts.length === 0 && currentUser?.role === "tenant" ? (
-        <EmptyTenancyView
-          user={currentUser}
-          lang={lang}
+    <div className="min-h-screen flex flex-col lg:flex-row bg-zinc-50/50 text-foreground">
+      {/* Desktop Sidebar Navigation (Persistent on >= lg viewports) */}
+      <div className="hidden lg:block shrink-0 sticky top-0 h-screen z-30">
+        <SidebarNav
+          currentAccount={currentAccount}
+          accounts={accounts}
+          onSelectAccount={handleSelectAccount}
+          onOpenAddAccount={() => setAddAccountOpen(true)}
+          onOpenAgentApi={() => setAgentApiOpen(true)}
+          onSync={handleSync}
+          syncing={syncing}
+          currentUser={currentUser}
           onLogout={handleLogout}
-        />
-      ) : selectedShortcode && activeDetailPost ? (
-        <PostDetailView
-          post={activeDetailPost}
           lang={lang}
-          onBack={() => setSelectedShortcode(null)}
-          onSaveSuccess={(updated) => {
-            setPosts((prev) =>
-              prev.map((p) => (p.shortcode === updated.shortcode ? updated : p))
-            );
-          }}
-          onOpenLogs={(sc) => setLogsShortcode(sc)}
+          isCatalogActive={!selectedShortcode}
+          onNavigateCatalog={handleBackToList}
         />
-      ) : (
-        <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-          {/* Account Meta & KPI Metrics Strip */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={profile?.avatar_url || "/media/avatar.jpg"}
-                  alt="Avatar"
-                  className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
-                  }}
-                />
-                <div>
-                  <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span>{profile?.display_name || currentAccount}</span>
-                    <span className="text-xs font-mono text-muted-foreground font-normal">
-                      @{currentAccount}
-                    </span>
-                  </h1>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                    {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
-                  </p>
-                </div>
-              </div>
+      </div>
 
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{t("liveSession")}</span>
-                </span>
-              </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                <div className="text-xs text-muted-foreground">{t("totalPosts")}</div>
-                <div className="text-xl font-bold font-mono text-foreground mt-1">
-                  {posts.length}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                <div className="text-xs text-muted-foreground">{t("activeAutomations")}</div>
-                <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
-                  {activeCount}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                <div className="text-xs text-muted-foreground">{t("configuredRules")}</div>
-                <div className="text-xl font-bold font-mono text-amber-700 mt-1">
-                  {configuredCount}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                <div className="text-xs text-muted-foreground">{t("totalActions")}</div>
-                <div className="text-xl font-bold font-mono text-sky-700 mt-1">
-                  {posts.reduce(
-                    (acc, p) =>
-                      acc +
-                      Number(
-                        (p as unknown as { logs_count: number }).logs_count || 0
-                      ),
-                    0
-                  )}
-                </div>
-              </div>
-            </div>
+      {/* Mobile Drawer (Accessible on < lg viewports) */}
+      {mobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          {/* Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+          {/* Slide-over Drawer */}
+          <div className="relative w-64 max-w-[80vw] h-full z-10 animate-in slide-in-from-start duration-200">
+            <SidebarNav
+              currentAccount={currentAccount}
+              accounts={accounts}
+              onSelectAccount={(username) => {
+                handleSelectAccount(username);
+                setMobileDrawerOpen(false);
+              }}
+              onOpenAddAccount={() => {
+                setMobileDrawerOpen(false);
+                setAddAccountOpen(true);
+              }}
+              onOpenAgentApi={() => {
+                setMobileDrawerOpen(false);
+                setAgentApiOpen(true);
+              }}
+              onSync={handleSync}
+              syncing={syncing}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              lang={lang}
+              onCloseMobileDrawer={() => setMobileDrawerOpen(false)}
+              isCatalogActive={!selectedShortcode}
+              onNavigateCatalog={() => {
+                handleBackToList();
+                setMobileDrawerOpen(false);
+              }}
+            />
           </div>
+        </div>
+      )}
 
-          {/* Search & Tabs Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t("searchPlaceholder")}
-                icon={<Search className="w-4 h-4 text-muted-foreground" />}
-                className="h-9 text-xs"
-              />
-            </div>
+      {/* Main Content Viewport */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        {/* Decluttered Top Header Navigation */}
+        <header className="sticky top-0 z-20 h-14 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Mobile Hamburger Drawer Toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileDrawerOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              aria-label={t("openMenu")}
+            >
+              <Menu className="w-4 h-4" />
+            </button>
 
-            {/* Filter Tabs */}
-            <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary overflow-x-auto text-xs">
-              {(
-                [
-                  { id: "all", label: t("filterAll") },
-                  { id: "active", label: t("filterActive") },
-                  { id: "inactive", label: t("filterInactive") },
-                  { id: "reels", label: t("filterReels") },
-                  { id: "posts", label: t("filterPosts") },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setFilterTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-md whitespace-nowrap text-xs font-medium transition-colors cursor-pointer ${
-                    filterTab === tab.id
-                      ? "bg-white text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Catalog Posts List / Grid */}
-          {loading ? (
-            <div className="py-20 text-center text-zinc-500 text-xs">
-              در حال بارگذاری پست‌های پیج...
-            </div>
-          ) : filteredPosts.length === 0 ? (
-            <div className="py-20 text-center space-y-3 rounded-xl border border-border bg-card">
-              <FolderOpen className="w-10 h-10 mx-auto text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">{t("noPostsMatch")}</p>
-            </div>
-          ) : viewMode === "cards" ? (
-            /* Cards / Rows View */
-            <div className="space-y-3">
-              {filteredPosts.map((p) => {
-                const isActive = p.auto_reply === 1;
-                const isReel = p.post_type === "reel";
-
-                return (
-                  <div
-                    key={p.shortcode}
-                    onClick={() => setSelectedShortcode(p.shortcode)}
-                    className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all p-3.5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between cursor-pointer"
+            {/* Contextual Title / Breadcrumb */}
+            <div className="flex items-center gap-2 text-xs">
+              {selectedShortcode ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBackToList}
+                    className="text-muted-foreground hover:text-foreground font-medium flex items-center gap-1 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                      {/* Media Thumb */}
-                      <div className="relative w-14 h-18 sm:w-16 sm:h-20 shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
+                    <span>{t("navCatalog")}</span>
+                  </button>
+                  <span className="text-zinc-300">/</span>
+                  <span className="font-mono font-semibold text-foreground">
+                    {selectedShortcode}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-foreground">
+                    {t("dashboardTitle") || "داشبورد اتوماسیون"}
+                  </span>
+                  <span className="text-zinc-300">/</span>
+                  <span className="font-mono text-muted-foreground">
+                    @{currentAccount || "---"}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Clean Right Actions: Agent Status Badge & Unified Language Dropdown */}
+          <div className="flex items-center gap-2">
+            {agentStatus && (
+              <span
+                className={cn(
+                  "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
+                  agentStatus.is_online
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-zinc-100 text-zinc-600 border-zinc-200"
+                )}
+                title={
+                  agentStatus.sse_connected
+                    ? "اتصال استریم فعال با ایجنت"
+                    : agentStatus.is_online
+                    ? "هارت‌بیت فعال"
+                    : "ایجنت در دسترس نیست"
+                }
+              >
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full shrink-0",
+                    agentStatus.is_online
+                      ? "bg-emerald-500 animate-pulse"
+                      : "bg-zinc-400"
+                  )}
+                />
+                <span>
+                  {agentStatus.is_online ? "ایجنت متصل (MCP)" : "ایجنت آفلاین"}
+                </span>
+              </span>
+            )}
+
+            <LanguageDropdown
+              currentLang={lang}
+              onLangChange={handleSetLang}
+              size="sm"
+            />
+          </div>
+        </header>
+
+        {/* Sync Status Alert Banner */}
+        {syncAlert && (
+          <div
+            className={cn(
+              "mx-4 mt-3 px-3 py-2 rounded-lg text-xs flex items-center justify-between border",
+              syncAlert.type === "success" &&
+                "bg-emerald-50 text-emerald-800 border-emerald-200",
+              syncAlert.type === "error" &&
+                "bg-red-50 text-red-800 border-red-200",
+              syncAlert.type === "info" &&
+                "bg-zinc-100 text-zinc-800 border-zinc-200"
+            )}
+          >
+            <span>{syncAlert.message}</span>
+            <button
+              type="button"
+              onClick={() => setSyncAlert(null)}
+              className="text-muted-foreground hover:text-foreground text-xs cursor-pointer px-1.5 py-0.5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Main Content Body */}
+        {!loading && accounts.length === 0 && currentUser?.role === "tenant" ? (
+          <EmptyTenancyView
+            user={currentUser}
+            lang={lang}
+            onLogout={handleLogout}
+          />
+        ) : selectedShortcode && activeDetailPost ? (
+          <PostDetailView
+            post={activeDetailPost}
+            lang={lang}
+            onBack={handleBackToList}
+            onSaveSuccess={(updated) => {
+              setPosts((prev) =>
+                prev.map((p) => (p.shortcode === updated.shortcode ? updated : p))
+              );
+            }}
+            onOpenLogs={(sc) => setLogsShortcode(sc)}
+          />
+        ) : (
+          <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+            {/* Account Meta & KPI Metrics Strip */}
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={profile?.avatar_url || "/media/avatar.jpg"}
+                    alt="Avatar"
+                    className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+                    }}
+                  />
+                  <div>
+                    <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <span>{profile?.display_name || currentAccount}</span>
+                      <span className="text-xs font-mono text-muted-foreground font-normal">
+                        @{currentAccount}
+                      </span>
+                    </h1>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                      {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{t("liveSession")}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("totalPosts")}</div>
+                  <div className="text-xl font-bold font-mono text-foreground mt-1">
+                    {posts.length}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("activeAutomations")}</div>
+                  <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
+                    {activeCount}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("configuredRules")}</div>
+                  <div className="text-xl font-bold font-mono text-amber-700 mt-1">
+                    {configuredCount}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("totalActions")}</div>
+                  <div className="text-xl font-bold font-mono text-sky-700 mt-1">
+                    {posts.reduce(
+                      (acc, p) =>
+                        acc +
+                        Number(
+                          (p as unknown as { logs_count: number }).logs_count || 0
+                        ),
+                      0
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Search, Filter Tabs & Relocated View Mode Toolbar */}
+            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  icon={<Search className="w-4 h-4 text-muted-foreground" />}
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              {/* Controls: Filter Tabs + View Mode Toggle */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                {/* Filter Tabs */}
+                <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary text-xs">
+                  {(
+                    [
+                      { id: "all", label: t("filterAll") },
+                      { id: "active", label: t("filterActive") },
+                      { id: "inactive", label: t("filterInactive") },
+                      { id: "reels", label: t("filterReels") },
+                      { id: "posts", label: t("filterPosts") },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setFilterTab(tab.id)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-md whitespace-nowrap text-xs font-medium transition-colors cursor-pointer",
+                        filterTab === tab.id
+                          ? "bg-white text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* View Mode Switcher (Relocated to Content Toolbar) */}
+                <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("cards")}
+                    className={cn(
+                      "p-1.5 rounded-md transition-colors cursor-pointer",
+                      viewMode === "cards"
+                        ? "bg-white text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    title={t("viewCards") || "Card View"}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                    className={cn(
+                      "p-1.5 rounded-md transition-colors cursor-pointer",
+                      viewMode === "grid"
+                        ? "bg-white text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    title={t("viewGrid") || "Grid View"}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Catalog Posts List / Grid */}
+            {loading ? (
+              <div className="py-20 text-center text-zinc-500 text-xs">
+                در حال بارگذاری پست‌های پیج...
+              </div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="py-20 text-center space-y-3 rounded-xl border border-border bg-card">
+                <FolderOpen className="w-10 h-10 mx-auto text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">{t("noPostsMatch")}</p>
+              </div>
+            ) : viewMode === "cards" ? (
+              /* Cards / Rows View */
+              <div className="space-y-3">
+                {filteredPosts.map((p) => {
+                  const isActive = p.auto_reply === 1;
+                  const isReel = p.post_type === "reel";
+
+                  return (
+                    <div
+                      key={p.shortcode}
+                      onClick={() => handleSelectPost(p.shortcode)}
+                      className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all p-3.5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                        {/* Media Thumb */}
+                        <div className="relative w-14 h-18 sm:w-16 sm:h-20 shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
+                            alt="Thumbnail"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
+                            }}
+                          />
+                          <span className="absolute bottom-1 end-1 px-1 py-0.2 rounded text-[9px] font-mono bg-black/60 text-white">
+                            {isReel ? "REEL" : "POST"}
+                          </span>
+                        </div>
+
+                        {/* Content Snippet */}
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-foreground">
+                              {p.shortcode}
+                            </span>
+                            <span
+                              className={cn(
+                                "inline-block w-2 h-2 rounded-full",
+                                isActive ? "bg-emerald-500" : "bg-zinc-300"
+                              )}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                            {p.caption || t("noCaption")}
+                          </p>
+
+                          {/* Active Rule Tags */}
+                          {isActive && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {p.trigger_type === "keywords" && (
+                                <Badge variant="amber">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  <span>{t("tagTriggerKeywords")}</span>
+                                </Badge>
+                              )}
+                              {p.trigger_type === "ai_context" && (
+                                <Badge variant="fuchsia">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  <span>{t("tagTriggerAi")}</span>
+                                </Badge>
+                              )}
+                              {p.trigger_type === "all" && (
+                                <Badge variant="amber">
+                                  <span>{t("tagTriggerAll")}</span>
+                                </Badge>
+                              )}
+                              {p.comment_action_type === "direct" && (
+                                <Badge variant="sky">
+                                  <MessageSquare className="w-2.5 h-2.5" />
+                                  <span>{t("tagCommentDirect")}</span>
+                                </Badge>
+                              )}
+                              {p.comment_action_type === "ai" && (
+                                <Badge variant="sky">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  <span>{t("tagCommentAi")}</span>
+                                </Badge>
+                              )}
+                              {p.dm_action_type === "direct" && (
+                                <Badge variant="purple">
+                                  <Send className="w-2.5 h-2.5" />
+                                  <span>{t("tagDmDirect")}</span>
+                                </Badge>
+                              )}
+                              {p.dm_action_type === "ai" && (
+                                <Badge variant="purple">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  <span>{t("tagDmAi")}</span>
+                                </Badge>
+                              )}
+                              {p.dm_require_follow === 1 && (
+                                <Badge variant="emerald">
+                                  <UserCheck className="w-2.5 h-2.5" />
+                                  <span>{t("tagRequireFollow")}</span>
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions on Card */}
+                      <div
+                        className="flex items-center gap-3 shrink-0 self-end sm:self-center pt-2 sm:pt-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLogsShortcode(p.shortcode);
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary px-2.5 py-1.5 rounded-lg border border-border transition-colors cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-sky-600" />
+                          <span>{t("viewLogs")}</span>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold",
+                              isActive ? "text-emerald-700" : "text-muted-foreground"
+                            )}
+                          >
+                            {isActive ? t("statusOn") : t("statusOff")}
+                          </span>
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={() => handleQuickToggle(p.shortcode, {} as unknown as React.MouseEvent)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Grid View */
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {filteredPosts.map((p) => {
+                  const isActive = p.auto_reply === 1;
+                  const isReel = p.post_type === "reel";
+
+                  return (
+                    <div
+                      key={p.shortcode}
+                      onClick={() => handleSelectPost(p.shortcode)}
+                      className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all overflow-hidden cursor-pointer flex flex-col"
+                    >
+                      <div className="relative aspect-4/5 bg-secondary">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
@@ -580,196 +844,64 @@ export function InflowDashboard({
                               "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
                           }}
                         />
-                        <span className="absolute bottom-1 end-1 px-1 py-0.2 rounded text-[9px] font-mono bg-black/60 text-white">
+                        <span className="absolute top-2 start-2 px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/60 text-white">
                           {isReel ? "REEL" : "POST"}
                         </span>
-                      </div>
-
-                      {/* Content Snippet */}
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-semibold text-foreground">
-                            {p.shortcode}
-                          </span>
-                          <span
-                            className={`inline-block w-2 h-2 rounded-full ${
-                              isActive ? "bg-emerald-500" : "bg-zinc-300"
-                            }`}
+                        <div className="absolute top-2 end-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickToggle(p.shortcode, e)}
+                            className={cn(
+                              "w-2.5 h-2.5 rounded-full cursor-pointer transition-transform",
+                              isActive
+                                ? "bg-emerald-500 ring-4 ring-emerald-500/20"
+                                : "bg-zinc-300"
+                            )}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                          {p.caption || t("noCaption")}
-                        </p>
-
-                        {/* Active Rule Tags */}
-                        {isActive && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {p.trigger_type === "keywords" && (
-                              <Badge variant="amber">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span>{t("tagTriggerKeywords")}</span>
-                              </Badge>
-                            )}
-                            {p.trigger_type === "ai_context" && (
-                              <Badge variant="fuchsia">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span>{t("tagTriggerAi")}</span>
-                              </Badge>
-                            )}
-                            {p.trigger_type === "all" && (
-                              <Badge variant="amber">
-                                <span>{t("tagTriggerAll")}</span>
-                              </Badge>
-                            )}
-                            {p.comment_action_type === "direct" && (
-                              <Badge variant="sky">
-                                <MessageSquare className="w-2.5 h-2.5" />
-                                <span>{t("tagCommentDirect")}</span>
-                              </Badge>
-                            )}
-                            {p.comment_action_type === "ai" && (
-                              <Badge variant="sky">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span>{t("tagCommentAi")}</span>
-                              </Badge>
-                            )}
-                            {p.dm_action_type === "direct" && (
-                              <Badge variant="purple">
-                                <Send className="w-2.5 h-2.5" />
-                                <span>{t("tagDmDirect")}</span>
-                              </Badge>
-                            )}
-                            {p.dm_action_type === "ai" && (
-                              <Badge variant="purple">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span>{t("tagDmAi")}</span>
-                              </Badge>
-                            )}
-                            {p.dm_require_follow === 1 && (
-                              <Badge variant="emerald">
-                                <UserCheck className="w-2.5 h-2.5" />
-                                <span>{t("tagRequireFollow")}</span>
-                              </Badge>
-                            )}
+                      </div>
+                      <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs font-semibold text-foreground">
+                              {p.shortcode}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    </div>
+                          <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1">
+                            {p.caption || t("noCaption")}
+                          </p>
+                        </div>
 
-                    {/* Actions on Card */}
-                    <div
-                      className="flex items-center gap-3 shrink-0 self-end sm:self-center pt-2 sm:pt-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLogsShortcode(p.shortcode);
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary px-2.5 py-1.5 rounded-lg border border-border transition-colors cursor-pointer"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-sky-600" />
-                        <span>{t("viewLogs")}</span>
-                      </button>
-
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-xs font-semibold ${
-                            isActive ? "text-emerald-700" : "text-muted-foreground"
-                          }`}
-                        >
-                          {isActive ? t("statusOn") : t("statusOff")}
-                        </span>
-                        <Switch
-                          checked={isActive}
-                          onCheckedChange={() => handleQuickToggle(p.shortcode, {} as unknown as React.MouseEvent)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            /* Grid View */
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {filteredPosts.map((p) => {
-                const isActive = p.auto_reply === 1;
-                const isReel = p.post_type === "reel";
-
-                return (
-                  <div
-                    key={p.shortcode}
-                    onClick={() => setSelectedShortcode(p.shortcode)}
-                    className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all overflow-hidden cursor-pointer flex flex-col"
-                  >
-                    <div className="relative aspect-4/5 bg-secondary">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
-                        alt="Thumbnail"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
-                        }}
-                      />
-                      <span className="absolute top-2 start-2 px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/60 text-white">
-                        {isReel ? "REEL" : "POST"}
-                      </span>
-                      <div className="absolute top-2 end-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => handleQuickToggle(p.shortcode, e)}
-                          className={`w-2.5 h-2.5 rounded-full cursor-pointer transition-transform ${
-                            isActive
-                              ? "bg-emerald-500 ring-4 ring-emerald-500/20"
-                              : "bg-zinc-300"
-                          }`}
-                        />
-                      </div>
-                    </div>
-                    <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-semibold text-foreground">
-                            {p.shortcode}
+                        <div className="flex items-center justify-between pt-2 border-t border-border text-[10px]">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLogsShortcode(p.shortcode);
+                            }}
+                            className="text-sky-600 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Clock className="w-3 h-3" />
+                            <span>{t("viewLogs")}</span>
+                          </button>
+                          <span
+                            className={cn(
+                              "font-semibold",
+                              isActive ? "text-emerald-700" : "text-muted-foreground"
+                            )}
+                          >
+                            {isActive ? t("statusOn") : t("statusOff")}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1">
-                          {p.caption || t("noCaption")}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-border text-[10px]">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLogsShortcode(p.shortcode);
-                          }}
-                          className="text-sky-600 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Clock className="w-3 h-3" />
-                          <span>{t("viewLogs")}</span>
-                        </button>
-                        <span
-                          className={`font-semibold ${
-                            isActive ? "text-emerald-700" : "text-muted-foreground"
-                          }`}
-                        >
-                          {isActive ? t("statusOn") : t("statusOff")}
-                        </span>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Logs Modal */}
       {logsShortcode && activeLogPost && (
@@ -788,21 +920,13 @@ export function InflowDashboard({
         onClose={() => setAgentApiOpen(false)}
       />
 
-      {/* Add Post Modal */}
-      <AddPostModal
-        open={addPostOpen}
-        accountUsername={currentAccount}
-        onClose={() => setAddPostOpen(false)}
-        onCreated={() => fetchPosts(currentAccount)}
-      />
-
       {/* Add Account Modal */}
       <AddAccountModal
         open={addAccountOpen}
         onClose={() => setAddAccountOpen(false)}
         onCreated={(username) => {
           fetchAccounts();
-          setCurrentAccount(username);
+          handleSelectAccount(username);
         }}
       />
     </div>

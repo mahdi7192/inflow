@@ -1,8 +1,11 @@
 <!--
 Sync Impact Report:
-- Version Change: 1.2.0 -> 1.3.0 (PATCH: Enforced canonical shadcn/ui Light Mode standard in Principle X, prohibiting dark/neon gradients and ambient blur blobs)
+- Version Change: 1.3.0 -> 1.4.0 (MINOR: Clarified per-page token binding, direct MCP-to-page architecture, minimalist page identity, and strict zero-leakage tenant abstraction)
 - Modified Principles:
-  - Principle X: Explicitly mandated authentic shadcn/ui Light Mode (zinc palette, #ffffff surfaces, #fafafa canvas, #18181b primary elements) and monochrome squircle brand mark.
+  - Principle VI: Multi-Tenant User Authentication, Account Ownership & Minimalist Page Entity (added minimalist page identity rule: page is fundamentally an ID; auxiliary data is lazily populated by agent)
+  - Principle VII: Strict 1-to-1 Page-to-Bot Binding & Isolated Hermes Profiles (reaffirmed dedicated Hermes profile per page)
+  - Principle VIII: Per-Page Scoped Tokens & Direct MCP Connection Architecture (tokens and MCP connections are strictly per-page, not per-user; Hermes profile MCP configured with page's unique key)
+  - Principle IX: Back-Office Exclusivity & Zero-Leakage Tenant Abstraction (standard users never see tokens/MCP configs/APIs; Superadmin back-office handles user creation, page assignment, and token/MCP visibility)
 - Added Principles / Sections: None
 - Removed Sections: None
 - Deferred TODOs: None
@@ -23,8 +26,8 @@ All development on `inFlow` follows the GitHub Spec-Kit workflow:
 No direct, unplanned code modifications are permitted for new features or structural changes.
 
 ### II. Control Plane vs. Execution Plane Isolation
-* `inFlow` is strictly the **Control Plane**: state management, UI dashboard, CRUD, idempotency locking, event dispatching, and REST APIs.
-* Worker agents (`Hermes Agent`, Python workers) run in the **Execution Plane** on the Linux server and interact only via authenticated REST endpoints and signed webhooks.
+* `inFlow` is strictly the **Control Plane**: state management, UI dashboard, CRUD, idempotency locking, event dispatching, and REST/MCP APIs.
+* Worker agents (`Hermes Agent`, Python workers) run in the **Execution Plane** on the Linux server and interact only via authenticated REST endpoints and signed webhooks/MCP tools.
 * Never run Instagram browser bots, headless browsers, or session credentials directly inside `inFlow`.
 
 ### III. Absolute Idempotency & Safety
@@ -42,25 +45,34 @@ No direct, unplanned code modifications are permitted for new features or struct
 * English and numbers must preserve proper bidirectional spacing without layout distortion.
 * All internationalized strings must be registered in `src/lib/i18n.ts`.
 
-### VI. Multi-Tenant User Authentication & Account Ownership
+### VI. Multi-Tenant User Authentication, Account Ownership & Minimalist Page Entity
 * Users authenticate into `inFlow` via username/password credentials.
-* The relationship between users and Instagram accounts is strictly 1-to-N: each user can manage one or more Instagram accounts.
+* The relationship between users and Instagram accounts is strictly 1-to-N: each user can manage one or more Instagram accounts, while each account is owned by at most one user.
 * Tenant isolation is enforced: a user can only view, configure, or trigger automations for Instagram accounts explicitly assigned to their user profile.
 * All dashboard routes and API endpoints MUST validate user session credentials and resource tenancy before returning or mutating data.
+* **Minimalist Page Entity**: In the Control Plane, an Instagram page is fundamentally defined by its unique identifier (e.g. `username` / Instagram page ID). Rich auxiliary metadata (avatar URL, bio, follower count, media catalog) is non-blocking at creation time and is lazily synchronized and enriched by the execution agent during runtime polling.
 
-### VII. Strict 1-to-1 Page-to-Bot Binding & Profile Isolation
+### VII. Strict 1-to-1 Page-to-Bot Binding & Isolated Hermes Profiles
 * Each connected Instagram account MUST be bound to exactly one dedicated Hermes bot profile (or worker instance).
 * Each Hermes bot profile MUST handle exactly one Instagram account.
 * Bot credentials, browser cookies, local sessions, and scraper states must remain isolated per profile on the server.
 * The mapping between `account_username` and `bot_profile_id` is an immutable, system-level association maintained in the Control Plane database.
 
-### VIII. Scoped Inter-Plane API Tokens & Event Webhooks
-* **Inbound (Worker -> Control Plane)**: Every API request from a worker agent (`/api/agent/poll`, log submissions) MUST include a scoped API Bearer token. inFlow MUST validate that this token belongs to the specific `account_username` being polled or updated. Unauthorized cross-account access MUST be rejected with HTTP 401/403.
-* **Outbound (Control Plane -> Worker Webhooks)**: When user interactions or automated triggers in `inFlow` dispatch events to a Hermes bot, the Control Plane resolves the target bot's endpoint via the 1-to-1 binding table and dispatches an authenticated webhook payload (signed with a shared secret). The worker validates the signature and targeted Instagram page before executing actions.
+### VIII. Per-Page Scoped Tokens & Direct MCP Connection Architecture
+* **Tokens are Per-Page, NOT Per-User**: Every inter-plane API token and Model Context Protocol (MCP) authentication key is cryptographically bound to a specific Instagram Page (`account_username`), never to a user account.
+* **Direct Page-to-MCP Binding**: The MCP server connects directly and exclusively to the targeted Instagram page using that page's unique token. There is no concept of a user-level MCP connection.
+* **Hermes Profile MCP Configuration**: When spinning up an isolated Hermes agent profile for a page, its MCP client configuration is injected with that specific page's dedicated key.
+* **Inbound Validation**: Every API request or MCP tool call from a worker agent MUST present this page-scoped token. The Control Plane verifies that the token strictly matches the target `account_username`. Cross-page access or unauthorized operations are rejected with HTTP 401/403.
+* **Outbound Webhooks**: Signed with the page-specific secret to dispatch notifications or trigger actions on the dedicated bot profile.
 
-### IX. Back-Office Administration & Separation of Concerns
-* Administrative operations (creating users, assigning Instagram pages to users, provisioning Hermes bot profile associations, generating/revoking inter-plane API tokens, configuring webhook endpoints) MUST be isolated within a dedicated Back-Office management plane.
-* Role-based access control (RBAC) separates Superadmins (who manage users, bot bindings, and platform tokens) from Standard Tenants (who manage their assigned Instagram posts, rules, and comment logs).
+### IX. Back-Office Exclusivity & Zero-Leakage Tenant Abstraction
+* **Zero Technical Leakage**: Standard tenants/users MUST NEVER be exposed to API tokens, secret keys, MCP configurations, worker endpoints, or infrastructure details. The tenant UI is purely high-level: managing post triggers, DM templates, and viewing comment logs.
+* **Back-Office Exclusivity**: Superadmins exclusively operate the Back-Office management plane to:
+  1. Create, edit, and suspend platform users.
+  2. Provision Instagram pages (requiring only the page identifier/ID).
+  3. Assign and reassign Instagram pages to specific users.
+  4. View, generate, and revoke page-specific API tokens and inspect/copy Hermes MCP configuration snippets.
+* Role-based access control (RBAC) strictly prevents standard tenants from accessing administrative routes or inspecting inter-plane credentials.
 
 ### X. Unified Design System & shadcn/ui Light Mode Architecture (NON-NEGOTIABLE)
 * All UI components across inFlow (including buttons, inputs, forms, cards, dialogs/modals, switches, badges, and dropdowns) MUST strictly use or extend the standardized `shadcn/ui` primitives located in `src/components/ui/`.
@@ -82,4 +94,4 @@ Amendments to this Constitution require:
    - **MINOR**: Addition of new principles or material expansions of existing guidance.
    - **PATCH**: Textual clarifications, wording improvements, and typo corrections.
 
-**Version**: 1.3.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.4.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18

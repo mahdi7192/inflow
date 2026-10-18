@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { LanguageDropdown } from "@/components/ui/language-dropdown";
 import { Button, Input, Card } from "@/components/ui/primitives";
 import { I18N, Lang } from "@/lib/i18n";
 import { SafeUser } from "@/lib/auth";
@@ -140,22 +141,11 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
         {/* Right Actions */}
         <div className="flex items-center gap-3">
           {/* Language Switcher */}
-          <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary text-xs">
-            {(["fa", "en", "ar"] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => handleSetLang(l)}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
-                  lang === l
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          <LanguageDropdown
+            currentLang={lang}
+            onLangChange={handleSetLang}
+            size="sm"
+          />
 
           {/* User Badge */}
           <div className="flex items-center gap-2 pl-2 border-l border-border rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-2">

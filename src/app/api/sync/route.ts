@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
+import { authenticateMcpRequest } from "@/lib/mcp/auth-guard";
+import { AgentStreamManager } from "@/lib/mcp/sse-manager";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthenticated" },
-        { status: 401 }
-      );
+    const authUser = await getSessionUser();
+    let botAccount = "";
+
+    if (!authUser) {
+      const mcpAuth = await authenticateMcpRequest(req);
+      if (mcpAuth.authenticated) {
+        botAccount = mcpAuth.accountUsername || "";
+      } else {
+        return NextResponse.json(
+          { success: false, error: "Unauthenticated" },
+          { status: 401 }
+        );
+      }
     }
 
     const db = getDb();
@@ -23,11 +32,11 @@ export async function POST(req: NextRequest) {
     }
 
     const accountUsername = String(
-      body.account || body.account_username || ""
+      body.account || body.account_username || botAccount || ""
     ).trim();
 
-    // Verify tenancy if target account specified
-    if (accountUsername && !hasAccountAccess(user, accountUsername)) {
+    // Verify tenancy if target account specified and authenticated as web user
+    if (authUser && accountUsername && !hasAccountAccess(authUser, accountUsername)) {
       return NextResponse.json(
         {
           success: false,
@@ -37,7 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If agent pushes an array of scraped posts during sync:
+    // Case 1: If worker pushes an array of scraped posts during sync
     if (Array.isArray(body.posts) && body.posts.length > 0) {
       const upsertPost = db.prepare(`
         INSERT INTO posts (
@@ -50,9 +59,11 @@ export async function POST(req: NextRequest) {
         ON CONFLICT(shortcode) DO UPDATE SET
           caption = COALESCE(NULLIF(excluded.caption, ''), posts.caption),
           thumbnail_url = COALESCE(NULLIF(excluded.thumbnail_url, ''), posts.thumbnail_url),
-          synced_at = excluded.synced_at
+          synced_at = excluded.synced_at,
+          updated_at = excluded.updated_at
       `);
 
+      let insertedCount = 0;
       const tx = db.transaction((items: Record<string, unknown>[]) => {
         items.forEach((item, idx) => {
           const sc = String(item.shortcode || "").trim();
@@ -72,38 +83,90 @@ export async function POST(req: NextRequest) {
             updated_at: now,
             sort_index: idx,
           });
+          insertedCount++;
         });
       });
 
       tx(body.posts as Record<string, unknown>[]);
+
+      // If tied to a job ID, complete the job
+      const jobId = body.job_id ? Number(body.job_id) : null;
+      if (jobId) {
+        db.prepare(`
+          UPDATE agent_jobs
+          SET status = 'completed',
+              result_summary = ?,
+              completed_at = ?
+          WHERE id = ?
+        `).run(
+          JSON.stringify({ synced_count: insertedCount }),
+          now,
+          jobId
+        );
+      }
+
+      if (accountUsername) {
+        db.prepare(
+          "UPDATE accounts SET last_heartbeat_at = ?, updated_at = ? WHERE username = ?"
+        ).run(now, now, accountUsername);
+      }
+
+      const countRow = (
+        accountUsername
+          ? db.prepare("SELECT COUNT(*) as total FROM posts WHERE account_username = ?").get(accountUsername)
+          : db.prepare("SELECT COUNT(*) as total FROM posts").get()
+      ) as { total: number };
+
+      return NextResponse.json({
+        success: true,
+        synced_at: now,
+        synced_count: insertedCount,
+        stats: { total: countRow.total },
+      });
     }
 
-    if (accountUsername) {
-      db.prepare(
-        "UPDATE accounts SET last_heartbeat_at = ?, updated_at = ? WHERE username = ?"
-      ).run(now, now, accountUsername);
-    } else {
-      db.prepare(
-        "UPDATE accounts SET last_heartbeat_at = ?, updated_at = ?"
-      ).run(now, now);
-    }
+    // Case 2: On-demand Sync triggered by UI operator
+    const targetAccount = accountUsername || "r9spoort1";
 
-    const countRow = accountUsername
-      ? (db
-          .prepare(
-            "SELECT COUNT(*) as total FROM posts WHERE account_username = ?"
-          )
-          .get(accountUsername) as { total: number })
-      : (db.prepare("SELECT COUNT(*) as total FROM posts").get() as {
-          total: number;
-        });
+    // Insert job into agent_jobs
+    const insertJob = db.prepare(`
+      INSERT INTO agent_jobs (
+        account_username, job_type, status, payload, created_at
+      ) VALUES (?, 'sync_catalog', 'pending', ?, ?)
+    `);
+
+    const jobPayload = JSON.stringify({
+      requested_by: authUser ? authUser.username : "api_client",
+      force_full: Boolean(body.force_full),
+    });
+
+    const info = insertJob.run(targetAccount, jobPayload, now);
+    const jobId = Number(info.lastInsertRowid);
+
+    // Broadcast real-time SSE event to active agent streams (Option C)
+    const streamsReached = AgentStreamManager.broadcastToAccount(
+      targetAccount,
+      "sync_requested",
+      {
+        job_id: jobId,
+        job_type: "sync_catalog",
+        account_username: targetAccount,
+        requested_at: now,
+        parameters: { force_full: Boolean(body.force_full) },
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      synced_at: now,
-      stats: {
-        total: countRow.total,
-      },
+      job_id: jobId,
+      status: "dispatched",
+      streams_reached: streamsReached,
+      agent_online: streamsReached > 0,
+      account_username: targetAccount,
+      message:
+        streamsReached > 0
+          ? "Sync event dispatched in real-time over active agent stream"
+          : "Sync job queued in database. Waiting for agent connection.",
     });
   } catch (error) {
     return NextResponse.json(

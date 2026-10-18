@@ -86,6 +86,8 @@ export function getDb(): Database.Database {
   initSchema(db);
   seedIfEmpty(db);
   seedUsersIfEmpty(db);
+  seedBotBindingsIfEmpty(db);
+  cleanupStaleAgentJobs(db);
 
   global.__inflowDb = db;
   return db;
@@ -191,6 +193,40 @@ function initSchema(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_user_accounts_user_id ON user_accounts(user_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_accounts_account ON user_accounts(account_username);
+
+    CREATE TABLE IF NOT EXISTS agent_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT NOT NULL,
+      job_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      payload TEXT DEFAULT '{}',
+      result_summary TEXT DEFAULT NULL,
+      error_message TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL,
+      started_at TEXT DEFAULT NULL,
+      completed_at TEXT DEFAULT NULL,
+      FOREIGN KEY (account_username) REFERENCES accounts(username) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agent_jobs_account_status 
+      ON agent_jobs (account_username, status);
+    CREATE INDEX IF NOT EXISTS idx_agent_jobs_created 
+      ON agent_jobs (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS account_bot_bindings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT UNIQUE NOT NULL,
+      bot_profile_id TEXT NOT NULL,
+      api_token TEXT UNIQUE NOT NULL,
+      webhook_url TEXT DEFAULT NULL,
+      last_heartbeat_at TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (account_username) REFERENCES accounts(username) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_account_bot_token 
+      ON account_bot_bindings (api_token);
   `);
 }
 
@@ -347,4 +383,53 @@ function seedUsersIfEmpty(db: Database.Database) {
     assignStmt.run(adminId, acc.username, now);
   }
 }
+
+function seedBotBindingsIfEmpty(db: Database.Database) {
+  const bindingCount = db
+    .prepare("SELECT COUNT(*) as count FROM account_bot_bindings")
+    .get() as { count: number };
+
+  if (bindingCount.count > 0) return;
+
+  const accounts = db.prepare("SELECT username FROM accounts").all() as { username: string }[];
+  const now = nowTimestamp();
+
+  const insertBinding = db.prepare(`
+    INSERT OR IGNORE INTO account_bot_bindings (
+      account_username, bot_profile_id, api_token, webhook_url, last_heartbeat_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const acc of accounts) {
+    const token = acc.username === "r9spoort1" ? "inflow_bot_test_key_123" : `inflow_bot_${acc.username}_key`;
+    insertBinding.run(
+      acc.username,
+      `hermes_${acc.username}`,
+      token,
+      `http://127.0.0.1:8000/webhook/${acc.username}`,
+      now,
+      now,
+      now
+    );
+  }
+}
+
+export function cleanupStaleAgentJobs(db: Database.Database = getDb()): number {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    .toISOString()
+    .replace("T", " ")
+    .slice(0, 19);
+
+  const res = db.prepare(`
+    UPDATE agent_jobs
+    SET status = 'timed_out',
+        error_message = 'Job timed out after 5 minutes without completion',
+        completed_at = datetime('now')
+    WHERE status IN ('pending', 'running')
+      AND created_at < ?
+  `).run(fiveMinutesAgo);
+
+  return res.changes;
+}
+
 
