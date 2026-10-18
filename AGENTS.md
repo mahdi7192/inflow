@@ -111,6 +111,31 @@ Stores every processed comment and acts as the concurrency lock.
 * `dm_text` (TEXT)
 * `created_at`, `processed_at` (TEXT)
 
+#### 4. `users` (Multi-Tenant User Management & RBAC)
+Stores platform operators, administrators, and tenant credentials.
+* `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+* `username` (TEXT UNIQUE NOT NULL COLLATE NOCASE)
+* `display_name` (TEXT NOT NULL)
+* `password_hash` (TEXT NOT NULL) — Salted `scrypt` hash (`salt:derivedKeyHex`)
+* `role` (TEXT NOT NULL) — `'superadmin'` | `'tenant'`
+* `status` (TEXT NOT NULL) — `'active'` | `'suspended'`
+* `last_login_at` (TEXT)
+* `created_at`, `updated_at` (TEXT)
+
+#### 5. `user_sessions` (Database-Backed Sessions)
+Manages authenticated web sessions with sub-millisecond lookup and instant revocation.
+* `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+* `session_token` (TEXT UNIQUE NOT NULL) — 64 hex characters (32 crypto random bytes)
+* `user_id` (INTEGER NOT NULL REFERENCES users(id))
+* `expires_at`, `created_at` (TEXT)
+
+#### 6. `user_accounts` (1-to-N Tenancy Ownership)
+Enforces Constitution Principle VI: one Instagram account belongs to at most one user, while a user can manage multiple accounts.
+* `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+* `user_id` (INTEGER NOT NULL REFERENCES users(id))
+* `account_username` (TEXT UNIQUE NOT NULL REFERENCES accounts(username))
+* `created_at` (TEXT)
+
 ---
 
 ## 4. REST API Contracts for Agents & UI
@@ -187,6 +212,10 @@ Stores every processed comment and acts as the concurrency lock.
    * Multi-language keys are maintained in `src/lib/i18n.ts`.
 4. **Idempotency Over Everything:**
    * Never bypass or remove `comment_id` unique constraints. Double-replying on Instagram leads to shadowbanning.
+5. **Unified Design System & shadcn/ui Standard:**
+   * All UI components must strictly use or extend `src/components/ui/` primitives.
+   * Ad-hoc inline color styling across routes is prohibited; brand theming is centrally driven by CSS variables in `globals.css`.
+   * Official inFlow brand mark must remain consistent across all screens (no rogue Vercel triangle logos).
 
 ---
 

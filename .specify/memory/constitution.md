@@ -1,13 +1,9 @@
 <!--
 Sync Impact Report:
-- Version Change: 1.0.0 -> 1.1.0 (MINOR: Added multi-tenancy, bot profile binding, scoped API token validation, webhook dispatching, and back-office governance)
-- Modified Principles:
-  - II. Control Plane vs. Execution Plane Isolation (Expanded with Hermes profile isolation and webhook dispatch mechanisms)
+- Version Change: 1.1.0 -> 1.2.0 (MINOR: Added Principle X for unified shadcn/ui design system, centralized CSS token theming, and brand identity enforcement across all routes)
+- Modified Principles: None
 - Added Principles / Sections:
-  - VI. Multi-Tenant User Authentication & Account Ownership (1-to-N user-to-page access control)
-  - VII. Strict 1-to-1 Page-to-Bot Binding & Profile Isolation (Hermes profile mapping)
-  - VIII. Scoped Inter-Plane API Tokens & Event Webhooks (Mutual verification between Control Plane & Execution Plane)
-  - IX. Back-Office Administration & Separation of Concerns (Separation of operational admin plane from tenant dashboard)
+  - X. Unified Design System & shadcn/ui Architecture (NON-NEGOTIABLE) (Standardized shadcn/ui primitives, centralized CSS variable theming, and consistent brand mark)
 - Removed Sections: None
 - Deferred TODOs: None
 -->
@@ -66,6 +62,13 @@ No direct, unplanned code modifications are permitted for new features or struct
 * Administrative operations (creating users, assigning Instagram pages to users, provisioning Hermes bot profile associations, generating/revoking inter-plane API tokens, configuring webhook endpoints) MUST be isolated within a dedicated Back-Office management plane.
 * Role-based access control (RBAC) separates Superadmins (who manage users, bot bindings, and platform tokens) from Standard Tenants (who manage their assigned Instagram posts, rules, and comment logs).
 
+### X. Unified Design System & shadcn/ui Architecture (NON-NEGOTIABLE)
+* All UI components across inFlow (including buttons, inputs, forms, cards, dialogs/modals, switches, badges, and dropdowns) MUST strictly use or extend the standardized `shadcn/ui` primitives located in `src/components/ui/`.
+* Ad-hoc, hardcoded, or inline color styling and arbitrary background/border palettes across page routes are strictly prohibited.
+* Brand styling and themes MUST be token-driven and managed centrally through CSS custom properties in `src/app/globals.css` (e.g. `--background`, `--foreground`, `--card`, `--primary`, `--border`, `--ring`).
+* Visual identity and the inFlow official brand mark MUST remain consistent across all routes (Login, Dashboard, Back-Office). Rogue icons (such as Vercel triangle logos) or mismatched page headers MUST NOT be used.
+* All components in `src/components/ui/` MUST natively adhere to Principle V (RTL typography, Vazirmatn font, and bidirectional spacing).
+
 ## Governance
 
 This Constitution supersedes all ad-hoc coding practices in the repository. AI agents (Hermes, Claude, Cursor, Copilot) must verify compliance with this Constitution before proposing or merging code changes.
@@ -78,4 +81,4 @@ Amendments to this Constitution require:
    - **MINOR**: Addition of new principles or material expansions of existing guidance.
    - **PATCH**: Textual clarifications, wording improvements, and typo corrections.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.2.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
