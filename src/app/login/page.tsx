@@ -4,7 +4,11 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { I18N, Lang } from "@/lib/i18n";
 import { Lock, User, LogIn, AlertCircle, Globe, ShieldCheck } from "lucide-react";
-import { InstagramIcon } from "@/components/ui/icons";
+import { BrandLogo } from "@/components/ui/brand-logo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -77,142 +81,93 @@ export default function LoginPage() {
   return (
     <div
       dir={isRtl ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-purple-500/30 selection:text-purple-200"
+      className="min-h-screen bg-zinc-50/50 text-foreground flex flex-col justify-between selection:bg-zinc-200 selection:text-zinc-900"
     >
       {/* Top Header with Language Selector */}
-      <header className="w-full px-6 py-4 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-            <InstagramIcon className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-            {t.platformName}
-          </span>
-        </div>
+      <header className="w-full px-6 py-3.5 flex items-center justify-between border-b border-border bg-white/80 backdrop-blur-md">
+        <BrandLogo size="default" />
 
         {/* Language Switcher */}
-        <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
-          <Globe className="w-3.5 h-3.5 text-slate-400 mx-1" />
-          <button
-            type="button"
-            onClick={() => handleLangChange("fa")}
-            className={`px-2.5 py-1 rounded-md transition-all font-medium ${
-              lang === "fa"
-                ? "bg-purple-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-            }`}
-          >
-            فارسی
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLangChange("ar")}
-            className={`px-2.5 py-1 rounded-md transition-all font-medium ${
-              lang === "ar"
-                ? "bg-purple-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-            }`}
-          >
-            العربية
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLangChange("en")}
-            className={`px-2.5 py-1 rounded-md transition-all font-medium ${
-              lang === "en"
-                ? "bg-purple-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-            }`}
-          >
-            EN
-          </button>
+        <div className="flex items-center gap-1 bg-secondary border border-border rounded-lg p-0.5 text-xs">
+          <Globe className="w-3.5 h-3.5 text-muted-foreground mx-1" />
+          {(["fa", "ar", "en"] as const).map((l) => (
+            <Button
+              key={l}
+              type="button"
+              variant={lang === l ? "default" : "ghost"}
+              size="sm"
+              onClick={() => handleLangChange(l)}
+              className={cn(
+                "h-6 px-2.5 text-xs font-medium",
+                lang === l ? "bg-white text-foreground shadow-xs hover:bg-white" : "text-muted-foreground"
+              )}
+            >
+              {l === "fa" ? "فارسی" : l === "ar" ? "العربية" : "EN"}
+            </Button>
+          ))}
         </div>
       </header>
 
       {/* Main Login Card */}
       <main className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-2xl p-8 shadow-2xl shadow-purple-950/20 backdrop-blur-xl relative overflow-hidden">
-          {/* Subtle Ambient Glow */}
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-
+        <Card className="w-full max-w-md p-8 shadow-sm border border-border bg-card rounded-xl">
           {/* Heading */}
-          <div className="text-center mb-8 relative">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-3">
-              <ShieldCheck className="w-6 h-6" />
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-secondary text-foreground border border-border mb-3">
+              <ShieldCheck className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground mb-1.5">
               {t.loginTitle}
             </h1>
-            <p className="text-sm text-slate-400 leading-relaxed max-w-xs mx-auto">
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
               {t.loginSubtitle}
             </p>
           </div>
 
           {/* Error Alert */}
           {error && (
-            <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-sm flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div className="flex-1 text-start">{error}</div>
             </div>
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-2 text-start">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-foreground text-start">
                 {t.usernameLabel}
               </label>
-              <div className="relative">
-                <div
-                  className={`absolute inset-y-0 ${
-                    isRtl ? "right-0 pr-3.5" : "left-0 pl-3.5"
-                  } flex items-center pointer-events-none text-slate-400`}
-                >
-                  <User className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t.usernamePlaceholder}
-                  className={`w-full bg-slate-950/80 border border-slate-700/80 rounded-xl py-2.5 ${
-                    isRtl ? "pr-10 pl-3" : "pl-10 pr-3"
-                  } text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors`}
-                />
-              </div>
+              <Input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t.usernamePlaceholder}
+                icon={<User className="w-4 h-4 text-muted-foreground" />}
+              />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-2 text-start">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-foreground text-start">
                 {t.passwordLabel}
               </label>
-              <div className="relative">
-                <div
-                  className={`absolute inset-y-0 ${
-                    isRtl ? "right-0 pr-3.5" : "left-0 pl-3.5"
-                  } flex items-center pointer-events-none text-slate-400`}
-                >
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t.passwordPlaceholder}
-                  className={`w-full bg-slate-950/80 border border-slate-700/80 rounded-xl py-2.5 ${
-                    isRtl ? "pr-10 pl-3" : "pl-10 pr-3"
-                  } text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors`}
-                />
-              </div>
+              <Input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.passwordPlaceholder}
+                icon={<Lock className="w-4 h-4 text-muted-foreground" />}
+              />
             </div>
 
-            <button
+            <Button
               type="submit"
+              variant="default"
+              size="lg"
               disabled={loading}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-3 h-10 font-medium"
             >
               {loading ? (
                 <span>{t.loggingIn}</span>
@@ -222,13 +177,13 @@ export default function LoginPage() {
                   <span>{t.loginButton}</span>
                 </>
               )}
-            </button>
+            </Button>
           </form>
-        </div>
+        </Card>
       </main>
 
       {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-slate-500 border-t border-slate-900">
+      <footer className="w-full py-4 text-center text-xs text-muted-foreground border-t border-border">
         inFlow &copy; 2026 &bull; Instagram Automation Control Plane
       </footer>
     </div>

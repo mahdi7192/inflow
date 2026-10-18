@@ -66,17 +66,17 @@ export function AgentApiModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl border border-white/12 bg-[#0c0c0f] shadow-2xl overflow-hidden"
+        className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-xl border border-border bg-card shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 bg-[#101014]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-secondary/30">
           <div className="flex items-center gap-2.5">
-            <Terminal className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <Terminal className="w-4 h-4 text-emerald-600" />
+            <h3 className="text-sm font-semibold text-foreground">
               مستندات و خروجی زنده API ویژه ایجنت هرمس (Hermes Worker API)
             </h3>
             <Badge variant="emerald">@{accountUsername}</Badge>
@@ -84,7 +84,7 @@ export function AgentApiModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -96,22 +96,22 @@ export function AgentApiModal({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="emerald">GET</Badge>
-                <code className="font-mono text-zinc-200">
+                <code className="font-mono text-foreground font-medium">
                   /api/agent/poll?account={accountUsername}
                 </code>
               </div>
-              <span className="text-zinc-400">
+              <span className="text-muted-foreground">
                 فراخوانی هر ۲ دقیقه توسط ایجنت (دریافت پست‌های روشن + قوانین + لیست قفل‌ها)
               </span>
             </div>
             <div
               dir="ltr"
-              className="relative rounded-xl bg-black border border-white/10 p-3 font-mono text-[11px] text-emerald-300 overflow-x-auto"
+              className="relative rounded-lg bg-zinc-950 border border-zinc-800 p-3 font-mono text-[11px] text-emerald-400 overflow-x-auto"
             >
               <button
                 type="button"
                 onClick={() => copyText(curlPoll, 1)}
-                className="absolute top-2 right-2 p-1.5 rounded-md bg-white/8 hover:bg-white/15 text-zinc-300 cursor-pointer"
+                className="absolute top-2 right-2 p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-zinc-300 cursor-pointer"
               >
                 {copiedIdx === 1 ? (
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -128,22 +128,22 @@ export function AgentApiModal({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="sky">POST</Badge>
-                <code className="font-mono text-zinc-200">
+                <code className="font-mono text-foreground font-medium">
                   /api/posts/[shortcode]/logs
                 </code>
               </div>
-              <span className="text-zinc-400">
+              <span className="text-muted-foreground">
                 ثبت قفل یکتای کامنت (`comment_id`) و ذخیره نتیجه ریپلای و دایرکت
               </span>
             </div>
             <div
               dir="ltr"
-              className="relative rounded-xl bg-black border border-white/10 p-3 font-mono text-[11px] text-sky-300 overflow-x-auto"
+              className="relative rounded-lg bg-zinc-950 border border-zinc-800 p-3 font-mono text-[11px] text-sky-400 overflow-x-auto"
             >
               <button
                 type="button"
                 onClick={() => copyText(curlLog, 2)}
-                className="absolute top-2 right-2 p-1.5 rounded-md bg-white/8 hover:bg-white/15 text-zinc-300 cursor-pointer"
+                className="absolute top-2 right-2 p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-zinc-300 cursor-pointer"
               >
                 {copiedIdx === 2 ? (
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -158,7 +158,7 @@ export function AgentApiModal({
           {/* Live Response Preview */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-zinc-200">
+              <span className="font-semibold text-foreground">
                 خروجی زنده فعلی `/api/agent/poll` برای ایجنت:
               </span>
               <Button variant="outline" size="sm" onClick={fetchLivePoll}>
@@ -170,7 +170,7 @@ export function AgentApiModal({
             </div>
             <div
               dir="ltr"
-              className="rounded-xl bg-[#070709] border border-white/10 p-3.5 font-mono text-[11px] text-zinc-300 max-h-64 overflow-y-auto"
+              className="rounded-lg bg-zinc-950 border border-zinc-800 p-3.5 font-mono text-[11px] text-zinc-200 max-h-64 overflow-y-auto"
             >
               <pre>{pollPreview}</pre>
             </div>

@@ -21,7 +21,8 @@ import {
   LogOut,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
-import { Button, Badge, Switch } from "@/components/ui/primitives";
+import { BrandLogo } from "@/components/ui/brand-logo";
+import { Button, Badge, Switch, Input } from "@/components/ui/primitives";
 import { I18N, Lang } from "@/lib/i18n";
 import type { AccountRow, PostRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
@@ -216,42 +217,33 @@ export function InflowDashboard({
   ).length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#050505] text-[#ededed]">
-      {/* Vercel Header Navigation */}
-      <header className="sticky top-0 z-40 h-13 border-b border-white/8 bg-black/85 backdrop-blur-md px-4 flex items-center justify-between">
+    <div className="min-h-screen flex flex-col bg-zinc-50/50 text-foreground">
+      {/* inFlow Header Navigation */}
+      <header className="sticky top-0 z-40 h-14 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Logo */}
-          <div className="flex items-center gap-2 font-bold tracking-tight text-white select-none">
-            <svg
-              className="w-5 h-5 fill-white"
-              viewBox="0 0 76 65"
-              aria-label="inFlow logo"
-            >
-              <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-            </svg>
-            <span className="font-mono text-sm tracking-wider">inFlow</span>
-          </div>
+          {/* Official Brand Logo */}
+          <BrandLogo size="sm" />
 
-          <span className="text-zinc-600">/</span>
+          <span className="text-zinc-300">/</span>
 
           {/* Account Switcher Dropdown */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-lg hover:bg-white/8 text-xs font-medium text-zinc-200 border border-transparent hover:border-white/10 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-2.5 py-1 rounded-lg hover:bg-secondary text-xs font-medium text-foreground border border-transparent hover:border-border transition-all cursor-pointer"
             >
-              <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
+              <InstagramIcon className="w-3.5 h-3.5 text-zinc-700" />
               <span>@{currentAccount}</span>
-              <ChevronDown className="w-3 h-3 text-zinc-400" />
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </button>
 
             {accountDropdownOpen && (
               <div
-                className="absolute top-full start-0 mt-1.5 w-60 rounded-xl border border-white/12 bg-[#0d0d10] shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95"
+                className="absolute top-full start-0 mt-1.5 w-60 rounded-xl border border-border bg-popover shadow-lg p-1.5 z-50 animate-in fade-in zoom-in-95"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="px-2.5 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                <div className="px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   پیج‌های متصل به پلتفرم
                 </div>
                 {accounts.map((acc) => (
@@ -265,27 +257,27 @@ export function InflowDashboard({
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer ${
                       acc.username === currentAccount
-                        ? "bg-white/10 text-white font-medium"
-                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                        ? "bg-secondary text-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
                       <span className="truncate">@{acc.username}</span>
                     </div>
                     {acc.username === currentAccount && (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
                     )}
                   </button>
                 ))}
-                <div className="h-px bg-white/8 my-1" />
+                <div className="h-px bg-border my-1" />
                 <button
                   type="button"
                   onClick={() => {
                     setAccountDropdownOpen(false);
                     setAddAccountOpen(true);
                   }}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-blue-400 hover:bg-blue-500/10 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-foreground hover:bg-secondary transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{t("addAccount")}</span>
@@ -298,7 +290,7 @@ export function InflowDashboard({
         {/* Header Actions */}
         <div className="flex items-center gap-2">
           {/* Language Selector */}
-          <div className="flex items-center p-0.5 rounded-lg border border-white/10 bg-zinc-950 text-xs">
+          <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary text-xs">
             {(["fa", "en", "ar"] as const).map((l) => (
               <button
                 key={l}
@@ -306,8 +298,8 @@ export function InflowDashboard({
                 onClick={() => handleSetLang(l)}
                 className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
                   lang === l
-                    ? "bg-white/15 text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-white text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {l.toUpperCase()}
@@ -316,14 +308,14 @@ export function InflowDashboard({
           </div>
 
           {/* View Mode Toggle */}
-          <div className="hidden sm:flex items-center p-0.5 rounded-lg border border-white/10 bg-zinc-950">
+          <div className="hidden sm:flex items-center p-0.5 rounded-lg border border-border bg-secondary">
             <button
               type="button"
               onClick={() => setViewMode("cards")}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                 viewMode === "cards"
-                  ? "bg-white/15 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-white text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
               title="Card View"
             >
@@ -334,8 +326,8 @@ export function InflowDashboard({
               onClick={() => setViewMode("grid")}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                 viewMode === "grid"
-                  ? "bg-white/15 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-white text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
               title="Grid View"
             >
@@ -350,7 +342,7 @@ export function InflowDashboard({
             onClick={() => setAgentApiOpen(true)}
             className="hidden md:inline-flex"
           >
-            <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+            <Terminal className="w-3.5 h-3.5 text-emerald-600" />
             <span>{t("agentApiBtn")}</span>
           </Button>
 
@@ -383,21 +375,21 @@ export function InflowDashboard({
           {currentUser?.role === "superadmin" && (
             <Link
               href="/backoffice"
-              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-medium transition-all"
+              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-all shadow-2xs"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-foreground" />
               <span>{t("backofficeBtn")}</span>
             </Link>
           )}
 
           {/* User Profile & Logout Button */}
           {currentUser && (
-            <div className="flex items-center gap-2 pl-2 border-l border-white/10 rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-2">
+            <div className="flex items-center gap-2 pl-2 border-l border-border rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-2">
               <div className="hidden sm:flex flex-col text-end rtl:text-start leading-tight">
-                <span className="text-xs font-medium text-white truncate max-w-[120px]">
+                <span className="text-xs font-medium text-foreground truncate max-w-[120px]">
                   {currentUser.display_name || currentUser.username}
                 </span>
-                <span className="text-[10px] text-zinc-400">
+                <span className="text-[10px] text-muted-foreground">
                   {currentUser.role === "superadmin"
                     ? t("roleSuperadmin")
                     : t("roleTenant")}
@@ -407,7 +399,7 @@ export function InflowDashboard({
                 type="button"
                 onClick={handleLogout}
                 title={t("logoutButton")}
-                className="p-1.5 rounded-lg border border-white/10 bg-zinc-950 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -438,35 +430,35 @@ export function InflowDashboard({
       ) : (
         <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
           {/* Account Meta & KPI Metrics Strip */}
-          <div className="rounded-2xl border border-white/8 bg-[#0a0a0d] p-5 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={profile?.avatar_url || "/media/avatar.jpg"}
                   alt="Avatar"
-                  className="w-12 h-12 rounded-full object-cover border border-white/12 bg-zinc-900"
+                  className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
                   }}
                 />
                 <div>
-                  <h1 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                  <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span>{profile?.display_name || currentAccount}</span>
-                    <span className="text-xs font-mono text-zinc-400 font-normal">
+                    <span className="text-xs font-mono text-muted-foreground font-normal">
                       @{currentAccount}
                     </span>
                   </h1>
-                  <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                     {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span>{t("liveSession")}</span>
                 </span>
               </div>
@@ -474,30 +466,30 @@ export function InflowDashboard({
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <div className="rounded-xl border border-white/6 bg-[#111116] p-3 text-center">
-                <div className="text-xs text-zinc-400">{t("totalPosts")}</div>
-                <div className="text-xl font-bold font-mono text-zinc-100 mt-1">
+              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                <div className="text-xs text-muted-foreground">{t("totalPosts")}</div>
+                <div className="text-xl font-bold font-mono text-foreground mt-1">
                   {posts.length}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/6 bg-[#111116] p-3 text-center">
-                <div className="text-xs text-zinc-400">{t("activeAutomations")}</div>
-                <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                <div className="text-xs text-muted-foreground">{t("activeAutomations")}</div>
+                <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
                   {activeCount}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/6 bg-[#111116] p-3 text-center">
-                <div className="text-xs text-zinc-400">{t("configuredRules")}</div>
-                <div className="text-xl font-bold font-mono text-amber-400 mt-1">
+              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                <div className="text-xs text-muted-foreground">{t("configuredRules")}</div>
+                <div className="text-xl font-bold font-mono text-amber-700 mt-1">
                   {configuredCount}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/6 bg-[#111116] p-3 text-center">
-                <div className="text-xs text-zinc-400">{t("totalActions")}</div>
-                <div className="text-xl font-bold font-mono text-sky-400 mt-1">
+              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                <div className="text-xs text-muted-foreground">{t("totalActions")}</div>
+                <div className="text-xl font-bold font-mono text-sky-700 mt-1">
                   {posts.reduce(
                     (acc, p) =>
                       acc +
@@ -515,18 +507,18 @@ export function InflowDashboard({
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
             {/* Search Input */}
             <div className="relative flex-1">
-              <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input
+              <Input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t("searchPlaceholder")}
-                className="w-full h-9 ps-9 pe-3 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-white/25"
+                icon={<Search className="w-4 h-4 text-muted-foreground" />}
+                className="h-9 text-xs"
               />
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center p-0.5 rounded-xl border border-white/10 bg-zinc-950 overflow-x-auto text-xs">
+            <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary overflow-x-auto text-xs">
               {(
                 [
                   { id: "all", label: t("filterAll") },
@@ -540,10 +532,10 @@ export function InflowDashboard({
                   key={tab.id}
                   type="button"
                   onClick={() => setFilterTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap text-xs font-medium transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-md whitespace-nowrap text-xs font-medium transition-colors cursor-pointer ${
                     filterTab === tab.id
-                      ? "bg-white/15 text-white"
-                      : "text-zinc-400 hover:text-zinc-200"
+                      ? "bg-white text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {tab.label}
@@ -558,9 +550,9 @@ export function InflowDashboard({
               در حال بارگذاری پست‌های پیج...
             </div>
           ) : filteredPosts.length === 0 ? (
-            <div className="py-20 text-center space-y-3 rounded-2xl border border-white/6 bg-[#0a0a0d]">
-              <FolderOpen className="w-10 h-10 mx-auto text-zinc-600" />
-              <p className="text-xs text-zinc-400">{t("noPostsMatch")}</p>
+            <div className="py-20 text-center space-y-3 rounded-xl border border-border bg-card">
+              <FolderOpen className="w-10 h-10 mx-auto text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">{t("noPostsMatch")}</p>
             </div>
           ) : viewMode === "cards" ? (
             /* Cards / Rows View */
@@ -573,11 +565,11 @@ export function InflowDashboard({
                   <div
                     key={p.shortcode}
                     onClick={() => setSelectedShortcode(p.shortcode)}
-                    className="group rounded-2xl border border-white/8 bg-[#0c0c0f] hover:bg-[#121216] hover:border-white/16 transition-all p-3.5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between cursor-pointer"
+                    className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all p-3.5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between cursor-pointer"
                   >
                     <div className="flex items-center gap-3.5 flex-1 min-w-0">
                       {/* Media Thumb */}
-                      <div className="relative w-14 h-18 sm:w-16 sm:h-20 shrink-0 rounded-xl overflow-hidden bg-zinc-950 border border-white/10">
+                      <div className="relative w-14 h-18 sm:w-16 sm:h-20 shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
@@ -588,7 +580,7 @@ export function InflowDashboard({
                               "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
                           }}
                         />
-                        <span className="absolute bottom-1 end-1 px-1 py-0.2 rounded text-[9px] font-mono bg-black/70 text-zinc-300">
+                        <span className="absolute bottom-1 end-1 px-1 py-0.2 rounded text-[9px] font-mono bg-black/60 text-white">
                           {isReel ? "REEL" : "POST"}
                         </span>
                       </div>
@@ -596,16 +588,16 @@ export function InflowDashboard({
                       {/* Content Snippet */}
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-semibold text-zinc-200">
+                          <span className="font-mono text-xs font-semibold text-foreground">
                             {p.shortcode}
                           </span>
                           <span
                             className={`inline-block w-2 h-2 rounded-full ${
-                              isActive ? "bg-emerald-400" : "bg-zinc-600"
+                              isActive ? "bg-emerald-500" : "bg-zinc-300"
                             }`}
                           />
                         </div>
-                        <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                           {p.caption || t("noCaption")}
                         </p>
 
@@ -675,16 +667,16 @@ export function InflowDashboard({
                           e.stopPropagation();
                           setLogsShortcode(p.shortcode);
                         }}
-                        className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/8 px-2.5 py-1.5 rounded-lg border border-white/8 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary px-2.5 py-1.5 rounded-lg border border-border transition-colors cursor-pointer"
                       >
-                        <Clock className="w-3.5 h-3.5 text-sky-400" />
+                        <Clock className="w-3.5 h-3.5 text-sky-600" />
                         <span>{t("viewLogs")}</span>
                       </button>
 
                       <div className="flex items-center gap-2">
                         <span
                           className={`text-xs font-semibold ${
-                            isActive ? "text-emerald-400" : "text-zinc-500"
+                            isActive ? "text-emerald-700" : "text-muted-foreground"
                           }`}
                         >
                           {isActive ? t("statusOn") : t("statusOff")}
@@ -710,9 +702,9 @@ export function InflowDashboard({
                   <div
                     key={p.shortcode}
                     onClick={() => setSelectedShortcode(p.shortcode)}
-                    className="group rounded-2xl border border-white/8 bg-[#0c0c0f] hover:border-white/20 overflow-hidden cursor-pointer flex flex-col"
+                    className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all overflow-hidden cursor-pointer flex flex-col"
                   >
-                    <div className="relative aspect-4/5 bg-zinc-950">
+                    <div className="relative aspect-4/5 bg-secondary">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
@@ -723,7 +715,7 @@ export function InflowDashboard({
                             "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
                         }}
                       />
-                      <span className="absolute top-2 start-2 px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/70 text-zinc-200">
+                      <span className="absolute top-2 start-2 px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/60 text-white">
                         {isReel ? "REEL" : "POST"}
                       </span>
                       <div className="absolute top-2 end-2" onClick={(e) => e.stopPropagation()}>
@@ -732,8 +724,8 @@ export function InflowDashboard({
                           onClick={(e) => handleQuickToggle(p.shortcode, e)}
                           className={`w-2.5 h-2.5 rounded-full cursor-pointer transition-transform ${
                             isActive
-                              ? "bg-emerald-400 ring-4 ring-emerald-500/20"
-                              : "bg-zinc-600"
+                              ? "bg-emerald-500 ring-4 ring-emerald-500/20"
+                              : "bg-zinc-300"
                           }`}
                         />
                       </div>
@@ -741,30 +733,30 @@ export function InflowDashboard({
                     <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-semibold text-zinc-200">
+                          <span className="font-mono text-xs font-semibold text-foreground">
                             {p.shortcode}
                           </span>
                         </div>
-                        <p className="text-[11px] text-zinc-400 line-clamp-2 mt-1">
+                        <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1">
                           {p.caption || t("noCaption")}
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-white/6 text-[10px]">
+                      <div className="flex items-center justify-between pt-2 border-t border-border text-[10px]">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setLogsShortcode(p.shortcode);
                           }}
-                          className="text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          className="text-sky-600 hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           <Clock className="w-3 h-3" />
                           <span>{t("viewLogs")}</span>
                         </button>
                         <span
                           className={`font-semibold ${
-                            isActive ? "text-emerald-400" : "text-zinc-500"
+                            isActive ? "text-emerald-700" : "text-muted-foreground"
                           }`}
                         >
                           {isActive ? t("statusOn") : t("statusOff")}

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { X, Plus, Loader2, Film } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
-import { Button } from "@/components/ui/primitives";
+import { Button, Input, Textarea } from "@/components/ui/primitives";
 
 export function AddAccountModal({
   open,
@@ -53,89 +53,89 @@ export function AddAccountModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-white/12 bg-[#0c0c0f] shadow-2xl overflow-hidden"
+        className="w-full max-w-md rounded-xl border border-border bg-card shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 bg-[#101014]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-secondary/30">
           <div className="flex items-center gap-2">
-            <InstagramIcon className="w-4 h-4 text-pink-400" />
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <InstagramIcon className="w-4 h-4 text-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">
               افزودن پیج اینستاگرام جدید به پلتفرم inFlow
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 cursor-pointer"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          <div>
-            <label className="block text-zinc-300 font-medium mb-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-foreground font-medium">
               یوزرنیم پیج اینستاگرام (بدون @) *
             </label>
-            <input
+            <Input
               dir="ltr"
               type="text"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. tehran.style"
-              className="w-full h-9 px-3 rounded-lg bg-black border border-white/12 text-zinc-100 font-mono focus:outline-none focus:border-blue-500"
+              className="h-9 font-mono text-xs"
             />
           </div>
-          <div>
-            <label className="block text-zinc-300 font-medium mb-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-foreground font-medium">
               نام نمایشی پیج / برند
             </label>
-            <input
+            <Input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="مثال: فروشگاه تهران استایل"
-              className="w-full h-9 px-3 rounded-lg bg-black border border-white/12 text-zinc-100 focus:outline-none focus:border-blue-500"
+              className="h-9 text-xs"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-zinc-300 font-medium mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-foreground font-medium">
                 تعداد فالوور (اختیاری)
               </label>
-              <input
+              <Input
                 dir="ltr"
                 type="text"
                 value={followers}
                 onChange={(e) => setFollowers(e.target.value)}
                 placeholder="e.g. 24.5K"
-                className="w-full h-9 px-3 rounded-lg bg-black border border-white/12 text-zinc-100 font-mono focus:outline-none focus:border-blue-500"
+                className="h-9 font-mono text-xs"
               />
             </div>
-            <div>
-              <label className="block text-zinc-300 font-medium mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-foreground font-medium">
                 توضیحات کوتاه
               </label>
-              <input
+              <Input
                 type="text"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 placeholder="پوشاک و اکسسوری"
-                className="w-full h-9 px-3 rounded-lg bg-black border border-white/12 text-zinc-100 focus:outline-none focus:border-blue-500"
+                className="h-9 text-xs"
               />
             </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               انصراف
             </Button>
-            <Button type="submit" variant="default" disabled={submitting}>
+            <Button type="submit" variant="default" size="sm" disabled={submitting}>
               {submitting ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
@@ -199,47 +199,47 @@ export function AddPostModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-white/12 bg-[#0c0c0f] shadow-2xl overflow-hidden"
+        className="w-full max-w-md rounded-xl border border-border bg-card shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 bg-[#101014]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-secondary/30">
           <div className="flex items-center gap-2">
-            <Film className="w-4 h-4 text-sky-400" />
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <Film className="w-4 h-4 text-sky-600" />
+            <h3 className="text-sm font-semibold text-foreground">
               ثبت پست یا ریلز جدید برای @{accountUsername}
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 cursor-pointer"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          <div>
-            <label className="block text-zinc-300 font-medium mb-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-foreground font-medium">
               لینک پست اینستاگرام یا کد پست (Shortcode) *
             </label>
-            <input
+            <Input
               dir="ltr"
               type="text"
               required
               value={shortcodeOrUrl}
               onChange={(e) => setShortcodeOrUrl(e.target.value)}
               placeholder="https://www.instagram.com/reel/DehQhnjoEcr/ or DehQhnjoEcr"
-              className="w-full h-9 px-3 rounded-lg bg-black border border-white/12 text-zinc-100 font-mono focus:outline-none focus:border-blue-500"
+              className="h-9 font-mono text-xs"
             />
           </div>
 
-          <div>
-            <label className="block text-zinc-300 font-medium mb-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-foreground font-medium">
               نوع محتوا
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -248,8 +248,8 @@ export function AddPostModal({
                 onClick={() => setPostType("reel")}
                 className={`h-9 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
                   postType === "reel"
-                    ? "bg-white/10 border-white/30 text-white"
-                    : "bg-black border-white/10 text-zinc-400"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border text-foreground hover:bg-secondary/60"
                 }`}
               >
                 🎬 ریلز (Reel)
@@ -259,8 +259,8 @@ export function AddPostModal({
                 onClick={() => setPostType("post")}
                 className={`h-9 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
                   postType === "post"
-                    ? "bg-white/10 border-white/30 text-white"
-                    : "bg-black border-white/10 text-zinc-400"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border text-foreground hover:bg-secondary/60"
                 }`}
               >
                 📷 پست (Post)
@@ -268,24 +268,24 @@ export function AddPostModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-zinc-300 font-medium mb-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-foreground font-medium">
               کپشن پست (کانتکس پایه هوش مصنوعی)
             </label>
-            <textarea
+            <Textarea
               rows={4}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="متن کپشن پست یا توضیحات محصول را وارد کنید..."
-              className="w-full p-3 rounded-lg bg-black border border-white/12 text-zinc-100 focus:outline-none focus:border-blue-500 resize-y"
+              className="text-xs"
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               انصراف
             </Button>
-            <Button type="submit" variant="default" disabled={submitting}>
+            <Button type="submit" variant="default" size="sm" disabled={submitting}>
               {submitting ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (

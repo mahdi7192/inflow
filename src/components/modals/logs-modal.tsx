@@ -15,7 +15,7 @@ import {
   Plus,
   Loader2,
 } from "lucide-react";
-import { Button, Badge } from "@/components/ui/primitives";
+import { Button, Badge, Input } from "@/components/ui/primitives";
 import { I18N, Lang } from "@/lib/i18n";
 import type { PostRow, CommentLogRow } from "@/lib/db";
 
@@ -152,21 +152,21 @@ export function LogsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl border border-white/12 bg-[#0c0c0f] shadow-2xl overflow-hidden"
+        className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-xl border border-border bg-card shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 bg-[#101014]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-secondary/30">
           <div className="flex items-center gap-2.5">
-            <Clock className="w-4 h-4 text-sky-400" />
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <Clock className="w-4 h-4 text-sky-600" />
+            <h3 className="text-sm font-semibold text-foreground">
               {t("modalLogsTitle")}
             </h3>
-            <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-white/6 text-zinc-300 border border-white/10">
+            <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border">
               {post.shortcode}
             </span>
           </div>
@@ -176,13 +176,13 @@ export function LogsModal({
               size="sm"
               onClick={() => setSimOpen(!simOpen)}
             >
-              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+              <Plus className="w-3.5 h-3.5 text-emerald-600" />
               <span>{t("simulateCommentBtn")}</span>
             </Button>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -193,50 +193,50 @@ export function LogsModal({
         {simOpen && (
           <form
             onSubmit={handleSimulateComment}
-            className="border-b border-emerald-500/25 bg-emerald-950/15 p-4 space-y-3"
+            className="border-b border-emerald-200 bg-emerald-50/50 p-4 space-y-3"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 شبیه‌ساز ثبت لاگ و قفل کامنت توسط ایجنت هرمس
               </span>
-              <span className="text-[11px] text-zinc-400">
+              <span className="text-[11px] text-muted-foreground">
                 تست مستقیم قوانین فعلی پست
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-[11px] text-zinc-400 mb-1">
+                <label className="block text-[11px] text-muted-foreground mb-1">
                   یوزرنیم کامنت‌گذار
                 </label>
-                <input
+                <Input
                   type="text"
                   value={simUsername}
                   onChange={(e) => setSimUsername(e.target.value)}
-                  className="w-full h-8 px-2.5 rounded-lg bg-black/60 border border-white/12 text-xs text-zinc-100 font-mono focus:outline-none focus:border-emerald-500"
+                  className="h-8 text-xs font-mono"
                   placeholder="username"
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-[11px] text-zinc-400 mb-1">
+                <label className="block text-[11px] text-muted-foreground mb-1">
                   متن کامنت تستی
                 </label>
-                <input
+                <Input
                   type="text"
                   value={simComment}
                   onChange={(e) => setSimComment(e.target.value)}
-                  className="w-full h-8 px-2.5 rounded-lg bg-black/60 border border-white/12 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500"
+                  className="h-8 text-xs"
                   placeholder="متن کامنت..."
                 />
               </div>
             </div>
             <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={simFollows}
                   onChange={(e) => setSimFollows(e.target.checked)}
-                  className="rounded border-white/20 bg-black text-emerald-500"
+                  className="rounded border-border text-emerald-600"
                 />
                 <span>کاربر پیج را فالو دارد (تست شرط فالو)</span>
               </label>
@@ -253,36 +253,36 @@ export function LogsModal({
         )}
 
         {/* Summary KPI Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 border-b border-white/8 bg-[#09090c]">
-          <div className="rounded-xl border border-white/8 bg-[#121216] p-3 text-center">
-            <div className="text-lg font-bold font-mono text-zinc-100">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 border-b border-border bg-secondary/20">
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <div className="text-lg font-bold font-mono text-foreground">
               {summary.total_comments}
             </div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">
+            <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statTotalComments")}
             </div>
           </div>
-          <div className="rounded-xl border border-white/8 bg-[#121216] p-3 text-center">
-            <div className="text-lg font-bold font-mono text-emerald-400">
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <div className="text-lg font-bold font-mono text-emerald-700">
               {summary.trigger_matches}
             </div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">
+            <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statMatched")}
             </div>
           </div>
-          <div className="rounded-xl border border-white/8 bg-[#121216] p-3 text-center">
-            <div className="text-lg font-bold font-mono text-sky-400">
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <div className="text-lg font-bold font-mono text-sky-700">
               {summary.comments_replied}
             </div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">
+            <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statReplies")}
             </div>
           </div>
-          <div className="rounded-xl border border-white/8 bg-[#121216] p-3 text-center">
-            <div className="text-lg font-bold font-mono text-purple-400">
+          <div className="rounded-lg border border-border bg-card p-3 text-center">
+            <div className="text-lg font-bold font-mono text-purple-700">
               {summary.dms_sent}
             </div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">
+            <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statDms")}
             </div>
           </div>
@@ -291,12 +291,12 @@ export function LogsModal({
         {/* Logs List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {loading ? (
-            <div className="py-12 flex flex-col items-center justify-center text-zinc-500 gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+            <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               <span className="text-xs">{t("syncing")}</span>
             </div>
           ) : logs.length === 0 ? (
-            <div className="py-12 text-center text-zinc-500 space-y-2">
+            <div className="py-12 text-center text-muted-foreground space-y-2">
               <Clock className="w-8 h-8 mx-auto opacity-40" />
               <p className="text-xs">{t("noLogsYet")}</p>
             </div>
@@ -306,7 +306,7 @@ export function LogsModal({
               return (
                 <div
                   key={log.comment_id}
-                  className="rounded-xl border border-white/10 bg-[#121216] p-3.5 space-y-2.5"
+                  className="rounded-lg border border-border bg-card p-3.5 space-y-2.5 shadow-2xs"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -314,7 +314,7 @@ export function LogsModal({
                         href={`https://www.instagram.com/${log.username}/`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-mono font-medium text-zinc-200 bg-white/6 hover:bg-white/12 px-2 py-0.5 rounded-md border border-white/10 transition-colors"
+                        className="inline-flex items-center gap-1 text-xs font-mono font-medium text-foreground bg-secondary hover:bg-secondary/80 px-2 py-0.5 rounded-md border border-border transition-colors"
                       >
                         <span>@{log.username}</span>
                         <ExternalLink className="w-2.5 h-2.5 opacity-60" />
@@ -335,20 +335,20 @@ export function LogsModal({
 
                       <span
                         title="شناسه قفل یکتا برای جلوگیری از اجرای تکراری (Idempotency Lock)"
-                        className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded border border-white/6"
+                        className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded border border-border"
                       >
-                        <Lock className="w-2.5 h-2.5 text-amber-400" />
+                        <Lock className="w-2.5 h-2.5 text-amber-600" />
                         lock:{log.comment_id}
                       </span>
                     </div>
-                    <span className="text-[11px] font-mono text-zinc-500">
+                    <span className="text-[11px] font-mono text-muted-foreground">
                       {log.processed_at || log.created_at}
                     </span>
                   </div>
 
                   {/* User Comment */}
-                  <div className="rounded-lg bg-black/40 border border-white/6 px-3 py-2 text-xs text-zinc-200">
-                    <span className="text-zinc-400 font-medium me-1.5">
+                  <div className="rounded-lg bg-secondary/30 border border-border px-3 py-2 text-xs text-foreground">
+                    <span className="text-muted-foreground font-medium me-1.5">
                       {t("logCommentLabel")}:
                     </span>
                     «{log.comment_text}»
@@ -361,36 +361,36 @@ export function LogsModal({
                     <div className="grid grid-cols-1 gap-2 pt-1">
                       {log.comment_reply_status === "sent" &&
                         log.comment_reply_text && (
-                          <div className="rounded-lg border border-sky-500/25 bg-sky-500/8 px-3 py-2 text-xs space-y-1">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-400">
+                          <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs space-y-1">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-700">
                               <MessageSquare className="w-3.5 h-3.5" />
                               <span>{t("logCommentReply")}</span>
                             </div>
-                            <p className="text-zinc-200 leading-relaxed whitespace-pre-line">
+                            <p className="text-foreground leading-relaxed whitespace-pre-line">
                               «{log.comment_reply_text}»
                             </p>
                           </div>
                         )}
 
                       {log.dm_status === "sent" && log.dm_text && (
-                        <div className="rounded-lg border border-purple-500/25 bg-purple-500/8 px-3 py-2 text-xs space-y-1">
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-400">
+                        <div className="rounded-lg border border-purple-200 bg-purple-50/60 px-3 py-2 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-700">
                             <Send className="w-3.5 h-3.5" />
                             <span>{t("logDmSent")}</span>
                           </div>
-                          <p className="text-zinc-200 leading-relaxed whitespace-pre-line">
+                          <p className="text-foreground leading-relaxed whitespace-pre-line">
                             {log.dm_text}
                           </p>
                         </div>
                       )}
 
                       {log.dm_status === "pending_follow" && (
-                        <div className="rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-2 text-xs space-y-1">
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400">
+                        <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700">
                             <UserCheck className="w-3.5 h-3.5" />
                             <span>{t("logPendingFollow")}</span>
                           </div>
-                          <p className="text-zinc-300 leading-relaxed">
+                          <p className="text-foreground leading-relaxed">
                             {log.dm_text}
                           </p>
                         </div>

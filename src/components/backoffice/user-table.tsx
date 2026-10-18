@@ -11,6 +11,7 @@ import {
   Key,
 } from "lucide-react";
 import { I18N, Lang } from "@/lib/i18n";
+import { Badge, Button } from "@/components/ui/primitives";
 import { AssignAccountsModal } from "./assign-accounts-modal";
 
 export interface BackofficeUser {
@@ -101,7 +102,6 @@ export function UserTable({
         setActionError(data.error || "Failed to reset password");
       } else {
         alert("رمز عبور با موفقیت بروزرسانی شد");
-        onRefresh();
       }
     } catch {
       setActionError("Network error occurred");
@@ -112,11 +112,15 @@ export function UserTable({
 
   // Delete user
   const handleDeleteUser = async (user: BackofficeUser) => {
-    setActionError(null);
-    if (!window.confirm(t("deleteConfirmBody"))) {
+    if (
+      !window.confirm(
+        `آیا از حذف کاربر @${user.username} اطمینان دارید؟ این عملیات قابل بازگشت نیست.`
+      )
+    ) {
       return;
     }
 
+    setActionError(null);
     setLoadingId(user.id);
     try {
       const res = await fetch(`/api/backoffice/users/${user.id}`, {
@@ -138,15 +142,15 @@ export function UserTable({
   return (
     <div className="space-y-4">
       {actionError && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs">
+        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive text-xs">
           {actionError}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-white/8 bg-[#0a0a0d] shadow-xl">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
         <table className="w-full text-start text-xs border-collapse">
           <thead>
-            <tr className="border-b border-white/8 bg-white/[0.02] text-zinc-400 font-medium">
+            <tr className="border-b border-border bg-secondary/30 text-muted-foreground font-medium">
               <th className="py-3.5 px-4 text-start">{t("usernameLabel")}</th>
               <th className="py-3.5 px-4 text-start">{t("displayNameLabel")}</th>
               <th className="py-3.5 px-4 text-start">{t("roleLabel")}</th>
@@ -155,7 +159,7 @@ export function UserTable({
               <th className="py-3.5 px-4 text-end">عملیات</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-border/50">
             {users.map((user) => {
               const isSelf = user.id === currentUserId;
               const isSuperadmin = user.role === "superadmin";
@@ -163,24 +167,24 @@ export function UserTable({
               return (
                 <tr
                   key={user.id}
-                  className="hover:bg-white/[0.02] transition-colors"
+                  className="hover:bg-secondary/40 transition-colors"
                 >
                   {/* Username */}
                   <td className="py-3.5 px-4">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center font-bold text-zinc-200">
+                      <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center font-bold text-foreground">
                         {user.username.slice(0, 1).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-mono text-zinc-100 font-medium flex items-center gap-1.5">
+                        <div className="font-mono text-foreground font-medium flex items-center gap-1.5">
                           <span>@{user.username}</span>
                           {isSelf && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            <Badge variant="purple" className="text-[10px] py-0 px-1.5">
                               شما
-                            </span>
+                            </Badge>
                           )}
                         </div>
-                        <div className="text-[10px] text-zinc-500">
+                        <div className="text-[10px] text-muted-foreground">
                           ID: #{user.id}
                         </div>
                       </div>
@@ -188,44 +192,44 @@ export function UserTable({
                   </td>
 
                   {/* Display Name */}
-                  <td className="py-3.5 px-4 text-zinc-300">
+                  <td className="py-3.5 px-4 text-foreground/90">
                     {user.display_name || user.username}
                   </td>
 
                   {/* Role */}
                   <td className="py-3.5 px-4">
                     {isSuperadmin ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <Badge variant="purple">
                         <ShieldCheck className="w-3 h-3" />
                         <span>{t("roleSuperadmin")}</span>
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <Badge variant="sky">
                         <UserIcon className="w-3 h-3" />
                         <span>{t("roleTenant")}</span>
-                      </span>
+                      </Badge>
                     )}
                   </td>
 
                   {/* Status */}
                   <td className="py-3.5 px-4">
                     {user.status === "active" ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <Badge variant="emerald">
                         <CheckCircle className="w-3 h-3" />
                         <span>{t("userStatusActive")}</span>
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      <Badge variant="destructive">
                         <Ban className="w-3 h-3" />
                         <span>{t("userStatusSuspended")}</span>
-                      </span>
+                      </Badge>
                     )}
                   </td>
 
                   {/* Assigned Accounts */}
                   <td className="py-3.5 px-4">
                     {isSuperadmin ? (
-                      <span className="text-[11px] text-zinc-400 font-medium">
+                      <span className="text-[11px] text-muted-foreground font-medium">
                         دسترسی به تمام پیج‌ها
                       </span>
                     ) : user.assigned_accounts.length > 0 ? (
@@ -233,14 +237,14 @@ export function UserTable({
                         {user.assigned_accounts.map((acc) => (
                           <span
                             key={acc}
-                            className="inline-block px-1.5 py-0.5 rounded bg-zinc-800 border border-white/8 text-[11px] font-mono text-zinc-300"
+                            className="inline-block px-1.5 py-0.5 rounded bg-secondary border border-border text-[11px] font-mono text-foreground"
                           >
                             @{acc}
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-zinc-500 italic">
+                      <span className="text-[11px] text-muted-foreground italic">
                         {t("noAssignedAccounts")}
                       </span>
                     )}
@@ -251,30 +255,36 @@ export function UserTable({
                     <div className="inline-flex items-center gap-1.5">
                       {/* Assign Accounts Button */}
                       {!isSuperadmin && (
-                        <button
+                        <Button
                           type="button"
+                          variant="secondary"
+                          size="icon"
                           onClick={() => setSelectedUserForAssign(user)}
                           title={t("assignAccountsBtn")}
-                          className="p-1.5 rounded-lg border border-white/10 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+                          className="h-7 w-7"
                         >
                           <Link2 className="w-3.5 h-3.5" />
-                        </button>
+                        </Button>
                       )}
 
                       {/* Reset Password Button */}
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="icon"
                         onClick={() => handleResetPassword(user)}
                         title="تغییر رمز عبور"
-                        className="p-1.5 rounded-lg border border-white/10 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+                        className="h-7 w-7"
                       >
                         <Key className="w-3.5 h-3.5" />
-                      </button>
+                      </Button>
 
                       {/* Toggle Status Button */}
                       {!isSelf && (
-                        <button
+                        <Button
                           type="button"
+                          variant={user.status === "active" ? "outline" : "emerald"}
+                          size="icon"
                           disabled={loadingId === user.id}
                           onClick={() => handleToggleStatus(user)}
                           title={
@@ -282,31 +292,29 @@ export function UserTable({
                               ? "تعلیق کاربر"
                               : "فعال‌سازی مجدد کاربر"
                           }
-                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                            user.status === "active"
-                              ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
-                          }`}
+                          className="h-7 w-7"
                         >
                           {user.status === "active" ? (
-                            <Ban className="w-3.5 h-3.5" />
+                            <Ban className="w-3.5 h-3.5 text-amber-400" />
                           ) : (
                             <CheckCircle className="w-3.5 h-3.5" />
                           )}
-                        </button>
+                        </Button>
                       )}
 
                       {/* Delete Button */}
                       {!isSelf && (
-                        <button
+                        <Button
                           type="button"
+                          variant="destructive"
+                          size="icon"
                           disabled={loadingId === user.id}
                           onClick={() => handleDeleteUser(user)}
                           title={t("deleteUserBtn")}
-                          className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 transition-colors cursor-pointer"
+                          className="h-7 w-7"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
