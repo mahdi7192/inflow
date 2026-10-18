@@ -1,86 +1,65 @@
 # Server Orchestrator IPC & CLI Contract
+# Defines the execution commands and JSON response formats for the server-side orchestrator script (scripts/hermes_orchestrator.py).
 
-This contract defines the execution commands and JSON response formats for the server-side orchestrator script (`scripts/hermes_orchestrator.py`).
+commands:
+  provision:
+    description: "Creates dedicated Hermes profile, writes config.yaml, deploys vnc_guard.py, and initializes virtual display."
+    cli: "python3 scripts/hermes_orchestrator.py provision --account <account_username> --token <page_token> [--json]"
+    output_schema:
+      type: object
+      properties:
+        success: { type: boolean }
+        account: { type: string }
+        profile_name: { type: string }
+        profile_dir: { type: string }
+        display: { type: string }
+        status: { type: string }
+        vnc_url: { type: string }
 
----
+  vnc_start:
+    description: "Launches websockify with a one-time token and starts Chrome navigated to Instagram."
+    cli: "python3 scripts/hermes_orchestrator.py vnc-start --account <account_username> [--url <target_url>] [--json]"
+    output_schema:
+      type: object
+      properties:
+        success: { type: boolean }
+        account: { type: string }
+        token: { type: string }
+        vnc_url: { type: string }
+        timeout_seconds: { type: integer }
+        expires_at: { type: string }
 
-## 1. CLI Commands
+  vnc_stop:
+    description: "Kills the websockify process and removes the one-time token file."
+    cli: "python3 scripts/hermes_orchestrator.py vnc-stop --account <account_username> [--json]"
+    output_schema:
+      type: object
+      properties:
+        success: { type: boolean }
+        account: { type: string }
+        message: { type: string }
 
-### 1.1 Provision Bot Profile
-Creates the dedicated Hermes profile, writes `config.yaml`, deploys `vnc_guard.py`, and initializes the virtual display.
+  verify_session:
+    description: "Inspects Chrome user data directory or Instagram session state to verify authentication."
+    cli: "python3 scripts/hermes_orchestrator.py verify-session --account <account_username> [--json]"
+    output_schema:
+      type: object
+      properties:
+        success: { type: boolean }
+        account: { type: string }
+        authenticated: { type: boolean }
+        status: { type: string }
 
-```bash
-python3 scripts/hermes_orchestrator.py provision --account <account_username> --token <page_token> [--json]
-```
-
-**JSON Output Format**:
-```json
-{
-  "success": true,
-  "account": "r9spoort1",
-  "profile_name": "inflow_r9spoort1",
-  "profile_dir": "/root/.hermes/profiles/inflow_r9spoort1",
-  "display": ":20",
-  "status": "login_required",
-  "vnc_url": "http://185.120.40.10:6080/vnc.html?autoconnect=true&resize=scale&path=websockify/?token=a1b2c3d4"
-}
-```
-
----
-
-### 1.2 Start On-Demand VNC Guard Session
-Launches websockify with a one-time token and starts Chrome navigated to Instagram.
-
-```bash
-python3 scripts/hermes_orchestrator.py vnc-start --account <account_username> [--url <target_url>] [--json]
-```
-
-**JSON Output Format**:
-```json
-{
-  "success": true,
-  "account": "r9spoort1",
-  "token": "7f8a9b1c2d3e4f5a",
-  "vnc_url": "http://185.120.40.10:6080/vnc.html?autoconnect=true&resize=scale&path=websockify/?token=7f8a9b1c2d3e4f5a",
-  "timeout_seconds": 600,
-  "expires_at": "2026-10-18T19:25:00Z"
-}
-```
-
----
-
-### 1.3 Stop VNC Guard Session
-Kills the websockify process and removes the one-time token file.
-
-```bash
-python3 scripts/hermes_orchestrator.py vnc-stop --account <account_username> [--json]
-```
-
-**JSON Output Format**:
-```json
-{
-  "success": true,
-  "account": "r9spoort1",
-  "message": "VNC Guard session closed"
-}
-```
-
----
-
-### 1.4 Check Session & Harvest Cookies
-Inspects the Chrome user data directory or Instagram session state to verify if authentication succeeded.
-
-```bash
-python3 scripts/hermes_orchestrator.py verify-session --account <account_username> [--json]
-```
-
-**JSON Output Format**:
-```json
-{
-  "success": true,
-  "account": "r9spoort1",
-  "authenticated": true,
-  "session_id": "masked_session_id",
-  "status": "live"
-}
-```
+  sync:
+    description: "Executes isolated browser catalog scrape and syncs profile stats, posts, and completes pending jobs."
+    cli: "python3 scripts/hermes_orchestrator.py sync --account <account_username> [--json]"
+    output_schema:
+      type: object
+      properties:
+        success: { type: boolean }
+        account: { type: string }
+        posts_synced: { type: integer }
+        total_posts_reported: { type: integer }
+        followers_text: { type: string }
+        avatar_url: { type: string }
+        status: { type: string }

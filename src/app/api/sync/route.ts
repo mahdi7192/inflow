@@ -3,6 +3,7 @@ import { getDb, updateAccountProfileFromAgent } from "@/lib/db";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { authenticateMcpRequest } from "@/lib/mcp/auth-guard";
 import { AgentStreamManager } from "@/lib/mcp/sse-manager";
+import { ServerOrchestrator } from "@/lib/server-orchestrator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -167,6 +168,13 @@ export async function POST(req: NextRequest) {
       }
     );
 
+    // If no real-time SSE stream is listening, execute isolated sync via ServerOrchestrator
+    if (streamsReached === 0) {
+      ServerOrchestrator.syncAccount(targetAccount).catch((err) => {
+        console.error(`[Sync] Background sync failed for ${targetAccount}:`, err);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       job_id: jobId,
@@ -177,7 +185,7 @@ export async function POST(req: NextRequest) {
       message:
         streamsReached > 0
           ? "Sync event dispatched in real-time over active agent stream"
-          : "Sync job queued in database. Waiting for agent connection.",
+          : "Sync job queued in database and triggered via isolated server orchestrator.",
     });
   } catch (error) {
     return NextResponse.json(

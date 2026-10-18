@@ -26,16 +26,18 @@ from datetime import datetime, timezone, timedelta
 HERMES_HOME = os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes"))
 PROFILES_DIR = os.path.join(HERMES_HOME, "profiles")
 VNC_PORT = int(os.environ.get("INFLOW_VNC_PORT", "6080"))
-HOST_IP = os.environ.get("INFLOW_SERVER_HOST", "127.0.0.1")
+HOST_IP = os.environ.get("INFLOW_SERVER_HOST", "inflow.ketabdar.dev")
+VNC_BASE_URL = os.environ.get("INFLOW_VNC_BASE_URL", "https://inflow.ketabdar.dev/vnc")
 
 VNC_GUARD_TEMPLATE = """#!/usr/bin/env python3
-import os, sys, time, secrets, subprocess, signal
+import os, sys, time, secrets, subprocess, signal, json
 
 PID_FILE = "{profile_dir}/bot-desktop/websockify.pid"
 TOKEN_FILE = "{profile_dir}/bot-desktop/vnc_token.cfg"
 SOCK_PATH = "{profile_dir}/bot-desktop/rfb.sock"
 PORT = {port}
 HOST_IP = "{host_ip}"
+VNC_BASE_URL = "{vnc_base_url}"
 PROFILE_DIR = "{profile_dir}/bot-desktop/browser-profile"
 
 def ensure_desktop():
@@ -48,9 +50,9 @@ def ensure_desktop():
             "    from tools.bot_desktop import runtime\\n"
             "    runtime.start()\\n"
             "except Exception as e:\\n"
-            "    pass\\n"
+            "    sys.stderr.write(f'Desktop start error: {{e}}\\n')\\n"
         )
-        subprocess.run(["python3", "-c", py_cmd], check=False)
+        subprocess.run(["/usr/bin/python3", "-c", py_cmd], check=False)
         time.sleep(2)
 
 def is_profile_chrome_running():
@@ -83,7 +85,17 @@ def ensure_chrome(url=None):
     clean_stale_chrome_locks()
     running = is_profile_chrome_running()
     env = os.environ.copy()
-    env["DISPLAY"] = ":20"
+    display = ":20"
+    disp_file = "{profile_dir}/bot-desktop/display"
+    if os.path.exists(disp_file):
+        try:
+            with open(disp_file) as f:
+                d = f.read().strip()
+                if d:
+                    display = f":{{d}}" if not d.startswith(":") else d
+        except Exception:
+            pass
+    env["DISPLAY"] = display
     auth_file = "{profile_dir}/bot-desktop/Xauthority"
     if os.path.exists(auth_file):
         env["XAUTHORITY"] = auth_file
@@ -124,12 +136,13 @@ def stop():
     subprocess.run(f"fuser -k {{PORT}}/tcp 2>/dev/null || true", shell=True)
     print(f"VNC Guard: Port {{PORT}} is CLOSED.")
 
-def start(url=None, timeout_seconds=600):
+def start(url=None, token=None, timeout_seconds=600):
     stop()
     ensure_desktop()
     os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
     ensure_chrome(url)
-    token = secrets.token_hex(8)
+    if not token:
+        token = secrets.token_hex(8)
     with open(TOKEN_FILE, "w") as f:
         f.write(f"{{token}}: unix_socket:{{SOCK_PATH}}\\n")
     
@@ -148,18 +161,36 @@ def start(url=None, timeout_seconds=600):
     except FileNotFoundError:
         pass
         
-    vnc_url = f"http://{{HOST_IP}}:{{PORT}}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={{token}}"
+    if VNC_BASE_URL:
+        vnc_url = f"{{VNC_BASE_URL}}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={{token}}"
+    else:
+        vnc_url = f"http://{{HOST_IP}}:{{PORT}}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={{token}}"
     print(json.dumps({{"success": True, "token": token, "vnc_url": vnc_url, "timeout_seconds": timeout_seconds}}))
     return vnc_url
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "stop": stop()
-    elif len(sys.argv) > 1 and sys.argv[1].startswith("http"): start(url=sys.argv[1])
-    elif len(sys.argv) > 2 and sys.argv[1] == "start": start(url=sys.argv[2])
-    else: start()
+    if len(sys.argv) > 1 and sys.argv[1] == "stop":
+        stop()
+    elif len(sys.argv) > 1 and sys.argv[1] == "start":
+        url = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("-") else None
+        tok = sys.argv[3] if len(sys.argv) > 3 else None
+        start(url=url, token=tok)
+    elif len(sys.argv) > 1 and sys.argv[1].startswith("http"):
+        start(url=sys.argv[1])
+    else:
+        start()
 """
 
-CONFIG_YAML_TEMPLATE = """terminal:
+CONFIG_YAML_TEMPLATE = """model:
+  api_key: sk-523b3dd47c3ab70e-i4hfte-e73173eb
+  api_mode: chat_completions
+  base_url: http://127.0.0.1:20128/v1
+  context_length: 128000
+  default: ag/gemini-3.8-flash
+  provider: custom
+_config_version: 49
+
+terminal:
   cwd: {profile_dir}
 
 bot_desktop:
@@ -183,6 +214,36 @@ platform_toolsets:
     - skills
     - terminal
     - web
+
+mcp_servers:
+  inflow:
+    command: /opt/inflow/node_modules/.bin/tsx
+    args:
+      - /opt/inflow/src/cli/mcp.ts
+      - --token
+      - {token}
+      - --account
+      - {account}
+    env:
+      NODE_PATH: /opt/inflow/node_modules
+      INFLOW_MCP_TOKEN: {token}
+      INFLOW_MCP_ACCOUNT: {account}
+    enabled: true
+"""
+
+SOUL_TEMPLATE = """# inFlow Instagram Automation Agent: @{account}
+
+You are the dedicated autonomous AI agent responsible for Instagram automation of page @{account}.
+
+## Your Mission
+1. Execute scheduled tasks and pending jobs requested from the inFlow Dashboard (syncing reels, publishing comments, responding to direct messages).
+2. Automate engagement strictly adhering to the configured trigger rules and keywords.
+3. Monitor your browser session and ensure human-like browsing patterns to protect account health.
+
+## Tools & Capabilities
+- **inFlow Control Plane**: Access your page-scoped MCP tools (`inflow_get_active_automations`, `inflow_push_scraped_posts`, `inflow_record_comment_interaction`, `inflow_get_pending_jobs`, `inflow_complete_job`).
+- **Bot Desktop & Browser**: Operate inside your dedicated sandboxed browser profile.
+- **Telegram & Reports**: Always maintain professional, clear, data-backed execution.
 """
 
 def get_profile_name(account: str) -> str:
@@ -202,27 +263,36 @@ def provision_profile(account: str, token: str):
     # 2. Write config.yaml
     config_path = os.path.join(profile_dir, "config.yaml")
     with open(config_path, "w") as f:
-        f.write(CONFIG_YAML_TEMPLATE.format(profile_dir=profile_dir))
+        f.write(CONFIG_YAML_TEMPLATE.format(profile_dir=profile_dir, token=token, account=account))
 
-    # 3. Write profile .env with dedicated token
+    # 3. Write SOUL.md
+    soul_path = os.path.join(profile_dir, "SOUL.md")
+    with open(soul_path, "w") as f:
+        f.write(SOUL_TEMPLATE.format(account=account))
+
+    # 4. Write profile .env with dedicated token
     env_path = os.path.join(profile_dir, ".env")
     with open(env_path, "w") as f:
-        f.write(f"INFLOW_ACCOUNT={account}\nINFLOW_PAGE_TOKEN={token}\n")
+        f.write(f"INFLOW_ACCOUNT={account}\nINFLOW_MCP_TOKEN={token}\nINFLOW_PAGE_TOKEN={token}\n")
 
-    # 4. Deploy vnc_guard.py into bin/
+    # 5. Deploy vnc_guard.py into bin/
     vnc_guard_path = os.path.join(profile_dir, "bin", "vnc_guard.py")
     with open(vnc_guard_path, "w") as f:
         f.write(VNC_GUARD_TEMPLATE.format(
             profile_dir=profile_dir,
             port=VNC_PORT,
-            host_ip=HOST_IP
+            host_ip=HOST_IP,
+            vnc_base_url=VNC_BASE_URL
         ))
     os.chmod(vnc_guard_path, 0o755)
 
-    # 5. Start VNC Guard for initial login
+    # 6. Generate VNC token & URL
     vnc_token = secrets.token_hex(8)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=600)).isoformat()
-    vnc_url = f"http://{HOST_IP}:{VNC_PORT}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
+    if VNC_BASE_URL:
+        vnc_url = f"{VNC_BASE_URL}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
+    else:
+        vnc_url = f"http://{HOST_IP}:{VNC_PORT}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
 
     token_file = os.path.join(profile_dir, "bot-desktop", "vnc_token.cfg")
     sock_path = os.path.join(profile_dir, "bot-desktop", "rfb.sock")
@@ -249,7 +319,10 @@ def vnc_start(account: str, target_url: str = None):
 
     vnc_token = secrets.token_hex(8)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=600)).isoformat()
-    vnc_url = f"http://{HOST_IP}:{VNC_PORT}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
+    if VNC_BASE_URL:
+        vnc_url = f"{VNC_BASE_URL}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
+    else:
+        vnc_url = f"http://{HOST_IP}:{VNC_PORT}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
 
     token_file = os.path.join(profile_dir, "bot-desktop", "vnc_token.cfg")
     sock_path = os.path.join(profile_dir, "bot-desktop", "rfb.sock")
@@ -259,7 +332,7 @@ def vnc_start(account: str, target_url: str = None):
 
     if os.path.exists(vnc_guard_path):
         target = target_url or "https://www.instagram.com/accounts/login/"
-        subprocess.Popen([vnc_guard_path, "start", target], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+        subprocess.Popen([vnc_guard_path, "start", target, vnc_token], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
 
     return {
         "success": True,
@@ -288,10 +361,14 @@ def vnc_stop(account: str):
 def verify_session(account: str):
     profile_name = get_profile_name(account)
     profile_dir = get_profile_dir(profile_name)
-    cookie_db = os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Network", "Cookies")
+    cookie_candidates = [
+        os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Cookies"),
+        os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Network", "Cookies")
+    ]
+    cookie_db = next((p for p in cookie_candidates if os.path.exists(p)), None)
 
     authenticated = False
-    if os.path.exists(cookie_db):
+    if cookie_db and os.path.exists(cookie_db):
         try:
             conn = sqlite3.connect(f"file:{cookie_db}?mode=ro", uri=True)
             cursor = conn.cursor()
@@ -310,6 +387,34 @@ def verify_session(account: str):
         "authenticated": authenticated,
         "status": "live" if authenticated else "login_required"
     }
+
+def sync_account(account: str):
+    profile_name = get_profile_name(account)
+    profile_dir = get_profile_dir(profile_name)
+    sync_script = os.path.join(os.path.dirname(__file__), "sync_profile.js")
+
+    if not os.path.exists(sync_script):
+        return {"success": False, "account": account, "error": f"Sync script not found at {sync_script}"}
+
+    try:
+        proc = subprocess.run(
+            ["node", sync_script, "--account", account, "--profile-dir", profile_dir],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if proc.returncode == 0:
+            try:
+                return json.loads(proc.stdout.strip())
+            except Exception:
+                return {"success": True, "account": account, "output": proc.stdout.strip()}
+        else:
+            try:
+                return json.loads(proc.stderr.strip() or proc.stdout.strip())
+            except Exception:
+                return {"success": False, "account": account, "error": proc.stderr.strip() or proc.stdout.strip()}
+    except Exception as e:
+        return {"success": False, "account": account, "error": str(e)}
 
 def check_status(account: str):
     profile_name = get_profile_name(account)
@@ -330,7 +435,7 @@ def check_status(account: str):
 
 def main():
     parser = argparse.ArgumentParser(description="inFlow Hermes Server Orchestrator")
-    parser.add_argument("command", choices=["provision", "vnc-start", "vnc-stop", "verify-session", "status"])
+    parser.add_argument("command", choices=["provision", "vnc-start", "vnc-stop", "verify-session", "status", "sync"])
     parser.add_argument("--account", required=True, help="Instagram account handle")
     parser.add_argument("--token", help="Page-dedicated API token")
     parser.add_argument("--url", help="Target URL for browser navigation")
@@ -351,6 +456,8 @@ def main():
         result = verify_session(args.account)
     elif args.command == "status":
         result = check_status(args.account)
+    elif args.command == "sync":
+        result = sync_account(args.account)
 
     if args.json:
         print(json.dumps(result))

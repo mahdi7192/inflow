@@ -327,4 +327,51 @@ export class ServerOrchestrator {
       return { success: false, authenticated: false, status: "error", error: (err as Error).message };
     }
   }
+
+  /**
+   * Synchronizes account profile metrics and posts using the isolated bot browser profile.
+   */
+  static async syncAccount(account: string): Promise<{
+    success: boolean;
+    posts_synced?: number;
+    followers_text?: string;
+    total_posts_reported?: number;
+    error?: string;
+  }> {
+    const mode = this.getMode();
+    if (mode === "mock") {
+      return { success: true, posts_synced: 10, followers_text: "1,200 followers" };
+    }
+
+    if (mode === "local") {
+      try {
+        const { stdout } = await execFileAsync("python3", [
+          SCRIPT_PATH,
+          "sync",
+          "--account",
+          account,
+          "--json",
+        ], { timeout: 120000 });
+        const data = JSON.parse(stdout);
+        return data;
+      } catch (err: unknown) {
+        return { success: false, error: (err as Error).message };
+      }
+    }
+
+    // Remote mode
+    try {
+      const resp = await fetch(`${ORCHESTRATOR_URL}/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ORCHESTRATOR_SECRET}`,
+        },
+        body: JSON.stringify({ account }),
+      });
+      return await resp.json();
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
 }
