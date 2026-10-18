@@ -1,7 +1,7 @@
 """
 inFlow Multi-Account Instagram Automation Worker Engine
 Processes incoming comments, enforces follow gates (dm_require_follow),
-executes humanized replies, and dispatches direct messages with dynamic anti-ban pacing.
+executes humanized / AI replies, and dispatches direct messages with dynamic anti-ban pacing.
 """
 
 import sys
@@ -9,11 +9,11 @@ import os
 import time
 import argparse
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ig_client import InstagramClient, shortcode_to_media_id
+from ig_client import InstagramClient, shortcode_to_media_id, media_id_to_shortcode
 import db
 import matcher
 import humanizer
@@ -23,6 +23,12 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [inFlow:%(name)s] %(message)s"
 )
 logger = logging.getLogger("worker")
+
+def _resolve_reply_text(action_type: str, template: str, comment_text: str, caption: str) -> str:
+    """Generates the reply text based on action type (direct, reply, or ai)."""
+    if action_type == "ai":
+        return matcher.generate_ai_reply(comment_text, template, caption)
+    return humanizer.pick_reply_text(template)
 
 def process_account_pass(account_username: str, max_comments_per_post: int = 50) -> Dict[str, int]:
     stats = {
@@ -36,15 +42,37 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
 
     logger.info(f"Starting automation pass for account @{account_username}")
     
-    # 1. Initialize Instagram Client from decrypted profile session
+    # 1. Update heartbeat in DB immediately (Agent worker process is running and alive)
+    db.update_account_heartbeat(account_username)
+
+    # 2. Initialize Instagram Client from decrypted profile session
     try:
         client = InstagramClient(account_username)
     except Exception as e:
-        logger.error(f"Cannot initialize Instagram client for {account_username}: {e}")
+        err_msg = str(e)
+        logger.error(f"Cannot initialize Instagram client for {account_username}: {err_msg}")
+        if "sessionid" in err_msg.lower() or "login" in err_msg.lower() or "auth" in err_msg.lower():
+            db.update_account_bot_status(
+                account_username,
+                "login_required",
+                last_error=err_msg,
+                message="نشست نامعتبر است یا خروج صورت گرفته است (نیاز به ورود)"
+            )
+        else:
+            db.update_account_bot_status(
+                account_username,
+                "error",
+                last_error=err_msg,
+                message=f"خطا در کلاینت اینستاگرام: {err_msg}"
+            )
         return stats
 
-    # 2. Update heartbeat in DB
-    db.update_account_heartbeat(account_username)
+    # Client successfully connected, ensure status is 'live'
+    db.update_account_bot_status(
+        account_username,
+        "live",
+        message="اتصال فعال به اینستاگرام برقرار است"
+    )
 
     # 3. Retrieve active posts with automations enabled
     active_posts = db.get_active_posts(account_username)
@@ -57,16 +85,26 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
 
     for post in active_posts:
         shortcode = post.get("shortcode", "")
-        media_id = post.get("media_id", "") or shortcode_to_media_id(shortcode)
+        media_id = post.get("media_id", "")
+        if not media_id or not media_id.isdigit():
+            media_id = shortcode_to_media_id(shortcode)
+        if not shortcode and media_id:
+            shortcode = media_id_to_shortcode(media_id)
+        if len(shortcode) > 11:
+            shortcode = shortcode[:11]
+
+        caption = post.get("caption", "")
         trigger_type = post.get("trigger_type", "all")
         keywords = post.get("trigger_keywords", "")
+        trigger_context = post.get("trigger_context", "")
+        
         comment_action = post.get("comment_action_type", "none")
         comment_template = post.get("comment_action_text", "")
         dm_action = post.get("dm_action_type", "none")
         dm_template = post.get("dm_action_text", "")
         require_follow = bool(post.get("dm_require_follow", 0))
 
-        logger.info(f"Scanning post {shortcode} (media_id: {media_id}) - require_follow={require_follow}")
+        logger.info(f"Scanning post {shortcode} (media_id: {media_id}) - trigger={trigger_type}, require_follow={require_follow}")
 
         # Fetch comments from Instagram API
         comments = client.fetch_comments(media_id)
@@ -116,7 +154,7 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                     is_now_following = client.check_following(uid)
                     if is_now_following:
                         logger.info(f"Verified! User @{uname} now follows @{account_username}. Sending deferred DM.")
-                        dm_body = humanizer.pick_reply_text(dm_template)
+                        dm_body = _resolve_reply_text(dm_action, dm_template, text, caption)
                         dm_ok = client.send_dm(uid, dm_body)
                         if dm_ok:
                             db.update_pending_follow_to_sent(pending_rec["id"], dm_body)
@@ -125,7 +163,14 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
 
                         # Reply confirming DM delivery
                         reply_confirm = f"فالو شدنت تایید شد @{uname} عزیز، دایرکتت رو چک کن 📩✨"
-                        client.reply_to_comment(media_id, cid, reply_confirm)
+                        client.reply_to_comment(
+                            media_id=media_id,
+                            comment_id=cid,
+                            text=reply_confirm,
+                            shortcode=shortcode,
+                            username=uname,
+                            comment_text=text
+                        )
                         stats["replies_sent"] += 1
 
                         # Record this confirmation comment log
@@ -148,7 +193,14 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                     else:
                         logger.info(f"User @{uname} said confirmed but is NOT yet following.")
                         unfollow_reply = f"هنوز فالو نکردی @{uname} عزیز! لطفا اول پیج رو فالو کن و بعد بگو «فالو کردم» تا بلافاصله برات ارسال بشه 🌸"
-                        client.reply_to_comment(media_id, cid, unfollow_reply)
+                        client.reply_to_comment(
+                            media_id=media_id,
+                            comment_id=cid,
+                            text=unfollow_reply,
+                            shortcode=shortcode,
+                            username=uname,
+                            comment_text=text
+                        )
                         stats["replies_sent"] += 1
                         db.record_comment_interaction(
                             account_username=account_username,
@@ -168,7 +220,13 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                         continue
 
             # Standard comment evaluation
-            is_matched = matcher.matches_trigger(text, trigger_type, keywords)
+            is_matched = matcher.matches_trigger(
+                comment_text=text,
+                trigger_type=trigger_type,
+                trigger_keywords=keywords,
+                trigger_context=trigger_context,
+                post_caption=caption
+            )
             if not is_matched:
                 db.record_comment_interaction(
                     account_username=account_username,
@@ -194,20 +252,27 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
             dm_body = ""
 
             # Check Follow Gate condition
-            if dm_action != "none":
+            if dm_action in ("direct", "ai"):
                 if require_follow:
                     is_following = client.check_following(uid)
                     if is_following:
                         logger.info(f"User @{uname} already follows. Sending DM immediately.")
-                        dm_body = humanizer.pick_reply_text(dm_template)
+                        dm_body = _resolve_reply_text(dm_action, dm_template, text, caption)
                         dm_sent = client.send_dm(uid, dm_body)
                         dm_status = "sent" if dm_sent else "failed"
                         if dm_sent:
                             stats["dms_sent"] += 1
 
-                        if comment_action == "reply":
-                            reply_body = humanizer.pick_reply_text(comment_template)
-                            reply_ok = client.reply_to_comment(media_id, cid, reply_body)
+                        if comment_action in ("reply", "direct", "ai"):
+                            reply_body = _resolve_reply_text(comment_action, comment_template, text, caption)
+                            reply_ok = client.reply_to_comment(
+                                media_id=media_id,
+                                comment_id=cid,
+                                text=reply_body,
+                                shortcode=shortcode,
+                                username=uname,
+                                comment_text=text
+                            )
                             reply_status = "sent" if reply_ok else "failed"
                             if reply_ok:
                                 stats["replies_sent"] += 1
@@ -219,29 +284,50 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                         
                         # Public reply asking them to follow and say "فالو کردم"
                         reply_body = humanizer.get_follow_request_reply()
-                        reply_ok = client.reply_to_comment(media_id, cid, reply_body)
+                        reply_ok = client.reply_to_comment(
+                            media_id=media_id,
+                            comment_id=cid,
+                            text=reply_body,
+                            shortcode=shortcode,
+                            username=uname,
+                            comment_text=text
+                        )
                         reply_status = "sent" if reply_ok else "failed"
                         if reply_ok:
                             stats["replies_sent"] += 1
                 else:
                     # require_follow is False -> Send DM directly
-                    dm_body = humanizer.pick_reply_text(dm_template)
+                    dm_body = _resolve_reply_text(dm_action, dm_template, text, caption)
                     dm_sent = client.send_dm(uid, dm_body)
                     dm_status = "sent" if dm_sent else "failed"
                     if dm_sent:
                         stats["dms_sent"] += 1
 
-                    if comment_action == "reply":
-                        reply_body = humanizer.pick_reply_text(comment_template)
-                        reply_ok = client.reply_to_comment(media_id, cid, reply_body)
+                    if comment_action in ("reply", "direct", "ai"):
+                        reply_body = _resolve_reply_text(comment_action, comment_template, text, caption)
+                        reply_ok = client.reply_to_comment(
+                            media_id=media_id,
+                            comment_id=cid,
+                            text=reply_body,
+                            shortcode=shortcode,
+                            username=uname,
+                            comment_text=text
+                        )
                         reply_status = "sent" if reply_ok else "failed"
                         if reply_ok:
                             stats["replies_sent"] += 1
             else:
                 # DM is none, only comment reply if enabled
-                if comment_action == "reply":
-                    reply_body = humanizer.pick_reply_text(comment_template)
-                    reply_ok = client.reply_to_comment(media_id, cid, reply_body)
+                if comment_action in ("reply", "direct", "ai"):
+                    reply_body = _resolve_reply_text(comment_action, comment_template, text, caption)
+                    reply_ok = client.reply_to_comment(
+                        media_id=media_id,
+                        comment_id=cid,
+                        text=reply_body,
+                        shortcode=shortcode,
+                        username=uname,
+                        comment_text=text
+                    )
                     reply_status = "sent" if reply_ok else "failed"
                     if reply_ok:
                         stats["replies_sent"] += 1

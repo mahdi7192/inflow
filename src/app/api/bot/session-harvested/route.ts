@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Call orchestrator verification
     const verification = await ServerOrchestrator.verifySession(account);
 
-    if (verification.authenticated || verified) {
+    if (verification.authenticated) {
       updateAccountBotStatus(
         account,
         "live",
@@ -47,11 +47,20 @@ export async function POST(request: NextRequest) {
         "system"
       );
       clearAccountVncSession(account);
+
+      // Stop VNC session to clean up the interactive session
+      ServerOrchestrator.stopVncSession(account).catch(() => {});
+
+      // Automatically trigger sync for the newly logged-in account
+      ServerOrchestrator.syncAccount(account).catch((err) => {
+        console.error(`[SessionHarvested] Auto sync failed for ${account}:`, err);
+      });
+
       return NextResponse.json({
         success: true,
         account,
         status: "live",
-        message: "ربات اختصاصی با موفقیت فعال و لایو شد.",
+        message: "ربات اختصاصی با موفقیت فعال و لایو شد و همگام‌سازی پروفایل آغاز گردید.",
       });
     }
 

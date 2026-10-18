@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
-import { getAccountBotStatus, getBotLifecycleLogs } from "@/lib/db";
+import { getAccountBotStatus, getUnifiedBotActivityLogs } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       vncExpiresInSec = diff;
     }
 
-    const logs = getBotLifecycleLogs(account, 10);
+    const logs = getUnifiedBotActivityLogs(account, 30);
 
     return NextResponse.json({
       success: true,
@@ -42,14 +42,7 @@ export async function GET(request: NextRequest) {
       vnc_expires_in_sec: vncExpiresInSec,
       last_heartbeat_at: botStatus.last_heartbeat_at,
       bot_last_error: botStatus.bot_last_error,
-      logs: logs.map((l) => ({
-        id: l.id,
-        from_status: l.from_status,
-        to_status: l.to_status,
-        message: l.message,
-        actor: l.actor,
-        created_at: l.created_at,
-      })),
+      logs,
     });
   } catch (error: unknown) {
     console.error("Error in GET /api/bot/status:", error);

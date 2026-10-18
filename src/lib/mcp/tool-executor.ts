@@ -270,14 +270,30 @@ export async function executeMcpTool(
       let insertedCount = 0;
       const tx = db.transaction((items: Record<string, unknown>[]) => {
         items.forEach((item, idx) => {
-          const sc = String(item.shortcode || "").trim();
+          let sc = String(item.shortcode || "").trim();
           if (!sc) return;
+          if (sc.includes("?")) sc = sc.split("?")[0];
+          if (sc.includes("/")) sc = sc.split("/")[0];
+          const cleanSc = sc.length > 11 ? sc.slice(0, 11) : sc;
+
+          let mediaId = String(item.media_id || "").trim();
+          if (!mediaId || !/^\d+$/.test(mediaId)) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+            let mId = BigInt(0);
+            for (const char of cleanSc) {
+              const cIdx = alphabet.indexOf(char);
+              if (cIdx >= 0) {
+                mId = mId * BigInt(64) + BigInt(cIdx);
+              }
+            }
+            mediaId = mId.toString();
+          }
 
           upsertPost.run({
             account_username: accountUsername,
-            shortcode: sc,
-            media_id: String(item.media_id || ""),
-            url: String(item.url || `https://www.instagram.com/${accountUsername}/p/${sc}/`),
+            shortcode: cleanSc,
+            media_id: mediaId,
+            url: String(item.url || `https://www.instagram.com/${accountUsername}/p/${cleanSc}/`),
             post_type: item.post_type === "post" ? "post" : "reel",
             thumbnail_url: String(
               item.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"

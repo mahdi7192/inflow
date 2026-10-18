@@ -161,12 +161,12 @@ export function LogsModal({
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-secondary/30">
-          <div className="flex items-center gap-2.5">
-            <Clock className="w-4 h-4 text-sky-600" />
-            <h3 className="text-sm font-semibold text-foreground">
+          <div className="flex items-center gap-2 min-w-0">
+            <Clock className="w-4 h-4 text-sky-600 shrink-0" />
+            <h3 className="text-sm font-semibold text-foreground truncate">
               {t("modalLogsTitle")}
             </h3>
-            <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border">
+            <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border truncate max-w-[100px] sm:max-w-none shrink-0">
               {post.shortcode}
             </span>
           </div>

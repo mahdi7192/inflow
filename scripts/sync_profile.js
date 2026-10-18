@@ -81,6 +81,30 @@ function runDb(db, sql, params = []) {
 (async () => {
   let context = null;
   try {
+    // Ensure no running Chrome process is holding SingletonLock for this profile
+    try {
+      const pids = fs.readdirSync('/proc');
+      for (const pid of pids) {
+        if (!/^\d+$/.test(pid)) continue;
+        try {
+          const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+          if (cmd.includes(`--user-data-dir=${userDataDir}`)) {
+            process.kill(parseInt(pid, 10), 'SIGKILL');
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Clean stale lock files
+    for (const lockFile of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+      const p = path.join(userDataDir, lockFile);
+      try {
+        if (fs.existsSync(p) || fs.lstatSync(p).isSymbolicLink()) {
+          fs.unlinkSync(p);
+        }
+      } catch (_) {}
+    }
+
     context = await chromium.launchPersistentContext(userDataDir, {
       executablePath,
       headless: true,
@@ -168,7 +192,8 @@ function runDb(db, sql, params = []) {
         if (!match) continue;
 
         const pType = match[1] === 'reel' ? 'reel' : 'post';
-        const shortcode = match[2];
+        let rawCode = match[2].split('?')[0];
+        const shortcode = rawCode.length > 11 ? rawCode.slice(0, 11) : rawCode;
         if (seen.has(shortcode)) continue;
         seen.add(shortcode);
 

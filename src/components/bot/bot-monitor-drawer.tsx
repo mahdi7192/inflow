@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ShieldCheck,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { I18N, Lang, isRTL } from "@/lib/i18n";
 import { BotStatus } from "@/lib/db";
@@ -18,12 +19,42 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface BotLogItem {
-  id: number;
-  from_status: string | null;
-  to_status: string;
-  message: string;
-  actor: string;
+  id: string | number;
+  category?: string;
+  title?: string;
+  description?: string;
+  badge?: {
+    text: string;
+    variant: "default" | "success" | "warning" | "destructive" | "secondary";
+  };
+  metadata?: Record<string, any>;
+  from_status?: string | null;
+  to_status?: string;
+  message?: string;
+  actor?: string;
   created_at: string;
+}
+
+function formatLogTime(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  try {
+    let normalized = dateStr.trim();
+    if (!normalized.includes("T")) {
+      normalized = normalized.replace(" ", "T");
+    }
+    if (!normalized.endsWith("Z") && !normalized.includes("+") && !normalized.includes("-", 10)) {
+      normalized = `${normalized}Z`;
+    }
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 interface BotMonitorDrawerProps {
@@ -33,6 +64,7 @@ interface BotMonitorDrawerProps {
   botStatus: BotStatus;
   lang: Lang;
   onOpenVnc: () => void;
+  isVncLoading?: boolean;
   onStatusChange: (status: BotStatus) => void;
   agentStatus?: {
     is_online: boolean;
@@ -47,6 +79,7 @@ export function BotMonitorDrawer({
   botStatus,
   lang,
   onOpenVnc,
+  isVncLoading = false,
   onStatusChange,
   agentStatus,
 }: BotMonitorDrawerProps) {
@@ -218,9 +251,14 @@ export function BotMonitorDrawer({
             <Button
               className="w-full bg-zinc-900 hover:bg-zinc-800 text-white justify-center h-10 text-xs font-medium"
               onClick={onOpenVnc}
+              disabled={isVncLoading}
             >
-              <Monitor className="w-4 h-4 me-2" />
-              {t.botDrawerOpenVncBtn}
+              {isVncLoading ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : (
+                <Monitor className="w-4 h-4 me-2" />
+              )}
+              {isVncLoading ? "در حال اتصال به دسکتاپ..." : t.botDrawerOpenVncBtn}
             </Button>
 
             <div className="grid grid-cols-2 gap-2">
@@ -289,15 +327,36 @@ export function BotMonitorDrawer({
               </div>
             ) : (
               <div className="space-y-2">
-                {logs.map((log) => (
-                  <div key={log.id} className="p-3 bg-zinc-50 border border-zinc-200/80 rounded-lg text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">{log.to_status}</span>
-                      <span className="text-[10px] text-muted-foreground font-mono">{log.created_at}</span>
+                {logs.map((log) => {
+                  const title = log.title || log.to_status || "رویداد سیستم";
+                  const desc = log.description || log.message || "";
+                  const badgeText = log.badge?.text || log.to_status || "سیستم";
+                  const badgeVariant = (log.badge?.variant as any) || "secondary";
+
+                  return (
+                    <div
+                      key={log.id}
+                      className="p-3 bg-zinc-50 border border-zinc-200/80 rounded-lg text-xs space-y-1.5 transition-all hover:bg-zinc-100/60"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          <span className="font-semibold text-foreground truncate">{title}</span>
+                          <Badge variant={badgeVariant} className="text-[9px] py-0 px-1.5 shrink-0">
+                            {badgeText}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground font-medium tabular-nums shrink-0" dir="ltr">
+                          {formatLogTime(log.created_at)}
+                        </span>
+                      </div>
+                      {desc && (
+                        <p className="text-muted-foreground text-[11px] leading-relaxed whitespace-pre-line">
+                          {desc}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-muted-foreground text-[11px] leading-relaxed">{log.message}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -12,6 +12,7 @@ interface BotSetupWizardProps {
   botStatus: BotStatus;
   lang: Lang;
   onOpenVnc: () => void;
+  isVncLoading?: boolean;
   onStatusChange: (newStatus: BotStatus) => void;
 }
 
@@ -20,6 +21,7 @@ export function BotSetupWizard({
   botStatus,
   lang,
   onOpenVnc,
+  isVncLoading = false,
   onStatusChange,
 }: BotSetupWizardProps) {
   const [loading, setLoading] = useState(false);
@@ -283,9 +285,10 @@ export function BotSetupWizard({
               size="lg"
               className="w-full sm:w-auto bg-zinc-900 hover:bg-zinc-800 text-white font-medium"
               onClick={onOpenVnc}
+              disabled={isVncLoading}
             >
-              <Monitor className="w-4 h-4 me-2" />
-              {t.botLoginNowBtn}
+              {isVncLoading ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <Monitor className="w-4 h-4 me-2" />}
+              {isVncLoading ? "در حال اتصال به دسکتاپ..." : t.botLoginNowBtn}
             </Button>
           </div>
         </div>

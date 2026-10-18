@@ -15,6 +15,7 @@ import {
   Menu,
   AlertTriangle,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
@@ -98,8 +99,10 @@ export function InflowDashboard({
   const [vncModalOpen, setVncModalOpen] = useState(false);
   const [vncUrl, setVncUrl] = useState("");
   const [vncExpiresInSec, setVncExpiresInSec] = useState(600);
+  const [isVncLoading, setIsVncLoading] = useState(false);
 
   const handleOpenVnc = async () => {
+    setIsVncLoading(true);
     try {
       const res = await fetch("/api/bot/vnc-session", {
         method: "POST",
@@ -116,6 +119,8 @@ export function InflowDashboard({
       }
     } catch (err: unknown) {
       alert("خطا در ارتباط با سرور: " + (err as Error).message);
+    } finally {
+      setIsVncLoading(false);
     }
   };
 
@@ -576,6 +581,7 @@ export function InflowDashboard({
               botStatus={botStatus}
               lang={lang}
               onOpenVnc={handleOpenVnc}
+              isVncLoading={isVncLoading}
               onStatusChange={(newStatus) => {
                 setBotStatus(newStatus);
                 if (newStatus === "live") {
@@ -600,10 +606,11 @@ export function InflowDashboard({
                 <button
                   type="button"
                   onClick={handleOpenVnc}
-                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer flex items-center gap-1.5 transition-colors"
+                  disabled={isVncLoading}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer flex items-center gap-1.5 transition-colors"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>{I18N[lang]?.botLoginVncBtn || "ورود مجدد با دسکتاپ مجازی"}</span>
+                  {isVncLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                  <span>{isVncLoading ? "در حال اتصال..." : (I18N[lang]?.botLoginVncBtn || "ورود مجدد با دسکتاپ مجازی")}</span>
                 </button>
               </div>
             )}
@@ -621,9 +628,11 @@ export function InflowDashboard({
                 <button
                   type="button"
                   onClick={handleOpenVnc}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer"
+                  disabled={isVncLoading}
+                  className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer flex items-center gap-1.5"
                 >
-                  {I18N[lang]?.botResolveCheckpointBtn || "حل چالش در مرورگر"}
+                  {isVncLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  <span>{isVncLoading ? "در حال اتصال..." : (I18N[lang]?.botResolveCheckpointBtn || "حل چالش در مرورگر")}</span>
                 </button>
               </div>
             )}
@@ -1051,6 +1060,7 @@ export function InflowDashboard({
         lang={lang}
         agentStatus={agentStatus}
         onOpenVnc={handleOpenVnc}
+        isVncLoading={isVncLoading}
         onStatusChange={(status) => {
           setBotStatus(status);
           if (status === "live") fetchPosts(currentAccount);

@@ -192,7 +192,7 @@ export function PostDetailView({
           <div className="rounded-xl border border-border bg-card p-3.5 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">کد یکتای پست:</span>
-              <span className="font-mono text-foreground font-semibold">{post.shortcode}</span>
+              <span className="font-mono text-foreground font-semibold truncate max-w-[150px] sm:max-w-none">{post.shortcode}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">پیج مرتبط:</span>

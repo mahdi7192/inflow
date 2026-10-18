@@ -114,6 +114,37 @@ async function run() {
     await page.goto(postUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(3500);
 
+    const currentUrl = page.url();
+    if (currentUrl.includes('/accounts/login') || currentUrl.includes('/challenge')) {
+      await browser.close();
+      console.log(JSON.stringify({
+        success: false,
+        account,
+        error: 'Authentication required. Instagram redirected to login.',
+        login_required: true,
+        currentUrl
+      }));
+      process.exit(0);
+    }
+
+    const isLoginPrompt = await page.evaluate(() => {
+      const pwdInput = document.querySelector('input[type="password"]');
+      const hasContinueAs = Array.from(document.querySelectorAll('button, [role="button"]')).some(b => b.innerText && (b.innerText.includes('Continue as') || b.innerText.includes('Log in') || b.innerText.includes('Allow all cookies')));
+      return !!pwdInput || hasContinueAs;
+    });
+
+    if (isLoginPrompt) {
+      await browser.close();
+      console.log(JSON.stringify({
+        success: false,
+        account,
+        error: 'Session expired or password required.',
+        login_required: true,
+        currentUrl
+      }));
+      process.exit(0);
+    }
+
     // Track response
     let commentCreated = false;
     let createdCommentPk = null;

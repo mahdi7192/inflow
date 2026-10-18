@@ -109,13 +109,13 @@ def ensure_chrome(url=None):
     if os.path.exists(auth_file):
         env["XAUTHORITY"] = auth_file
     if not running:
-        target = url if url else "https://www.instagram.com/accounts/login/"
+        target = url if url else "https://www.instagram.com/"
         cmd = [
             "google-chrome-stable", "--no-sandbox", "--no-first-run", "--no-default-browser-check",
             "--disable-session-crashed-bubble", "--test-type", "--start-maximized",
             "--proxy-server=socks5://127.0.0.1:40000",
             "--disable-blink-features=AutomationControlled",
-            f"--user-data-dir={PROFILE_DIR}", target
+            f"--user-data-dir={{PROFILE_DIR}}", target
         ]
         try:
             subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -128,10 +128,10 @@ def ensure_chrome(url=None):
             "google-chrome-stable", "--no-sandbox",
             "--proxy-server=socks5://127.0.0.1:40000",
             "--disable-blink-features=AutomationControlled",
-            f"--user-data-dir={PROFILE_DIR}", url
+            f"--user-data-dir={{PROFILE_DIR}}", url
         ]
         try:
-            subprocess.run(cmd, env=env, check=False)
+            subprocess.run(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             time.sleep(1)
         except Exception:
             pass
@@ -370,9 +370,10 @@ def vnc_start(account: str, target_url: str = None):
     subprocess.run(["systemctl", "start", "inflow-websockify.service"], check=False)
 
     if os.path.exists(vnc_guard_path):
-        target = target_url or "https://www.instagram.com/accounts/login/"
+        target = target_url or "https://www.instagram.com/"
         try:
-            subprocess.run([sys.executable, vnc_guard_path, "start", target, vnc_token], timeout=6, check=False)
+            subprocess.run([sys.executable, vnc_guard_path, "start", target, vnc_token],
+                           timeout=6, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         except Exception:
             pass
 

@@ -147,9 +147,9 @@ export function getDb(): Database.Database {
 
   initSchema(db);
   migrateSchema(db);
-  seedIfEmpty(db);
+  // Disabled auto-seeding of mock data
+  // seedIfEmpty(db);
   seedUsersIfEmpty(db);
-  seedBotBindingsIfEmpty(db);
   cleanupStaleAgentJobs(db);
 
   global.__inflowDb = db;
@@ -191,6 +191,18 @@ function migrateSchema(db: Database.Database) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_bot_logs_account ON bot_lifecycle_logs(account_username, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS bot_activity_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      metadata TEXT DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bot_activity_logs_acc ON bot_activity_logs(account_username, created_at DESC);
   `);
 }
 
@@ -866,6 +878,168 @@ export function getBotLifecycleLogs(accountUsername: string, limit: number = 20)
     ORDER BY created_at DESC
     LIMIT ?
   `).all(accountUsername, limit) as BotLifecycleLogRow[];
+}
+
+export interface UnifiedBotActivityLog {
+  id: string;
+  category: "scan" | "comment" | "reply" | "dm" | "lifecycle" | "error" | "warning";
+  title: string;
+  description: string;
+  badge?: {
+    text: string;
+    variant: "default" | "success" | "warning" | "destructive" | "secondary";
+  };
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export function logBotActivity(
+  accountUsername: string,
+  eventType: string,
+  title: string,
+  description: string = "",
+  metadata: any = {}
+) {
+  const db = getDb();
+  const metaStr = typeof metadata === "string" ? metadata : JSON.stringify(metadata || {});
+  db.prepare(`
+    INSERT INTO bot_activity_logs (account_username, event_type, title, description, metadata)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(accountUsername, eventType, title, description, metaStr);
+}
+
+export function getUnifiedBotActivityLogs(accountUsername: string, limit: number = 25): UnifiedBotActivityLog[] {
+  const db = getDb();
+  const items: UnifiedBotActivityLog[] = [];
+
+  try {
+    // 1. Bot activity logs (scans, worker events, system notices)
+    const actRows = db.prepare(`
+      SELECT * FROM bot_activity_logs
+      WHERE account_username = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).all(accountUsername, limit) as Array<{
+      id: number;
+      account_username: string;
+      event_type: string;
+      title: string;
+      description: string;
+      metadata: string;
+      created_at: string;
+    }>;
+
+    for (const r of actRows) {
+      let meta = {};
+      try { meta = JSON.parse(r.metadata || "{}"); } catch {}
+      let variant: "default" | "success" | "warning" | "destructive" | "secondary" = "secondary";
+      if (r.event_type === "error" || r.event_type.includes("failed")) variant = "destructive";
+      else if (r.event_type === "warning") variant = "warning";
+      else if (r.event_type === "dm_sent" || r.event_type === "reply_sent" || r.event_type === "trigger_match") variant = "success";
+      
+      let badgeText = "سیستم";
+      if (r.event_type === "scan") badgeText = "سرکشی و پایش";
+      else if (r.event_type === "trigger_match") badgeText = "تطابق هوش مصنوعی";
+      else if (r.event_type === "dm_sent") badgeText = "دایرکت ارسال شد";
+      else if (r.event_type === "dm_failed") badgeText = "خطای دایرکت";
+      else if (r.event_type === "reply_sent") badgeText = "پاسخ کامنت ارسال شد";
+      else if (r.event_type === "reply_failed") badgeText = "خطای کامنت";
+      else if (r.event_type === "warning") badgeText = "هشدار";
+      else if (r.event_type === "error") badgeText = "خطا";
+
+      items.push({
+        id: `act-${r.id}`,
+        category: (r.event_type as any) || "scan",
+        title: r.title,
+        description: r.description,
+        badge: { text: badgeText, variant },
+        metadata: meta,
+        created_at: r.created_at,
+      });
+    }
+  } catch {}
+
+  try {
+    // 2. Comment & automation interaction logs
+    const commentRows = db.prepare(`
+      SELECT * FROM comment_logs
+      WHERE account_username = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).all(accountUsername, limit) as Array<{
+      id: number;
+      comment_id: string;
+      shortcode: string;
+      username: string;
+      comment_text: string;
+      trigger_matched: number;
+      comment_reply_status: string;
+      comment_reply_text: string;
+      dm_status: string;
+      dm_text: string;
+      created_at: string;
+    }>;
+
+    for (const c of commentRows) {
+      const isMatched = Boolean(c.trigger_matched);
+      let desc = `متن کامنت: «${c.comment_text}»\n`;
+      if (isMatched) {
+        const dmFa = c.dm_status === "sent" ? "ارسال شد ✅" : c.dm_status === "failed" ? "ناموفق ❌" : c.dm_status === "pending_follow" ? "در انتظار فالو ⏳" : "انجام نشد";
+        const replyFa = c.comment_reply_status === "sent" ? "ارسال شد ✅" : c.comment_reply_status === "failed" ? "ناموفق ❌" : "انجام نشد";
+        desc += `📩 دایرکت: ${dmFa} | 💬 ریپلای: ${replyFa}`;
+      } else {
+        desc += `وضعیت: نامرتبط با تریگر خودکار`;
+      }
+
+      items.push({
+        id: `comment-${c.id}`,
+        category: "comment",
+        title: `کامنت از @${c.username} در پست ${c.shortcode}`,
+        description: desc,
+        badge: isMatched
+          ? { text: "تطابق هوش مصنوعی", variant: "success" }
+          : { text: "بدون تریگر", variant: "secondary" },
+        metadata: {
+          username: c.username,
+          comment_id: c.comment_id,
+          shortcode: c.shortcode,
+          dm_status: c.dm_status,
+          dm_text: c.dm_text,
+          reply_status: c.comment_reply_status,
+          reply_text: c.comment_reply_text,
+        },
+        created_at: c.created_at,
+      });
+    }
+  } catch {}
+
+  try {
+    // 3. Lifecycle logs
+    const lifeRows = db.prepare(`
+      SELECT * FROM bot_lifecycle_logs
+      WHERE account_username = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).all(accountUsername, limit) as BotLifecycleLogRow[];
+
+    for (const l of lifeRows) {
+      items.push({
+        id: `life-${l.id}`,
+        category: "lifecycle",
+        title: l.actor === "user" ? "اقدام دستی کاربر" : "تغییر وضعیت نشست ربات",
+        description: `${l.message}${l.from_status ? ` (${l.from_status} ➔ ${l.to_status})` : ""}`,
+        badge: {
+          text: l.to_status === "live" ? "آنلاین و آماده" : l.to_status === "login_required" ? "نیاز به ورود" : l.to_status,
+          variant: l.to_status === "live" ? "success" : l.to_status === "login_required" ? "warning" : "default"
+        },
+        created_at: l.created_at,
+      });
+    }
+  } catch {}
+
+  // Sort unified logs chronologically (newest first)
+  items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return items.slice(0, limit);
 }
 
 

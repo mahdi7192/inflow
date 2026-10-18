@@ -6,6 +6,21 @@ import { BotStatus, updateAccountBotStatus, setAccountVncSession, clearAccountVn
 
 const execFileAsync = promisify(execFile);
 
+function parseSafeJson<T = any>(stdout: string): T {
+  const trimmed = stdout.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch {}
+    }
+    throw new Error(`Invalid JSON output: ${trimmed}`);
+  }
+}
+
 export interface ProvisionResult {
   success: boolean;
   profile_name: string;
@@ -87,7 +102,7 @@ export class ServerOrchestrator {
           pageToken,
           "--json",
         ]);
-        const data = JSON.parse(stdout);
+        const data = parseSafeJson(stdout);
         if (data.success) {
           updateAccountBotStatus(account, "login_required", "پروفایل هرمس و مرورگر رسمی با موفقیت مستقر شدند.", "system", null, data.profile_name);
           if (data.token && data.expires_at) {
@@ -193,7 +208,7 @@ export class ServerOrchestrator {
         if (targetUrl) args.push("--url", targetUrl);
 
         const { stdout } = await execFileAsync("python3", args);
-        const data = JSON.parse(stdout);
+        const data = parseSafeJson(stdout);
         if (data.success) {
           setAccountVncSession(account, data.token, data.expires_at);
           return {
@@ -294,7 +309,7 @@ export class ServerOrchestrator {
           account,
           "--json",
         ]);
-        const data = JSON.parse(stdout);
+        const data = parseSafeJson(stdout);
         if (data.authenticated) {
           updateAccountBotStatus(account, "live", "نشست اینستاگرام استخراج و تایید شد.", "system");
           clearAccountVncSession(account);
@@ -352,7 +367,7 @@ export class ServerOrchestrator {
           account,
           "--json",
         ], { timeout: 120000 });
-        const data = JSON.parse(stdout);
+        const data = parseSafeJson(stdout);
         return data;
       } catch (err: unknown) {
         return { success: false, error: (err as Error).message };
