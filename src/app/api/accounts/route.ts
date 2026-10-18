@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     `).run({
       username: rawUsername,
       display_name: body.display_name || rawUsername,
-      avatar_url: body.avatar_url || "/media/avatar.jpg",
+      avatar_url: body.avatar_url || "",
       bio: body.bio || "",
       followers_text: body.followers_text || "0",
       posts_count: body.posts_count || 0,

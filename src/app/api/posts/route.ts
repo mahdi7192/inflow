@@ -20,15 +20,11 @@ export async function GET(req: NextRequest) {
     let targetAccount = accountParam;
 
     if (!targetAccount) {
-      if (user.assigned_accounts.length > 0) {
-        targetAccount = user.assigned_accounts[0];
-      } else {
-        return NextResponse.json({
-          success: true,
-          profile: null,
-          posts: [],
-        });
-      }
+      return NextResponse.json({
+        success: true,
+        profile: null,
+        posts: [],
+      });
     }
 
     // Tenancy barrier: verify user has access to targetAccount

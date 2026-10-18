@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/db";
-import type { AccountRow } from "@/lib/db";
+import type { AccountRow, PostRow } from "@/lib/db";
 import { InflowDashboard } from "@/components/inflow-dashboard";
 import Link from "next/link";
 import { ShieldAlert, ArrowRight } from "lucide-react";
@@ -67,13 +67,13 @@ export default async function AccountPage({ params }: AccountPageProps) {
     );
   }
 
-  // Verify account exists in database
+  // Verify account exists in database and fetch full profile
   const db = getDb();
-  const accountExists = db
-    .prepare("SELECT username FROM accounts WHERE username = ?")
-    .get(username) as { username: string } | undefined;
+  const profile = db
+    .prepare("SELECT * FROM accounts WHERE username = ?")
+    .get(username) as AccountRow | undefined;
 
-  if (!accountExists) {
+  if (!profile) {
     return (
       <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4 font-vazir">
         <div className="max-w-md w-full bg-white border border-border p-6 rounded-2xl shadow-xs text-center">
@@ -95,6 +95,54 @@ export default async function AccountPage({ params }: AccountPageProps) {
     );
   }
 
+  // Fetch accounts accessible by user (for the account switcher in sidebar)
+  let accounts: AccountRow[] = [];
+  if (user.role === "superadmin") {
+    accounts = db
+      .prepare(`
+        SELECT 
+          a.*,
+          (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username) as total_posts,
+          (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username AND p.auto_reply = 1) as active_posts,
+          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username) as total_logs,
+          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.dm_status = 'sent') as total_dms,
+          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.comment_reply_status = 'sent') as total_replies
+        FROM accounts a
+        ORDER BY a.created_at DESC
+      `)
+      .all() as AccountRow[];
+  } else {
+    accounts = db
+      .prepare(`
+        SELECT 
+          a.*,
+          (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username) as total_posts,
+          (SELECT COUNT(*) FROM posts p WHERE p.account_username = a.username AND p.auto_reply = 1) as active_posts,
+          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username) as total_logs,
+          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.dm_status = 'sent') as total_dms,
+          (SELECT COUNT(*) FROM comment_logs l WHERE l.account_username = a.username AND l.comment_reply_status = 'sent') as total_replies
+        FROM accounts a
+        JOIN user_accounts ua ON a.username = ua.account_username
+        WHERE ua.user_id = ?
+        ORDER BY a.created_at DESC
+      `)
+      .all(user.id) as AccountRow[];
+  }
+
+  // Fetch posts for this account
+  const posts = db
+    .prepare(`
+      SELECT 
+        p.*,
+        (SELECT COUNT(*) FROM comment_logs l WHERE l.shortcode = p.shortcode) as logs_count,
+        (SELECT COUNT(*) FROM comment_logs l WHERE l.shortcode = p.shortcode AND l.dm_status = 'sent') as dms_count,
+        (SELECT COUNT(*) FROM comment_logs l WHERE l.shortcode = p.shortcode AND l.comment_reply_status = 'sent') as replies_count
+      FROM posts p
+      WHERE p.account_username = ?
+      ORDER BY p.sort_index ASC, p.id DESC
+    `)
+    .all(username) as PostRow[];
+
   return (
     <Suspense
       fallback={
@@ -106,7 +154,13 @@ export default async function AccountPage({ params }: AccountPageProps) {
         </div>
       }
     >
-      <InflowDashboard currentUser={user} initialAccount={username} />
+      <InflowDashboard
+        currentUser={user}
+        initialAccount={username}
+        initialProfile={profile}
+        initialPosts={posts}
+        initialAccounts={accounts}
+      />
     </Suspense>
   );
 }

@@ -32,23 +32,35 @@ import { BotMonitorDrawer } from "./bot/bot-monitor-drawer";
 import { VncViewerModal } from "./bot/vnc-viewer-modal";
 import { cn } from "@/lib/utils";
 
+export interface InflowDashboardProps {
+  currentUser?: SafeUser | null;
+  initialAccount?: string;
+  initialProfile?: AccountRow | null;
+  initialPosts?: PostRow[];
+  initialAccounts?: AccountRow[];
+}
+
 export function InflowDashboard({
   currentUser,
   initialAccount,
-}: {
-  currentUser?: SafeUser | null;
-  initialAccount?: string;
-}) {
+  initialProfile = null,
+  initialPosts = [],
+  initialAccounts = [],
+}: InflowDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
   const [lang, setLang] = useState<Lang>("fa");
-  const [accounts, setAccounts] = useState<AccountRow[]>([]);
-  const [currentAccount, setCurrentAccount] = useState<string>(initialAccount || "");
-  const [profile, setProfile] = useState<AccountRow | null>(null);
-  const [posts, setPosts] = useState<PostRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<AccountRow[]>(initialAccounts);
+  const [currentAccount, setCurrentAccount] = useState<string>(
+    initialAccount || (initialAccounts.length > 0 ? initialAccounts[0].username : "")
+  );
+  const [profile, setProfile] = useState<AccountRow | null>(initialProfile);
+  const [posts, setPosts] = useState<PostRow[]>(initialPosts);
+  const [loading, setLoading] = useState(
+    !initialProfile && !initialPosts.length && !initialAccount
+  );
   const [syncing, setSyncing] = useState(false);
   const [agentStatus, setAgentStatus] = useState<{
     is_online: boolean;
@@ -78,7 +90,9 @@ export function InflowDashboard({
   const [addAccountOpen, setAddAccountOpen] = useState(false);
 
   // Dedicated Bot Lifecycle & VNC Guard States
-  const [botStatus, setBotStatus] = useState<BotStatus>("unprovisioned");
+  const [botStatus, setBotStatus] = useState<BotStatus>(
+    initialProfile?.bot_status || "unprovisioned"
+  );
   const [botDrawerOpen, setBotDrawerOpen] = useState(false);
   const [vncModalOpen, setVncModalOpen] = useState(false);
   const [vncUrl, setVncUrl] = useState("");
@@ -160,11 +174,13 @@ export function InflowDashboard({
         setAccounts(data.accounts);
         if (data.accounts.length > 0) {
           const names = data.accounts.map((a: AccountRow) => a.username);
-          if (initialAccount && names.includes(initialAccount)) {
+          if (currentAccount && names.includes(currentAccount)) {
+            // Retain currently selected account
+          } else if (initialAccount && names.includes(initialAccount)) {
             setCurrentAccount(initialAccount);
           } else if (accountParam && names.includes(accountParam)) {
             setCurrentAccount(accountParam);
-          } else if (!currentAccount || !names.includes(currentAccount)) {
+          } else if (!currentAccount) {
             setCurrentAccount(data.accounts[0].username);
           }
         } else {
@@ -179,10 +195,10 @@ export function InflowDashboard({
   }, [accountParam, initialAccount, currentAccount]);
 
   // Fetch posts for the current account
-  const fetchPosts = useCallback(async (account: string) => {
-    setLoading(true);
+  const fetchPosts = useCallback(async (account: string, showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
-      const res = await fetch(`/api/posts?account=${account}`);
+      const res = await fetch(`/api/posts?account=${encodeURIComponent(account)}`);
       const data = await res.json();
       if (data.success) {
         setProfile(data.profile);
@@ -196,20 +212,25 @@ export function InflowDashboard({
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+    if (!initialAccounts || initialAccounts.length === 0) {
+      fetchAccounts();
+    }
+  }, [fetchAccounts, initialAccounts]);
 
   useEffect(() => {
     if (currentAccount) {
-      fetchPosts(currentAccount);
+      // If we don't already have profile for currentAccount, fetch it with loading indicator
+      if (!profile || profile.username !== currentAccount) {
+        fetchPosts(currentAccount, true);
+      }
       checkAgentStatus(currentAccount);
     }
-  }, [currentAccount, fetchPosts, checkAgentStatus]);
+  }, [currentAccount, profile, fetchPosts, checkAgentStatus]);
 
   // Synchronize URL query parameter with selectedShortcode state (Deep Linking)
   useEffect(() => {
@@ -607,16 +628,20 @@ export function InflowDashboard({
             <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={profile?.avatar_url || "/media/avatar.jpg"}
-                    alt="Avatar"
-                    className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
-                    }}
-                  />
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name || currentAccount}
+                      className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-bold font-mono text-muted-foreground shrink-0">
+                      {(currentAccount || "IN").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
                       <span>{profile?.display_name || currentAccount}</span>
@@ -779,15 +804,20 @@ export function InflowDashboard({
                         {/* Media Thumb */}
                         <div className="relative w-14 h-18 sm:w-16 sm:h-20 shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
-                            alt="Thumbnail"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
-                            }}
-                          />
+                          {p.thumbnail_url ? (
+                            <img
+                              src={p.thumbnail_url}
+                              alt="Thumbnail"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-secondary text-muted-foreground p-1 text-center">
+                              <FolderOpen className="w-5 h-5 opacity-40 mb-1" />
+                            </div>
+                          )}
                           <span className="absolute bottom-1 end-1 px-1 py-0.2 rounded text-[9px] font-mono bg-black/60 text-white">
                             {isReel ? "REEL" : "POST"}
                           </span>
@@ -916,15 +946,20 @@ export function InflowDashboard({
                     >
                       <div className="relative aspect-4/5 bg-secondary">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.thumbnail_url || "/media/thumbnails/DehQhnjoEcr.jpg"}
-                          alt="Thumbnail"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=300&auto=format&fit=crop&q=80";
-                          }}
-                        />
+                        {p.thumbnail_url ? (
+                          <img
+                            src={p.thumbnail_url}
+                            alt="Thumbnail"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-secondary text-muted-foreground p-2 text-center">
+                            <FolderOpen className="w-6 h-6 opacity-40 mb-1" />
+                          </div>
+                        )}
                         <span className="absolute top-2 start-2 px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/60 text-white">
                           {isReel ? "REEL" : "POST"}
                         </span>
