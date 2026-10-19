@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { I18N, Lang, isRTL } from "@/lib/i18n";
 import { BotStatus } from "@/lib/db";
@@ -70,6 +71,7 @@ interface BotMonitorDrawerProps {
     is_online: boolean;
     sse_connected: boolean;
   } | null;
+  onOpenDeleteAccount?: () => void;
 }
 
 export function BotMonitorDrawer({
@@ -82,6 +84,7 @@ export function BotMonitorDrawer({
   isVncLoading = false,
   onStatusChange,
   agentStatus,
+  onOpenDeleteAccount,
 }: BotMonitorDrawerProps) {
   const [profileName, setProfileName] = useState<string>(`inflow_${account}`);
   const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
@@ -360,6 +363,34 @@ export function BotMonitorDrawer({
               </div>
             )}
           </div>
+          {/* Danger Zone: Complete Account and Bot Deletion */}
+          {onOpenDeleteAccount && (
+            <div className="pt-2">
+              <div className="p-3.5 rounded-xl border border-destructive/20 bg-destructive/5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <Trash2 className="w-4 h-4 shrink-0" />
+                    <span className="text-xs font-bold text-foreground">حذف کامل حساب و ردپای ربات</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      onClose();
+                      onOpenDeleteAccount();
+                    }}
+                    className="h-7 text-xs px-2.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground cursor-pointer shadow-2xs"
+                  >
+                    حذف حساب
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  حذف کامل پروفایل ربات و داده‌های دیتابیس بدون باقی ماندن هیچ ردپایی روی سرور. (پیج و داده‌های اصلی اینستاگرام شما کاملاً امن و دست‌نخورده باقی می‌ماند).
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Drawer Footer */}

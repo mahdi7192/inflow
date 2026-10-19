@@ -109,12 +109,37 @@ def evaluate_ai_context(comment_text: str, trigger_context: str, post_caption: s
         logger.error(f"Failed to evaluate AI context with 9Router: {e}")
         return False
 
-def generate_ai_reply(comment_text: str, prompt_instructions: str, post_caption: str = "") -> str:
+def generate_ai_reply(
+    comment_text: str,
+    prompt_instructions: str,
+    post_caption: str = "",
+    channel: str = "comment"
+) -> str:
     """
-    Generates a natural, human-like Persian reply to a comment based on admin instructions.
+    Generates a natural, human-like Persian reply to a comment or direct message (DM)
+    based on admin instructions.
     """
-    prompt = f"""شما ادمین صمیمی، محترم و پاسخگوی اینستاگرام هستید.
-پاسخی طبیعی، دوستانه، کوتاه و بدون ساختگی بودن به کامنت زیر بدهید.
+    if channel == "dm":
+        prompt = f"""شما ادمین صمیمی، محترم و پاسخگوی این پیج اینستاگرام هستید.
+شما هم‌اکنون دقیقاً در صفحه چت خصوصی (دایرکت اینستاگرام) با این کاربر قرار دارید و می‌خواهید پیام دایرکت برایش ارسال کنید.
+
+کامنت کاربر در زیر پست:
+"{comment_text}"
+
+کپشن پست مربوطه:
+{post_caption or "بدون کپشن"}
+
+دستورالعمل ادمین برای محتوای دایرکت:
+{prompt_instructions}
+
+قوانین حیاتی و ضروری برای دایرکت:
+۱. شما هم‌اکنون داخل دایرکت هستید! بنابراین اکیداً و هرگز نباید عباراتی مثل «دایرکت شد»، «دایرکت فرستادم»، «دایرکتتون رو چک کنید» یا «براتون ارسال شد» بنویسید.
+۲. اصل پیام، پاسخ، لینک، تشکر یا اطلاعات مورد نظر را مستقیماً، گرم و صمیمی به کاربر تحویل دهید.
+۳. متن کوتاه، محاوره‌ای و روان باشد (حداکثر ۱ الی ۳ جمله).
+۴. فقط متن پیام را بنویسید، بدون گیومه یا توضیحات فرعی."""
+    else:
+        prompt = f"""شما ادمین صمیمی، محترم و پاسخگوی اینستاگرام هستید.
+شما در حال نوشتن یک پاسخ (ریپلای) عمومی زیر کامنت کاربر در پست اینستاگرام هستید.
 
 کپشن پست:
 {post_caption or "بدون کپشن"}
@@ -126,9 +151,9 @@ def generate_ai_reply(comment_text: str, prompt_instructions: str, post_caption:
 {prompt_instructions}
 
 نکات:
-- فقط متن مستقیم پاسخ را بنویسید (بدون سلام اضافه اگر لازم نیست، بدون نقل قول یا توضیحات اضافه).
-- حداکثر در 1 الی 2 جمله کوتاه.
-- کاملاً فارسی روان و محاوره‌ای متناسب با اینستاگرام."""
+- فقط متن مستقیم پاسخ عمومی را بنویسید (بدون نقل قول یا توضیحات اضافه).
+- حداکثر در ۱ الی ۲ جمله کوتاه و صمیمی.
+- کاملاً فارسی روان و محاوره‌ای متناسب با کامنت‌های اینستاگرام."""
 
     headers = {
         "Authorization": f"Bearer {_get_api_key()}",

@@ -90,6 +90,26 @@ def clean_stale_chrome_locks():
             except Exception:
                 pass
 
+def get_cdp_port():
+    cdp_file = "{profile_dir}/bot-desktop/cdp_port"
+    if os.path.exists(cdp_file):
+        try:
+            with open(cdp_file, "r") as f:
+                port = int(f.read().strip())
+                if 1024 < port < 65535:
+                    return port
+        except Exception:
+            pass
+    try:
+        disp_file = "{profile_dir}/bot-desktop/display"
+        if os.path.exists(disp_file):
+            with open(disp_file) as f:
+                d = f.read().strip().replace(":", "")
+                return 9200 + int(d)
+    except Exception:
+        pass
+    return 9226
+
 def ensure_chrome(url=None):
     clean_stale_chrome_locks()
     running = is_profile_chrome_running()
@@ -108,11 +128,13 @@ def ensure_chrome(url=None):
     auth_file = "{profile_dir}/bot-desktop/Xauthority"
     if os.path.exists(auth_file):
         env["XAUTHORITY"] = auth_file
+    cdp_port = get_cdp_port()
     if not running:
         target = url if url else "https://www.instagram.com/"
         cmd = [
             "google-chrome-stable", "--no-sandbox", "--no-first-run", "--no-default-browser-check",
             "--disable-session-crashed-bubble", "--test-type", "--start-maximized",
+            f"--remote-debugging-port={{cdp_port}}",
             "--proxy-server=socks5://127.0.0.1:40000",
             "--disable-blink-features=AutomationControlled",
             f"--user-data-dir={{PROFILE_DIR}}", target
@@ -126,6 +148,7 @@ def ensure_chrome(url=None):
     elif url:
         cmd = [
             "google-chrome-stable", "--no-sandbox",
+            f"--remote-debugging-port={{cdp_port}}",
             "--proxy-server=socks5://127.0.0.1:40000",
             "--disable-blink-features=AutomationControlled",
             f"--user-data-dir={{PROFILE_DIR}}", url
@@ -307,6 +330,20 @@ def provision_profile(account: str, token: str):
             account=account
         ))
     os.chmod(vnc_guard_path, 0o755)
+
+    # 5.1 Assign dedicated CDP port
+    cdp_port = 9226
+    try:
+        from engine.db import get_account_cdp_port
+        cdp_port = get_account_cdp_port(account)
+    except Exception:
+        pass
+    cdp_file = os.path.join(profile_dir, "bot-desktop", "cdp_port")
+    try:
+        with open(cdp_file, "w") as f:
+            f.write(str(cdp_port))
+    except Exception:
+        pass
 
     # 6. Generate VNC token & URL
     vnc_token = secrets.token_hex(8)
@@ -502,6 +539,55 @@ def sync_account(account: str):
     except Exception as e:
         return {"success": False, "account": account, "error": str(e)}
 
+def destroy_profile(account: str):
+    """
+    Completely stops all worker and browser processes for the account,
+    disables systemd units, and removes the entire bot profile directory
+    leaving zero trace on the filesystem.
+    """
+    account_clean = account.strip().lstrip("@").lower()
+    profile_name = get_profile_name(account_clean)
+    profile_dir = get_profile_dir(profile_name)
+
+    # 1. Stop and disable systemd worker service
+    service_name = f"inflow-worker@{account_clean}.service"
+    try:
+        subprocess.run(["systemctl", "stop", service_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+        subprocess.run(["systemctl", "disable", service_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+    except Exception:
+        pass
+
+    # 2. Stop VNC if running
+    try:
+        vnc_stop(account_clean)
+    except Exception:
+        pass
+
+    # 3. Kill any chrome or agent processes using this profile directory
+    try:
+        subprocess.run(["pkill", "-f", profile_dir], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        subprocess.run(["pkill", "-9", "-f", f"profile={profile_name}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except Exception:
+        pass
+
+    # 4. Remove the profile directory completely
+    deleted_dir = False
+    if os.path.exists(profile_dir):
+        try:
+            shutil.rmtree(profile_dir)
+            deleted_dir = True
+        except Exception:
+            subprocess.run(["rm", "-rf", profile_dir], check=False)
+            deleted_dir = not os.path.exists(profile_dir)
+
+    return {
+        "success": True,
+        "account": account_clean,
+        "profile_dir": profile_dir,
+        "profile_deleted": deleted_dir,
+        "service_stopped": service_name
+    }
+
 def check_status(account: str):
     profile_name = get_profile_name(account)
     profile_dir = get_profile_dir(profile_name)
@@ -521,7 +607,7 @@ def check_status(account: str):
 
 def main():
     parser = argparse.ArgumentParser(description="inFlow Hermes Server Orchestrator")
-    parser.add_argument("command", choices=["provision", "vnc-start", "vnc-stop", "verify-session", "status", "sync"])
+    parser.add_argument("command", choices=["provision", "vnc-start", "vnc-stop", "verify-session", "status", "sync", "destroy"])
     parser.add_argument("--account", required=True, help="Instagram account handle")
     parser.add_argument("--token", help="Page-dedicated API token")
     parser.add_argument("--url", help="Target URL for browser navigation")
@@ -544,6 +630,8 @@ def main():
         result = check_status(args.account)
     elif args.command == "sync":
         result = sync_account(args.account)
+    elif args.command == "destroy":
+        result = destroy_profile(args.account)
 
     if args.json:
         print(json.dumps(result))

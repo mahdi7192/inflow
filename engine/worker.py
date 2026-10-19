@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("worker")
 
-def _resolve_reply_text(action_type: str, template: str, comment_text: str, caption: str) -> str:
-    """Generates the reply text based on action type (direct, reply, or ai)."""
+def _resolve_reply_text(action_type: str, template: str, comment_text: str, caption: str, channel: str = "comment") -> str:
+    """Generates the reply text based on action type (direct, reply, or ai) and target channel ('comment' or 'dm')."""
     if action_type == "ai":
-        return matcher.generate_ai_reply(comment_text, template, caption)
+        return matcher.generate_ai_reply(comment_text, template, caption, channel=channel)
     return humanizer.pick_reply_text(template)
 
 def process_account_pass(account_username: str, max_comments_per_post: int = 50) -> Dict[str, int]:
@@ -111,38 +111,33 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
         if not comments:
             continue
 
+        # Immediately ignore comments posted by the account owner itself
+        owner_id = str(client.ds_user_id or "")
+        comments = [
+            c for c in comments
+            if c.get("username", "").strip().lower() != account_username.lower()
+            and (not owner_id or str(c.get("user_id", "")) != owner_id)
+        ]
+
         # Filter out comments already processed
         unprocessed_comments = [c for c in comments if not db.is_comment_processed(c["comment_id"])]
         # Process in chronological order (oldest first)
         unprocessed_comments.sort(key=lambda x: x["created_at_utc"])
         
         queue_len = len(unprocessed_comments)
-        logger.info(f"Post {shortcode}: {len(comments)} total comments, {queue_len} unprocessed")
+        logger.info(f"Post {shortcode}: {len(comments)} user comments, {queue_len} unprocessed")
 
         for comment in unprocessed_comments[:max_comments_per_post]:
-            stats["comments_scanned"] += 1
             cid = comment["comment_id"]
             uid = comment["user_id"]
             uname = comment["username"]
             text = comment["text"]
 
-            # Ignore comments posted by the account owner itself
-            if uid == client.ds_user_id or uname.lower() == account_username.lower():
-                db.record_comment_interaction(
-                    account_username=account_username,
-                    shortcode=shortcode,
-                    media_id=media_id,
-                    comment_id=cid,
-                    user_id=uid,
-                    username=uname,
-                    comment_text=text,
-                    trigger_matched=False,
-                    comment_reply_status="skipped",
-                    comment_reply_text="",
-                    dm_status="skipped",
-                    dm_text="",
-                )
+            # Double check: skip account owner's own comments completely without logging
+            if (owner_id and str(uid) == owner_id) or uname.strip().lower() == account_username.lower():
                 continue
+
+            stats["comments_scanned"] += 1
 
             # Check if this user had a pending follow request on this post
             pending_rec = db.get_pending_follow_record(account_username, shortcode, uid)
@@ -154,8 +149,8 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                     is_now_following = client.check_following(uid)
                     if is_now_following:
                         logger.info(f"Verified! User @{uname} now follows @{account_username}. Sending deferred DM.")
-                        dm_body = _resolve_reply_text(dm_action, dm_template, text, caption)
-                        dm_ok = client.send_dm(uid, dm_body)
+                        dm_body = _resolve_reply_text(dm_action, dm_template, text, caption, channel="dm")
+                        dm_ok = client.send_dm(uid, dm_body, username=uname)
                         if dm_ok:
                             db.update_pending_follow_to_sent(pending_rec["id"], dm_body)
                             stats["dms_sent"] += 1
@@ -257,14 +252,14 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                     is_following = client.check_following(uid)
                     if is_following:
                         logger.info(f"User @{uname} already follows. Sending DM immediately.")
-                        dm_body = _resolve_reply_text(dm_action, dm_template, text, caption)
-                        dm_sent = client.send_dm(uid, dm_body)
+                        dm_body = _resolve_reply_text(dm_action, dm_template, text, caption, channel="dm")
+                        dm_sent = client.send_dm(uid, dm_body, username=uname)
                         dm_status = "sent" if dm_sent else "failed"
                         if dm_sent:
                             stats["dms_sent"] += 1
 
                         if comment_action in ("reply", "direct", "ai"):
-                            reply_body = _resolve_reply_text(comment_action, comment_template, text, caption)
+                            reply_body = _resolve_reply_text(comment_action, comment_template, text, caption, channel="comment")
                             reply_ok = client.reply_to_comment(
                                 media_id=media_id,
                                 comment_id=cid,
@@ -297,14 +292,14 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
                             stats["replies_sent"] += 1
                 else:
                     # require_follow is False -> Send DM directly
-                    dm_body = _resolve_reply_text(dm_action, dm_template, text, caption)
-                    dm_sent = client.send_dm(uid, dm_body)
+                    dm_body = _resolve_reply_text(dm_action, dm_template, text, caption, channel="dm")
+                    dm_sent = client.send_dm(uid, dm_body, username=uname)
                     dm_status = "sent" if dm_sent else "failed"
                     if dm_sent:
                         stats["dms_sent"] += 1
 
                     if comment_action in ("reply", "direct", "ai"):
-                        reply_body = _resolve_reply_text(comment_action, comment_template, text, caption)
+                        reply_body = _resolve_reply_text(comment_action, comment_template, text, caption, channel="comment")
                         reply_ok = client.reply_to_comment(
                             media_id=media_id,
                             comment_id=cid,
@@ -319,7 +314,7 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
             else:
                 # DM is none, only comment reply if enabled
                 if comment_action in ("reply", "direct", "ai"):
-                    reply_body = _resolve_reply_text(comment_action, comment_template, text, caption)
+                    reply_body = _resolve_reply_text(comment_action, comment_template, text, caption, channel="comment")
                     reply_ok = client.reply_to_comment(
                         media_id=media_id,
                         comment_id=cid,

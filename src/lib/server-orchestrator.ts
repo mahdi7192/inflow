@@ -389,4 +389,52 @@ export class ServerOrchestrator {
       return { success: false, error: (err as Error).message };
     }
   }
+
+  /**
+   * Completely destroys an account's isolated bot profile, stops background services,
+   * and purges all browser files and sockets from the server without a trace.
+   */
+  static async destroyProfile(account: string): Promise<{
+    success: boolean;
+    profile_dir?: string;
+    profile_deleted?: boolean;
+    service_stopped?: string;
+    error?: string;
+  }> {
+    const mode = this.getMode();
+    if (mode === "mock") {
+      return { success: true, profile_deleted: true };
+    }
+
+    if (mode === "local") {
+      try {
+        const { stdout } = await execFileAsync("python3", [
+          SCRIPT_PATH,
+          "destroy",
+          "--account",
+          account,
+          "--json",
+        ], { timeout: 30000 });
+        const data = parseSafeJson(stdout);
+        return data;
+      } catch (err: unknown) {
+        return { success: false, error: (err as Error).message };
+      }
+    }
+
+    // Remote mode
+    try {
+      const resp = await fetch(`${ORCHESTRATOR_URL}/destroy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ORCHESTRATOR_SECRET}`,
+        },
+        body: JSON.stringify({ account }),
+      });
+      return await resp.json();
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
 }

@@ -1,38 +1,48 @@
 """
-inFlow Instagram Session & API Client
-Safe, authenticated communication with Instagram Web endpoints
-using decrypted cookies from the isolated Chrome bot profile.
+inFlow Instagram Session & CDP Client
+Native Chrome DevTools Protocol (CDP) client directly connected to the
+account's isolated Chrome browser instance. Zero subprocess conflict,
+zero secondary profile locking, and fully human-simulated interactions.
 """
 
 import os
 import sys
 import json
-import uuid
 import time
-import shutil
-import tempfile
-import hashlib
-import subprocess
+import asyncio
 import logging
+import subprocess
 from typing import Dict, Any, Optional, List
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
-from curl_cffi import requests
 
 try:
     import db
 except ImportError:
     from . import db
 
+try:
+    from engine.cdp_client import CDPClient
+except ImportError:
+    from cdp_client import CDPClient
+
 logger = logging.getLogger("inflow.ig_client")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-PROXY_SOCKS5 = "socks5://127.0.0.1:40000"
-IG_APP_ID = "936619743392459"
-USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+def _run_async(coro):
+    """Run an async coroutine synchronously."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            return pool.submit(asyncio.run, coro).result()
+    else:
+        return asyncio.run(coro)
 
 def shortcode_to_media_id(shortcode: str) -> str:
-    """Converts an Instagram shortcode (e.g. DehQhnjoEcr or web slug) to its numeric media_id."""
+    """Converts an Instagram shortcode (e.g. DehQhnjoEcr) to numeric media_id."""
     if not shortcode:
         return ""
     clean_code = shortcode.split("?")[0].split("/")[0].strip()
@@ -61,166 +71,137 @@ def media_id_to_shortcode(media_id: str) -> str:
         shortcode.append(alphabet[rem])
     return "".join(reversed(shortcode))
 
-def extract_profile_cookies(profile_dir: str) -> Dict[str, str]:
-    """
-    Extracts and decrypts Instagram cookies from Chromium SQLite database.
-    Does NOT require Chrome to be running or open.
-    """
-    cookie_path = os.path.join(profile_dir, "Default", "Cookies")
-    if not os.path.exists(cookie_path):
-        cookie_path = os.path.join(profile_dir, "Default", "Network", "Cookies")
-        if not os.path.exists(cookie_path):
-            raise FileNotFoundError(f"Chrome cookie database not found in {profile_dir}")
-
-    # Standard Linux Chromium key derivation (PBKDF2 with key 'peanuts' and salt 'saltysalt')
-    key = hashlib.pbkdf2_hmac("sha1", b"peanuts", b"saltysalt", 1, 16)
-    
-    tmp_path = tempfile.mktemp(prefix="ig_cookies_")
-    try:
-        shutil.copyfile(cookie_path, tmp_path)
-        import sqlite3
-        con = sqlite3.connect(tmp_path)
-        rows = con.execute("SELECT name, encrypted_value FROM cookies WHERE host_key LIKE '%instagram%'").fetchall()
-        con.close()
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-
-    cookies: Dict[str, str] = {}
-    for name, enc in rows:
-        try:
-            if enc.startswith(b"v10") or enc.startswith(b"v11"):
-                enc_data = enc[3:]
-                iv = b" " * 16
-                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-                decryptor = cipher.decryptor()
-                dec = decryptor.update(enc_data) + decryptor.finalize()
-                pad = dec[-1]
-                # Modern Linux Chromium has a 32-byte hash header
-                val = dec[32:-pad].decode("utf-8", errors="ignore")
-                cookies[name] = val
-            else:
-                cookies[name] = enc.decode("utf-8", errors="ignore")
-        except Exception as e:
-            logger.debug(f"Failed to decrypt cookie {name}: {e}")
-
-    return cookies
-
 class InstagramClient:
     def __init__(self, account_username: str):
         self.account_username = account_username
-        self.profile_dir = f"/root/.hermes/profiles/inflow_{account_username}/bot-desktop/browser-profile"
-        self.cookies = extract_profile_cookies(self.profile_dir)
-        
-        self.ds_user_id = self.cookies.get("ds_user_id", "")
-        self.csrf_token = self.cookies.get("csrftoken", "")
-        self.session_id = self.cookies.get("sessionid", "")
-        
-        if not self.session_id:
+        self.cdp_port = db.get_account_cdp_port(account_username)
+        self.profile_dir = f"/root/.hermes/profiles/inflow_{account_username.lower()}"
+        self._ds_user_id = None
+        self._ensure_browser_ready()
+
+    @property
+    def ds_user_id(self) -> str:
+        if self._ds_user_id:
+            return self._ds_user_id
+        async def _get_uid():
+            cdp = None
             try:
-                db.update_account_bot_status(
-                    account_username,
-                    "login_required",
-                    last_error="No active sessionid found",
-                    message="کوکی نشست sessionid در پروفایل یافت نشد"
-                )
-            except Exception as e:
-                logger.warning(f"Could not update bot status in DB: {e}")
-            raise ValueError(f"No active sessionid found for account '{account_username}'. Is account logged in?")
+                cdp = await self._get_cdp()
+                cookies = await cdp.get_cookies()
+                for c in cookies:
+                    if c.get("name") == "ds_user_id":
+                        return c.get("value", "")
+                return ""
+            except Exception:
+                return ""
+            finally:
+                if cdp:
+                    await cdp.close()
+        self._ds_user_id = _run_async(_get_uid())
+        return self._ds_user_id
 
-        self.session = requests.Session(impersonate="chrome120", proxy=PROXY_SOCKS5)
-        for k, v in self.cookies.items():
-            self.session.cookies.set(k, v, domain=".instagram.com")
+    def _ensure_browser_ready(self):
+        """Verifies Chrome is running on the dedicated CDP port, otherwise triggers vnc_guard."""
+        vnc_guard = os.path.join(self.profile_dir, "bin", "vnc_guard.py")
+        if not os.path.exists(vnc_guard):
+            return
 
-        self.default_headers = {
-            "X-CSRFToken": self.csrf_token,
-            "X-IG-App-ID": IG_APP_ID,
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": "https://www.instagram.com/",
-            "User-Agent": USER_AGENT,
-        }
+        import urllib.request
+        try:
+            req = urllib.request.Request(f"http://127.0.0.1:{self.cdp_port}/json/version")
+            with urllib.request.urlopen(req, timeout=1.5):
+                return
+        except Exception:
+            pass
+
+        logger.info(f"Chrome CDP port {self.cdp_port} not responding for {self.account_username}. Launching via vnc_guard...")
+        try:
+            subprocess.run([sys.executable, vnc_guard, "start"], timeout=15, check=False)
+            time.sleep(2)
+        except Exception as e:
+            logger.warning(f"Failed to start browser for {self.account_username}: {e}")
+
+    async def _get_cdp(self) -> CDPClient:
+        cdp = CDPClient(port=self.cdp_port)
+        await cdp.connect()
+        return cdp
 
     def check_health(self) -> bool:
-        """Verifies if the session is currently authenticated and valid."""
-        try:
-            url = "https://www.instagram.com/api/v1/users/web_profile_info/?username=" + self.account_username
-            res = self.session.get(url, headers=self.default_headers, timeout=15)
-            # If not logged in, Instagram returns 404 or redirects
-            return res.status_code == 200 or "sessionid" in self.cookies
-        except Exception as e:
-            logger.error(f"Health check failed for {self.account_username}: {e}")
-            return False
-
-    def fetch_comments(self, media_id: str) -> List[Dict[str, Any]]:
-        """
-        Fetches latest comments for a media post.
-        Returns a list of parsed comment dicts.
-        """
-        url = f"https://www.instagram.com/api/v1/media/{media_id}/comments/?can_support_threading=true&permalink_enabled=false"
-        try:
-            res = self.session.get(url, headers=self.default_headers, timeout=20)
-            if res.status_code in (401, 403):
-                logger.warning(f"Fetch comments unauthorized {res.status_code} for media {media_id}")
-                try:
+        """Verifies if the browser session is authenticated."""
+        async def _check():
+            cdp = None
+            try:
+                cdp = await self._get_cdp()
+                logged = await cdp.is_logged_in()
+                if not logged:
                     db.update_account_bot_status(
                         self.account_username,
                         "login_required",
-                        last_error=f"Fetch comments HTTP {res.status_code}",
-                        message="نشست در اینستاگرام منقضی شد (نیاز به ورود)"
+                        last_error="No sessionid cookie in browser",
+                        message="نیاز به ورود مجدد از طریق پنل vNC"
                     )
-                except Exception:
-                    pass
+                return logged
+            except Exception as e:
+                logger.error(f"Health check failed for {self.account_username}: {e}")
+                db.update_account_bot_status(
+                    self.account_username,
+                    "error",
+                    last_error=str(e),
+                    message="خطا در اتصال به مرورگر ایزوله (CDP)"
+                )
+                return False
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_check())
+
+    def fetch_comments(self, media_id: str) -> List[Dict[str, Any]]:
+        """Fetches latest comments for a media post via browser context."""
+        async def _fetch():
+            cdp = None
+            try:
+                cdp = await self._get_cdp()
+                raw_comments = await cdp.fetch_media_comments(media_id)
+                parsed: List[Dict[str, Any]] = []
+                for c in raw_comments:
+                    u = c.get("user", {})
+                    parsed.append({
+                        "comment_id": str(c.get("pk")),
+                        "user_id": str(u.get("pk")),
+                        "username": str(u.get("username")),
+                        "text": str(c.get("text", "")).strip(),
+                        "created_at_utc": int(c.get("created_at_utc", c.get("created_at", 0))),
+                    })
+                return parsed
+            except Exception as e:
+                logger.error(f"Error fetching comments for media {media_id}: {e}")
                 return []
-            if "feedback_required" in res.text or "checkpoint_required" in res.text:
-                status_val = "checkpoint_required" if "checkpoint" in res.text else "rate_limited"
-                try:
-                    db.update_account_bot_status(
-                        self.account_username,
-                        status_val,
-                        last_error=res.text[:200],
-                        message="محدودیت اکشن یا چک‌پوینت از سمت اینستاگرام"
-                    )
-                except Exception:
-                    pass
-                return []
-            if res.status_code != 200:
-                logger.warning(f"Fetch comments returned status {res.status_code} for media {media_id}")
-                return []
-            data = res.json()
-            raw_comments = data.get("comments", [])
-            parsed: List[Dict[str, Any]] = []
-            for c in raw_comments:
-                u = c.get("user", {})
-                parsed.append({
-                    "comment_id": str(c.get("pk")),
-                    "user_id": str(u.get("pk")),
-                    "username": str(u.get("username")),
-                    "text": str(c.get("text", "")).strip(),
-                    "created_at_utc": int(c.get("created_at_utc", c.get("created_at", 0))),
-                })
-            return parsed
-        except Exception as e:
-            logger.error(f"Error fetching comments for media {media_id}: {e}")
-            return []
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_fetch())
 
     def check_following(self, target_user_id: str) -> bool:
-        """
-        Checks if target_user_id follows the authenticated account.
-        Returns True if followed_by is True.
-        """
+        """Checks if target_user_id follows the account via browser context."""
         if not target_user_id:
             return False
-        url = f"https://www.instagram.com/api/v1/friendships/show/{target_user_id}/"
-        try:
-            res = self.session.get(url, headers=self.default_headers, timeout=15)
-            if res.status_code == 200:
-                data = res.json()
-                # 'followed_by': True indicates target user follows our account!
-                return bool(data.get("followed_by", False))
-            return False
-        except Exception as e:
-            logger.error(f"Error checking friendship for {target_user_id}: {e}")
-            return False
+
+        async def _check():
+            cdp = None
+            try:
+                cdp = await self._get_cdp()
+                is_following, _ = await cdp.check_user_friendship(target_user_id)
+                return is_following
+            except Exception as e:
+                logger.error(f"Error checking friendship for {target_user_id}: {e}")
+                return False
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_check())
 
     def reply_to_comment(
         self,
@@ -231,143 +212,70 @@ class InstagramClient:
         username: str = "",
         comment_text: str = ""
     ) -> bool:
-        """
-        Replies publicly to a specific comment.
-        Uses headless Playwright script with Chrome profile for 100% reliability,
-        falling back to web API if needed.
-        """
-        if not shortcode:
-            shortcode = media_id_to_shortcode(media_id)
-
-        # 1. Try via browser helper script (Playwright)
-        helper_path = "/opt/inflow/scripts/post_comment_reply.js"
-        if os.path.exists(helper_path) and shortcode:
+        """Posts a reply to a comment using native browser context."""
+        async def _reply():
+            cdp = None
             try:
-                cmd = [
-                    "node",
-                    helper_path,
-                    "--account", self.account_username,
-                    "--shortcode", shortcode,
-                    "--reply", text
-                ]
-                if comment_id:
-                    cmd.extend(["--comment-id", str(comment_id)])
-                if username:
-                    cmd.extend(["--target-user", username])
-                if comment_text:
-                    cmd.extend(["--target-text", comment_text])
+                cdp = await self._get_cdp()
+                sc = shortcode or (media_id_to_shortcode(media_id) if media_id else "")
+                if sc and username:
+                    ui_success, ui_resp = await cdp.reply_to_comment_ui(sc, username, text)
+                    if ui_success:
+                        logger.info(f"Successfully replied via UI to comment {comment_id} for @{username}")
+                        return True
+                    logger.warning(f"UI reply failed for comment {comment_id}: {ui_resp}, falling back to API")
 
-                env = dict(os.environ)
-                env["NODE_PATH"] = "/root/twenty-repo/node_modules:/opt/inflow/node_modules"
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=45, env=env)
-                if proc.returncode == 0:
-                    try:
-                        res_data = json.loads(proc.stdout.strip())
-                        if res_data.get("login_required"):
-                            db.update_account_bot_status(
-                                self.account_username,
-                                "login_required",
-                                last_error=res_data.get("error", "Login required"),
-                                message="نشست نامعتبر است یا نیاز به ورود دارد"
-                            )
-                            return False
-                        if res_data.get("success"):
-                            logger.info(f"Successfully posted comment reply via browser helper for @{username}: {text}")
-                            return True
-                    except Exception:
-                        pass
-                logger.warning(f"Browser helper reply note: {proc.stderr[:150] or proc.stdout[:150]}")
+                success, resp = await cdp.reply_to_comment_api(media_id, comment_id, username, text)
+                if success:
+                    logger.info(f"Successfully replied to comment {comment_id} for @{username}")
+                    return True
+                logger.warning(f"Failed to reply to comment {comment_id}: {resp}")
+                if isinstance(resp, dict) and (resp.get("feedback_required") or resp.get("checkpoint_required")):
+                    db.update_account_bot_status(
+                        self.account_username,
+                        "rate_limited",
+                        last_error=str(resp)[:200],
+                        message="محدودیت موقت اینستاگرام در ثبت کامنت"
+                    )
+                return False
             except Exception as e:
-                logger.warning(f"Error calling browser helper: {e}")
-
-        # 2. Fallback to API if browser helper did not succeed
-        url = f"https://www.instagram.com/api/v1/web/comments/{media_id}/add/"
-        payload = {
-            "comment_text": text,
-            "replied_to_comment_id": comment_id,
-        }
-        headers = dict(self.default_headers)
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-        headers["X-Instagram-AJAX"] = "1"
-        try:
-            res = self.session.post(url, data=payload, headers=headers, timeout=20)
-            if res.status_code == 200:
-                data = res.json()
-                if data.get("status") == "ok":
-                    logger.info(f"Successfully replied to comment {comment_id} via API")
-                    return True
-            if "feedback_required" in res.text or "checkpoint_required" in res.text:
-                status_val = "checkpoint_required" if "checkpoint" in res.text else "rate_limited"
-                try:
-                    db.update_account_bot_status(
-                        self.account_username,
-                        status_val,
-                        last_error=res.text[:200],
-                        message="محدودیت اکشن یا چک‌پوینت از سمت اینستاگرام در ثبت پاسخ کامنت"
-                    )
-                except Exception:
-                    pass
+                logger.error(f"Error replying to comment {comment_id}: {e}")
                 return False
-            if res.status_code in (401, 403) or "login_required" in res.text:
-                try:
-                    db.update_account_bot_status(
-                        self.account_username,
-                        "login_required",
-                        last_error=f"API reply HTTP {res.status_code}",
-                        message="نشست نامعتبر است یا نیاز به ورود دارد"
-                    )
-                except Exception:
-                    pass
-            logger.warning(f"Reply to comment {comment_id} failed with code {res.status_code}: {res.text[:200]}")
-            return False
-        except Exception as e:
-            logger.error(f"Error replying to comment {comment_id}: {e}")
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_reply())
+
+    def send_dm(self, recipient_user_id: str, text: str, username: Optional[str] = None) -> bool:
+        """Sends a Direct Message using humanized CDP UI interaction in the browser."""
+        target_username = username or recipient_user_id
+        if not target_username:
+            logger.error("send_dm called without target username or recipient ID")
             return False
 
-    def send_dm(self, recipient_user_id: str, text: str) -> bool:
-        """
-        Sends a Direct Message (DM) to recipient_user_id.
-        """
-        url = "https://www.instagram.com/api/v1/direct_v2/threads/broadcast/text/"
-        payload = {
-            "recipient_users": f"[[{recipient_user_id}]]",
-            "text": text,
-            "action": "send_item",
-            "client_context": str(uuid.uuid4()),
-        }
-        headers = dict(self.default_headers)
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-        try:
-            res = self.session.post(url, data=payload, headers=headers, timeout=20)
-            if res.status_code == 200:
-                data = res.json()
-                if data.get("status") == "ok":
-                    logger.info(f"Successfully sent DM to user {recipient_user_id}")
+        async def _send():
+            cdp = None
+            try:
+                cdp = await self._get_cdp()
+                # 1. Open chat with target user
+                opened, reason = await cdp.open_dm_with_user(target_username)
+                if not opened:
+                    logger.warning(f"Could not open direct chat with @{target_username}: {reason}")
+                    return False
+
+                # 2. Type message with human jitter and send
+                sent, reason = await cdp.send_dm_text(text)
+                if sent:
+                    logger.info(f"Successfully sent humanized DM to @{target_username}")
                     return True
-            if "feedback_required" in res.text or "checkpoint_required" in res.text:
-                status_val = "checkpoint_required" if "checkpoint" in res.text else "rate_limited"
-                try:
-                    db.update_account_bot_status(
-                        self.account_username,
-                        status_val,
-                        last_error=res.text[:200],
-                        message="محدودیت ارسال دایرکت (Action Block) از سمت اینستاگرام"
-                    )
-                except Exception:
-                    pass
+                logger.warning(f"Failed to send DM to @{target_username}: {reason}")
                 return False
-            if res.status_code in (401, 403) or "login_required" in res.text:
-                try:
-                    db.update_account_bot_status(
-                        self.account_username,
-                        "login_required",
-                        last_error=f"Send DM HTTP {res.status_code}",
-                        message="نشست نامعتبر است یا نیاز به ورود دارد"
-                    )
-                except Exception:
-                    pass
-            logger.warning(f"Send DM to {recipient_user_id} failed with code {res.status_code}: {res.text[:200]}")
-            return False
-        except Exception as e:
-            logger.error(f"Error sending DM to {recipient_user_id}: {e}")
-            return False
+            except Exception as e:
+                logger.error(f"Error sending DM to @{target_username}: {e}")
+                return False
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_send())

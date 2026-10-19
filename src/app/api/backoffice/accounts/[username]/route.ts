@@ -25,6 +25,15 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // 1. Destroy profile files and services
+    try {
+      const { ServerOrchestrator } = await import("@/lib/server-orchestrator");
+      await ServerOrchestrator.destroyProfile(cleanUsername);
+    } catch (destroyErr) {
+      console.warn(`[Backoffice Delete] Warning destroying profile for ${cleanUsername}:`, destroyErr);
+    }
+
+    // 2. Remove database rows
     deleteAccount(cleanUsername);
 
     return NextResponse.json({

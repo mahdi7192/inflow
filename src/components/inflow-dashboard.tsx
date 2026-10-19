@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   ExternalLink,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
@@ -28,6 +29,7 @@ import { PostDetailView } from "./post-detail-view";
 import { LogsModal } from "./modals/logs-modal";
 import { AgentApiModal } from "./modals/agent-api-modal";
 import { AddAccountModal } from "./modals/create-modals";
+import { DeleteAccountModal } from "./modals/delete-account-modal";
 import { BotSetupWizard } from "./bot/bot-setup-wizard";
 import { BotToolbarButton } from "./bot/bot-toolbar-button";
 import { BotMonitorDrawer } from "./bot/bot-monitor-drawer";
@@ -90,6 +92,21 @@ export function InflowDashboard({
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
   const [agentApiOpen, setAgentApiOpen] = useState(false);
   const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+
+  const handleAccountDeleted = () => {
+    setDeleteAccountOpen(false);
+    const clean = (currentAccount || "").toLowerCase();
+    const remaining = accounts.filter(
+      (a) => a.username.toLowerCase() !== clean
+    );
+    setAccounts(remaining);
+    if (remaining.length > 0) {
+      handleSelectAccount(remaining[0].username);
+    } else {
+      router.push("/");
+    }
+  };
 
   // Dedicated Bot Lifecycle & VNC Guard States
   const [botStatus, setBotStatus] = useState<BotStatus>(
@@ -423,6 +440,7 @@ export function InflowDashboard({
           lang={lang}
           isCatalogActive={!selectedShortcode}
           onNavigateCatalog={handleBackToList}
+          onOpenDeleteAccount={() => setDeleteAccountOpen(true)}
         />
       </div>
 
@@ -461,6 +479,10 @@ export function InflowDashboard({
               onNavigateCatalog={() => {
                 handleBackToList();
                 setMobileDrawerOpen(false);
+              }}
+              onOpenDeleteAccount={() => {
+                setMobileDrawerOpen(false);
+                setDeleteAccountOpen(true);
               }}
             />
           </div>
@@ -666,6 +688,16 @@ export function InflowDashboard({
                     </p>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setDeleteAccountOpen(true)}
+                  title="حذف حساب و پاک‌سازی کامل ربات از سامانه"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-destructive text-xs font-medium transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>حذف حساب و ربات</span>
+                </button>
               </div>
 
               {/* KPI Cards */}
@@ -1065,6 +1097,7 @@ export function InflowDashboard({
           setBotStatus(status);
           if (status === "live") fetchPosts(currentAccount);
         }}
+        onOpenDeleteAccount={() => setDeleteAccountOpen(true)}
       />
 
       {/* VNC Viewer Modal */}
@@ -1080,6 +1113,16 @@ export function InflowDashboard({
           handleSync();
         }}
       />
+
+      {/* Delete Account & Wipe Bot Modal */}
+      {currentAccount && (
+        <DeleteAccountModal
+          open={deleteAccountOpen}
+          account={currentAccount}
+          onClose={() => setDeleteAccountOpen(false)}
+          onDeleted={handleAccountDeleted}
+        />
+      )}
     </div>
   );
 }

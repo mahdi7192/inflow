@@ -747,6 +747,8 @@ export function deleteAccount(accountUsername: string): void {
     db.prepare("DELETE FROM posts WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM comment_logs WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM agent_jobs WHERE account_username = ?").run(accountUsername);
+    db.prepare("DELETE FROM bot_lifecycle_logs WHERE account_username = ?").run(accountUsername);
+    db.prepare("DELETE FROM bot_activity_logs WHERE account_username = ?").run(accountUsername);
   });
   tx();
 }

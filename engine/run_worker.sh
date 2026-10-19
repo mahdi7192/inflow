@@ -5,7 +5,7 @@ ACCOUNT="${1:-mahdiketabdar}"
 ACCOUNT="${ACCOUNT//@/}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_EXEC="/root/.hermes/tools/python-3.14.7+20260901-linux-x64/bin/python3"
+PYTHON_EXEC="/usr/local/bin/inflow-python"
 if [ ! -f "$PYTHON_EXEC" ]; then
     PYTHON_EXEC="$(which python3)"
 fi

@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   X,
   Radio,
+  Trash2,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -37,6 +38,7 @@ export interface SidebarNavProps {
   onCloseMobileDrawer?: () => void;
   isCatalogActive?: boolean;
   onNavigateCatalog?: () => void;
+  onOpenDeleteAccount?: () => void;
 }
 
 export function SidebarNav({
@@ -53,6 +55,7 @@ export function SidebarNav({
   onCloseMobileDrawer,
   isCatalogActive = true,
   onNavigateCatalog,
+  onOpenDeleteAccount,
 }: SidebarNavProps) {
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -178,6 +181,22 @@ export function SidebarNav({
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>{t("addAccount")}</span>
+                  </button>
+                </>
+              )}
+              {currentAccount && onOpenDeleteAccount && (
+                <>
+                  <div className="h-px bg-border my-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountDropdownOpen(false);
+                      onOpenDeleteAccount();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-start"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>حذف حساب و ربات از سامانه</span>
                   </button>
                 </>
               )}

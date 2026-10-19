@@ -6,6 +6,7 @@ idempotency tracking, and pending-follow state resolution.
 
 import sqlite3
 import datetime
+import os
 from typing import List, Dict, Any, Optional
 
 DB_PATH = "/opt/inflow/data/inflow.db"
@@ -201,3 +202,38 @@ def update_account_bot_status(account_username: str, bot_status: str, last_error
         conn.commit()
     finally:
         conn.close()
+
+def get_account(username: str) -> Optional[Dict[str, Any]]:
+    """Fetches account record by username."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM accounts WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+def get_account_cdp_port(username: str) -> int:
+    """Returns the dedicated CDP port for the account's browser."""
+    profile_dir = f"/root/.hermes/profiles/inflow_{username.lower()}"
+    cdp_file = f"{profile_dir}/bot-desktop/cdp_port"
+    if os.path.exists(cdp_file):
+        try:
+            with open(cdp_file, "r") as f:
+                port = int(f.read().strip())
+                if 1024 < port < 65535:
+                    return port
+        except Exception:
+            pass
+    acc = get_account(username)
+    acc_id = acc["id"] if acc and "id" in acc else 6
+    port = 9220 + int(acc_id)
+    try:
+        os.makedirs(os.path.dirname(cdp_file), exist_ok=True)
+        with open(cdp_file, "w") as f:
+            f.write(str(port))
+    except Exception:
+        pass
+    return port
+

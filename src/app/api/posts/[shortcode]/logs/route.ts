@@ -11,7 +11,11 @@ export async function GET(
 
     const logs = db
       .prepare(
-        "SELECT * FROM comment_logs WHERE shortcode = ? ORDER BY id DESC"
+        `SELECT l.* FROM comment_logs l
+         LEFT JOIN posts p ON l.shortcode = p.shortcode
+         WHERE l.shortcode = ?
+           AND (l.username IS NULL OR LOWER(l.username) != LOWER(COALESCE(p.account_username, '')))
+         ORDER BY l.id DESC`
       )
       .all(shortcode) as CommentLogRow[];
 

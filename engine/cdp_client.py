@@ -1,0 +1,454 @@
+import asyncio
+import json
+import logging
+import os
+import random
+import urllib.request
+import websockets
+
+logger = logging.getLogger("inflow.cdp_client")
+
+class CDPClient:
+    def __init__(self, port=9222):
+        self.port = port
+        self.ws = None
+        self._msg_id = 1
+
+    async def connect(self):
+        try:
+            url = f"http://127.0.0.1:{self.port}/json"
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                tabs = json.loads(resp.read().decode())
+        except Exception as e:
+            raise RuntimeError(f"Could not connect to Chrome CDP on port {self.port}: {e}")
+
+        page_tabs = [t for t in tabs if t.get("type") == "page"]
+        page = next((t for t in page_tabs if "instagram.com" in t.get("url", "")), None)
+        if not page and page_tabs:
+            page = page_tabs[0]
+        if not page:
+            raise RuntimeError(f"No page tab available in Chrome on port {self.port}")
+
+        ws_url = page.get("webSocketDebuggerUrl")
+        if not ws_url:
+            raise RuntimeError(f"Tab has no webSocketDebuggerUrl on port {self.port}")
+
+        self.ws = await websockets.connect(ws_url, max_size=20_000_000)
+        logger.info(f"Connected to CDP on port {self.port}, page: {page.get('url')}")
+
+    async def close(self):
+        if self.ws:
+            try:
+                await self.ws.close()
+            except Exception:
+                pass
+            self.ws = None
+
+    async def send(self, method, params=None):
+        if not self.ws:
+            raise RuntimeError("CDP WebSocket is not connected")
+        mid = self._msg_id
+        self._msg_id += 1
+        payload = {"id": mid, "method": method, "params": params or {}}
+        await self.ws.send(json.dumps(payload))
+        while True:
+            resp_raw = await self.ws.recv()
+            resp = json.loads(resp_raw)
+            if resp.get("id") == mid:
+                return resp.get("result", {})
+
+    async def eval(self, expr, await_promise=False):
+        res = await self.send("Runtime.evaluate", {
+            "expression": expr,
+            "returnByValue": True,
+            "awaitPromise": await_promise
+        })
+        return res.get("result", {}).get("value")
+
+    async def get_cookies(self):
+        res = await self.send("Network.getCookies", {})
+        return res.get("cookies", [])
+
+    async def is_logged_in(self):
+        cookies = await self.get_cookies()
+        sessionid = next((c for c in cookies if c.get("name") == "sessionid"), None)
+        return sessionid is not None
+
+    async def navigate(self, url, wait_sec=3):
+        await self.send("Page.navigate", {"url": url})
+        delay = wait_sec + random.uniform(1.2, 2.8)
+        await asyncio.sleep(delay)
+        await self.simulate_human_glance()
+
+    async def simulate_human_glance(self):
+        """Simulate a user glancing down and up the screen slightly."""
+        try:
+            scroll_amount = random.randint(120, 280)
+            await self.eval(f"window.scrollBy(0, {scroll_amount});")
+            await asyncio.sleep(random.uniform(0.8, 1.8))
+            await self.eval(f"window.scrollBy(0, -{scroll_amount});")
+            await asyncio.sleep(random.uniform(0.5, 1.2))
+        except Exception:
+            pass
+
+    async def click_element_human(self, script_or_selector, is_expr=False):
+        """Click an element using native CDP mouse events with natural human jitter."""
+        if is_expr:
+            script = f"""(() => {{
+                const el = ({script_or_selector});
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return {{x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height}};
+            }})()"""
+        else:
+            script = f"""(() => {{
+                const el = document.querySelector({json.dumps(script_or_selector)});
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return {{x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height}};
+            }})()"""
+
+        coord = await self.eval(script)
+        if not coord:
+            return False
+
+        w = max(coord.get("w", 20), 10)
+        h = max(coord.get("h", 20), 10)
+        jx = coord["x"] + random.uniform(-w * 0.15, w * 0.15)
+        jy = coord["y"] + random.uniform(-h * 0.15, h * 0.15)
+
+        await self.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": jx, "y": jy})
+        await asyncio.sleep(random.uniform(0.12, 0.28))
+        await self.send("Input.dispatchMouseEvent", {"type": "mousePressed", "x": jx, "y": jy, "button": "left", "clickCount": 1})
+        await asyncio.sleep(random.uniform(0.06, 0.14))
+        await self.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": jx, "y": jy, "button": "left", "clickCount": 1})
+
+        # Trigger React synthetic click directly
+        click_trigger = f"""(() => {{
+            const el = ({script_or_selector if is_expr else f"document.querySelector({json.dumps(script_or_selector)})"});
+            if (el) el.click();
+        }})()"""
+        await self.eval(click_trigger)
+        await asyncio.sleep(random.uniform(0.3, 0.8))
+        return True
+
+    async def open_dm_with_user(self, username):
+        """Open direct chat with a specific username via direct/new with human interactions."""
+        await self.send("Page.navigate", {"url": "https://www.instagram.com/direct/new/"})
+        await asyncio.sleep(random.uniform(3.0, 4.5))
+        await self.simulate_human_glance()
+
+        focused = await self.eval("""(() => {
+            const inp = document.querySelector('input[name="searchInput"]');
+            if (!inp) return false;
+            inp.value = '';
+            inp.focus();
+            return true;
+        })()""")
+        if not focused:
+            return False, "Search input not found"
+
+        await asyncio.sleep(random.uniform(0.6, 1.2))
+
+        # Type username with realistic cadence
+        for ch in username:
+            await self.send("Input.insertText", {"text": ch})
+            await asyncio.sleep(random.uniform(0.05, 0.14))
+
+        # Wait for search results
+        await asyncio.sleep(random.uniform(2.5, 3.8))
+
+        # Click matching user in results
+        find_user_expr = f"""(() => {{
+            const btns = Array.from(document.querySelectorAll('div[role="button"]'));
+            return btns.find(b => b.innerText && b.innerText.toLowerCase().includes({json.dumps(username.lower())}));
+        }})()"""
+
+        clicked = await self.click_element_human(find_user_expr, is_expr=True)
+        if not clicked:
+            return False, f"User {username} not found in search results"
+
+        # Check if chat opened or if 'Chat' button needs to be clicked
+        for _ in range(12):
+            curr_url = await self.eval("window.location.href")
+            if curr_url and "/direct/t/" in curr_url:
+                await asyncio.sleep(random.uniform(2.0, 3.5))
+                return True, "Chat opened"
+
+            chat_btn_expr = """(() => {
+                const btns = Array.from(document.querySelectorAll('div[role="button"], button'));
+                const b = btns.find(el => {
+                    const t = (el.innerText || '').trim();
+                    return t === 'Chat' || t === 'Next' || t === 'دردشة' || t === 'التالي' || t === 'Send message';
+                });
+                if (b) {
+                    b.click();
+                    return true;
+                }
+                return false;
+            })()"""
+            await self.eval(chat_btn_expr)
+            await asyncio.sleep(1.0)
+
+        curr_url = await self.eval("window.location.href")
+        if curr_url and "/direct/t/" in curr_url:
+            return True, "Chat opened"
+        return False, f"Failed to navigate to chat thread, still on: {curr_url}"
+
+    async def send_dm_text(self, text):
+        deliberation_sec = random.uniform(2.5, 4.5)
+        logger.info(f"[Human-Sim] Reading chat context... pausing for {deliberation_sec:.1f}s")
+        await asyncio.sleep(deliberation_sec)
+
+        click_script = """(() => {
+            const el = document.querySelector('div[role="textbox"]');
+            if (!el) return null;
+            el.focus();
+            const r = el.getBoundingClientRect();
+            return {x: r.x + 20, y: r.y + 10};
+        })()"""
+        coord = await self.eval(click_script)
+        if not coord:
+            return False, "Textbox not found"
+
+        jitter_x = coord["x"] + random.uniform(-4, 6)
+        jitter_y = coord["y"] + random.uniform(-3, 3)
+
+        await self.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": jitter_x, "y": jitter_y})
+        await asyncio.sleep(random.uniform(0.1, 0.25))
+        await self.send("Input.dispatchMouseEvent", {"type": "mousePressed", "x": jitter_x, "y": jitter_y, "button": "left", "clickCount": 1})
+        await asyncio.sleep(random.uniform(0.05, 0.12))
+        await self.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": jitter_x, "y": jitter_y, "button": "left", "clickCount": 1})
+
+        await asyncio.sleep(random.uniform(0.6, 1.4))
+
+        # Realistic human typing simulation
+        words = text.split(" ")
+        for idx, word in enumerate(words):
+            i = 0
+            while i < len(word):
+                burst_len = random.choice([1, 1, 2, 3])
+                chunk = word[i:i+burst_len]
+                await self.send("Input.insertText", {"text": chunk})
+                i += burst_len
+                await asyncio.sleep(random.uniform(0.04, 0.13))
+
+            if idx < len(words) - 1:
+                await self.send("Input.insertText", {"text": " "})
+                pause = random.choice([0.15, 0.25, 0.45] if random.random() < 0.3 else [0.08, 0.15])
+                await asyncio.sleep(pause)
+
+        proofread_sec = random.uniform(1.8, 3.2)
+        logger.info(f"[Human-Sim] Finished typing. Proofreading for {proofread_sec:.1f}s before sending...")
+        await asyncio.sleep(proofread_sec)
+
+        send_btn_script = """(() => {
+            const btns = Array.from(document.querySelectorAll('div[role="button"], button'));
+            const sendBtn = btns.find(b => {
+                const t = (b.innerText || '').trim();
+                const aria = (b.getAttribute('aria-label') || '').trim();
+                return t === 'Send' || t === 'إرسال' || aria === 'Send' || aria === 'إرسال';
+            });
+            if (sendBtn) {
+                const r = sendBtn.getBoundingClientRect();
+                return {x: r.x + r.width/2, y: r.y + r.height/2};
+            }
+            return null;
+        })()"""
+        btn_coord = await self.eval(send_btn_script)
+        if btn_coord:
+            bx = btn_coord["x"] + random.uniform(-3, 3)
+            by = btn_coord["y"] + random.uniform(-2, 2)
+            await self.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": bx, "y": by})
+            await asyncio.sleep(random.uniform(0.1, 0.25))
+            await self.send("Input.dispatchMouseEvent", {"type": "mousePressed", "x": bx, "y": by, "button": "left", "clickCount": 1})
+            await asyncio.sleep(random.uniform(0.05, 0.1))
+            await self.send("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": bx, "y": by, "button": "left", "clickCount": 1})
+
+            await self.eval("""(() => {
+                const btns = Array.from(document.querySelectorAll('div[role="button"], button'));
+                const sendBtn = btns.find(b => {
+                    const t = (b.innerText || '').trim();
+                    const aria = (b.getAttribute('aria-label') || '').trim();
+                    return t === 'Send' || t === 'إرسال' || aria === 'Send' || aria === 'إرسال';
+                });
+                if (sendBtn) sendBtn.click();
+            })()""")
+        else:
+            await self.send("Input.dispatchKeyEvent", {"type": "rawKeyDown", "windowsVirtualKeyCode": 13, "unmodifiedText": "\r", "text": "\r"})
+            await asyncio.sleep(random.uniform(0.04, 0.09))
+            await self.send("Input.dispatchKeyEvent", {"type": "keyUp", "windowsVirtualKeyCode": 13, "unmodifiedText": "\r", "text": "\r"})
+
+        await asyncio.sleep(random.uniform(1.5, 2.5))
+        return True, "Sent"
+
+    async def reply_to_comment_ui(self, shortcode, username, reply_text):
+        """Reply to a comment natively via the browser DOM on the post page."""
+        try:
+            url = f"https://www.instagram.com/p/{shortcode}/"
+            current_url = await self.eval("window.location.href")
+            if not current_url or f"/p/{shortcode}/" not in current_url:
+                await self.send("Page.navigate", {"url": url})
+                await asyncio.sleep(random.uniform(3.0, 4.5))
+
+            # Click reply button for the target username
+            click_script = f"""(() => {{
+                const spans = Array.from(document.querySelectorAll('span, a')).filter(el => {json.dumps(username)} && el.innerText.trim().toLowerCase() === {json.dumps(username.lower())});
+                for (const s of spans) {{
+                    let parent = s.parentElement;
+                    for (let i = 0; i < 5 && parent; i++) {{
+                        const replyBtn = Array.from(parent.querySelectorAll('button, div[role="button"]')).find(b => {{
+                            const t = (b.innerText || '').trim();
+                            return t === 'Reply' || t === 'پاسخ' || t === 'رد';
+                        }});
+                        if (replyBtn) {{
+                            replyBtn.click();
+                            return true;
+                        }}
+                        parent = parent.parentElement;
+                    }}
+                }}
+                return false;
+            }})()"""
+            clicked = await self.eval(click_script)
+            await asyncio.sleep(random.uniform(0.8, 1.5))
+
+            # Focus textarea
+            focus_script = """(() => {
+                const ta = document.querySelector('textarea');
+                if (ta) { ta.focus(); return true; }
+                return false;
+            })()"""
+            await self.eval(focus_script)
+            await asyncio.sleep(0.3)
+
+            # Check if username prefix is already typed
+            prefix_check = await self.eval(f"""(() => {{
+                const ta = document.querySelector('textarea');
+                return ta && ta.value.toLowerCase().includes({json.dumps(username.lower())});
+            }})()""")
+            if not prefix_check:
+                await self.send("Input.insertText", {"text": f"@{username} "})
+                await asyncio.sleep(0.3)
+
+            # Humanized typing
+            clean_text = reply_text.strip()
+            if clean_text.startswith(f"@{username}"):
+                clean_text = clean_text[len(f"@{username}"):].strip()
+
+            words = clean_text.split(" ")
+            for idx, word in enumerate(words):
+                i = 0
+                while i < len(word):
+                    burst = random.choice([1, 1, 2, 3])
+                    chunk = word[i:i+burst]
+                    await self.send("Input.insertText", {"text": chunk})
+                    i += burst
+                    await asyncio.sleep(random.uniform(0.04, 0.12))
+                if idx < len(words) - 1:
+                    await self.send("Input.insertText", {"text": " "})
+                    await asyncio.sleep(random.uniform(0.08, 0.2))
+
+            await asyncio.sleep(random.uniform(1.2, 2.2))
+
+            # Click post button
+            post_script = """(() => {
+                const btns = Array.from(document.querySelectorAll('div[role="button"], button'));
+                const postBtn = btns.find(b => {
+                    const t = (b.innerText || '').trim();
+                    return t === 'Post' || t === 'ارسال' || t === 'نشر';
+                });
+                if (postBtn) {
+                    postBtn.click();
+                    return true;
+                }
+                return false;
+            })()"""
+            posted = await self.eval(post_script)
+            await asyncio.sleep(random.uniform(2.0, 3.5))
+            return bool(posted), {"status": "ok" if posted else "failed"}
+        except Exception as e:
+            logger.error(f"Error in reply_to_comment_ui: {e}")
+            return False, {"error": str(e)}
+
+    async def reply_to_comment_api(self, media_id, comment_id, username, reply_text):
+        """Post a reply to a comment using Instagram internal Web API inside browser."""
+        expr = f"""(() => {{
+            const cookies = document.cookie.split(';').map(c => c.trim());
+            const csrfCookie = cookies.find(c => c.startsWith('csrftoken='));
+            const csrf = csrfCookie ? csrfCookie.split('=')[1] : null;
+            if (!csrf) return {{error: 'no_csrf'}};
+            const text = {json.dumps(f"@{username} {reply_text}")};
+            const body = new URLSearchParams({{
+                'comment_text': text,
+                'replied_to_comment_id': {json.dumps(str(comment_id))}
+            }});
+            return fetch('/api/v1/web/comments/' + {json.dumps(str(media_id))} + '/add/', {{
+                method: 'POST',
+                headers: {{
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-IG-App-ID': '936619743392459',
+                    'X-CSRFToken': csrf,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }},
+                body: body.toString()
+            }}).then(r => r.json()).catch(e => ({{error: e.toString()}}));
+        }})()"""
+        val = await self.eval(expr, await_promise=True) or {}
+        if val.get("status") == "ok":
+            return True, val
+        return False, val
+
+    async def check_user_friendship(self, user_id):
+        """Check friendship status of a user (whether they follow us)."""
+        expr = f"""(() => {{
+            return fetch('/api/v1/friendships/show/{user_id}/', {{
+                headers: {{
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-IG-App-ID': '936619743392459'
+                }}
+            }}).then(r => r.json()).catch(e => ({{error: e.toString()}}));
+        }})()"""
+        res = await self.eval(expr, await_promise=True)
+        if isinstance(res, dict) and res.get("status") == "ok":
+            return res.get("followed_by", False), res
+        return False, res
+
+    async def fetch_media_comments(self, media_id):
+        """Fetch comments for a given media_id via Instagram internal Web API."""
+        expr = f"""(() => {{
+            const fetchPage = async (url) => {{
+                try {{
+                    const res = await fetch(url, {{
+                        headers: {{
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-IG-App-ID': '936619743392459'
+                        }}
+                    }});
+                    return await res.json();
+                }} catch (e) {{
+                    return null;
+                }}
+            }};
+
+            return (async () => {{
+                let allComments = [];
+                const baseRes = await fetchPage('/api/v1/media/' + {json.dumps(str(media_id))} + '/comments/?can_support_threading=true');
+                if (!baseRes || !baseRes.comments) return [];
+                allComments = allComments.concat(baseRes.comments);
+
+                if (baseRes.has_more_headload_comments && baseRes.next_min_id) {{
+                    const headUrl = '/api/v1/media/' + {json.dumps(str(media_id))} + '/comments/?can_support_threading=true&min_id=' + encodeURIComponent(baseRes.next_min_id);
+                    const headRes = await fetchPage(headUrl);
+                    if (headRes && headRes.comments) {{
+                        allComments = allComments.concat(headRes.comments);
+                    }}
+                }}
+                return allComments;
+            }})();
+        }})()"""
+        res = await self.eval(expr, await_promise=True)
+        if isinstance(res, list):
+            return res
+        return []
