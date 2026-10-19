@@ -89,6 +89,15 @@ def clean_stale_chrome_locks():
                     os.unlink(p)
             except Exception:
                 pass
+        sessions_dir = os.path.join(PROFILE_DIR, "Default", "Sessions")
+        try:
+            if os.path.isdir(sessions_dir):
+                for item in os.listdir(sessions_dir):
+                    item_path = os.path.join(sessions_dir, item)
+                    if os.path.isfile(item_path):
+                        os.unlink(item_path)
+        except Exception:
+            pass
 
 def get_cdp_port():
     cdp_file = "{profile_dir}/bot-desktop/cdp_port"
@@ -146,16 +155,37 @@ def ensure_chrome(url=None):
         except FileNotFoundError:
             pass
     elif url:
-        cmd = [
-            "google-chrome-stable", "--no-sandbox",
-            f"--remote-debugging-port={{cdp_port}}",
-            "--proxy-server=socks5://127.0.0.1:40000",
-            "--disable-blink-features=AutomationControlled",
-            f"--user-data-dir={{PROFILE_DIR}}", url
-        ]
         try:
-            subprocess.run(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-            time.sleep(1)
+            import urllib.request, json
+            req = urllib.request.Request(f"http://127.0.0.1:{{cdp_port}}/json")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                tabs = json.loads(resp.read().decode())
+            page_tabs = [t for t in tabs if t.get("type") == "page"]
+            ig_tabs = [t for t in page_tabs if "instagram.com" in t.get("url", "")]
+            if ig_tabs:
+                for extra in page_tabs:
+                    if extra.get("id") != ig_tabs[0].get("id"):
+                        try:
+                            urllib.request.urlopen(f"http://127.0.0.1:{{cdp_port}}/json/close/" + str(extra.get("id")), timeout=1)
+                        except Exception:
+                            pass
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{{cdp_port}}/json/activate/" + str(ig_tabs[0].get("id")), timeout=1)
+                except Exception:
+                    pass
+                return
+            elif page_tabs:
+                target_tab = page_tabs[0]
+                for extra in page_tabs[1:]:
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{{cdp_port}}/json/close/" + str(extra.get("id")), timeout=1)
+                    except Exception:
+                        pass
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{{cdp_port}}/json/activate/" + str(target_tab.get("id")), timeout=1)
+                except Exception:
+                    pass
+                return
         except Exception:
             pass
 
@@ -397,6 +427,22 @@ def vnc_start(account: str, target_url: str = None):
     else:
         vnc_url = f"http://{HOST_IP}:{VNC_PORT}/vnc.html?autoconnect=true&resize=scale&path=websockify/?token={vnc_token}"
 
+    vnc_guard_content = VNC_GUARD_TEMPLATE.format(
+        profile_dir=profile_dir,
+        profile_name=profile_name,
+        port=VNC_PORT,
+        host_ip=HOST_IP,
+        vnc_base_url=VNC_BASE_URL or "",
+        account=account
+    )
+    try:
+        os.makedirs(os.path.dirname(vnc_guard_path), exist_ok=True)
+        with open(vnc_guard_path, "w") as f:
+            f.write(vnc_guard_content)
+        os.chmod(vnc_guard_path, 0o755)
+    except Exception:
+        pass
+
     token_file = os.path.join(profile_dir, "bot-desktop", "vnc_token.cfg")
     sock_path = os.path.join(profile_dir, "bot-desktop", "rfb.sock")
     os.makedirs(os.path.dirname(token_file), exist_ok=True)
@@ -461,48 +507,72 @@ def vnc_stop(account: str):
 def verify_session(account: str):
     profile_name = get_profile_name(account)
     profile_dir = get_profile_dir(profile_name)
-    cookie_candidates = [
-        os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Cookies"),
-        os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Network", "Cookies")
-    ]
-    cookie_db = next((p for p in cookie_candidates if os.path.exists(p)), None)
-
     authenticated = False
-    if cookie_db and os.path.exists(cookie_db):
+
+    # 1. LIVE CHECK VIA CDP FIRST (Immediate in-memory check, no tab refresh required)
+    cdp_port = None
+    cdp_file = os.path.join(profile_dir, "bot-desktop", "cdp_port")
+    if os.path.exists(cdp_file):
         try:
-            conn = sqlite3.connect(f"file:{cookie_db}?mode=ro", uri=True)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM cookies WHERE host_key LIKE '%instagram.com%' AND name IN ('sessionid', 'ds_user_id')")
-            rows = cursor.fetchall()
-            names = {r[0] for r in rows}
-            conn.close()
-            
-            if "sessionid" in names and "ds_user_id" in names:
-                authenticated = True
-                try:
-                    import sys
-                    sys.path.insert(0, "/opt/inflow")
-                    from engine.ig_client import extract_profile_cookies
-                    from curl_cffi import requests
-                    cookies = extract_profile_cookies(os.path.join(profile_dir, "bot-desktop", "browser-profile"))
-                    if not cookies.get("sessionid"):
-                        authenticated = False
-                    else:
-                        sess = requests.Session(impersonate="chrome120", proxy="socks5://127.0.0.1:40000")
-                        for k, v in cookies.items():
-                            sess.cookies.set(k, v, domain=".instagram.com")
-                        res = sess.get(
-                            f"https://www.instagram.com/api/v1/users/web_profile_info/?username={account}",
-                            headers={"X-IG-App-ID": "936619743392459", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
-                            timeout=10
-                        )
-                        # 200 is ideal, but 429 or page with logged-in still means valid login
-                        if res.status_code == 200 or "logged-in" in res.text or res.status_code == 429:
-                            authenticated = True
-                except Exception:
-                    pass
+            with open(cdp_file, "r") as f:
+                cdp_port = int(f.read().strip())
         except Exception:
             pass
+
+    if not cdp_port:
+        try:
+            disp_file = os.path.join(profile_dir, "bot-desktop", "display")
+            if os.path.exists(disp_file):
+                with open(disp_file) as f:
+                    d = f.read().strip().replace(":", "")
+                    cdp_port = 9200 + int(d)
+        except Exception:
+            pass
+
+    if cdp_port:
+        try:
+            import asyncio
+            import sys
+            if "/opt/inflow" not in sys.path:
+                sys.path.insert(0, "/opt/inflow")
+            from engine.cdp_client import CDPClient
+
+            async def _check_cdp():
+                cdp = CDPClient(port=cdp_port)
+                await cdp.connect()
+                try:
+                    logged_in = await cdp.is_logged_in()
+                    if logged_in:
+                        await cdp.cleanup_extra_tabs()
+                    return logged_in
+                finally:
+                    await cdp.close()
+
+            authenticated = asyncio.run(asyncio.wait_for(_check_cdp(), timeout=4))
+        except Exception:
+            pass
+
+    # 2. FALLBACK TO SQLITE DATABASE (when Chrome closed or CDP unreachable)
+    if not authenticated:
+        cookie_candidates = [
+            os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Cookies"),
+            os.path.join(profile_dir, "bot-desktop", "browser-profile", "Default", "Network", "Cookies")
+        ]
+        cookie_db = next((p for p in cookie_candidates if os.path.exists(p)), None)
+
+        if cookie_db and os.path.exists(cookie_db):
+            try:
+                conn = sqlite3.connect(f"file:{cookie_db}?mode=ro", uri=True)
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM cookies WHERE host_key LIKE '%instagram.com%' AND name IN ('sessionid', 'ds_user_id')")
+                rows = cursor.fetchall()
+                names = {r[0] for r in rows}
+                conn.close()
+
+                if "sessionid" in names and "ds_user_id" in names:
+                    authenticated = True
+            except Exception:
+                pass
 
     status = "live" if authenticated else "login_required"
 

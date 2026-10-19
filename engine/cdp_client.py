@@ -66,14 +66,49 @@ class CDPClient:
         })
         return res.get("result", {}).get("value")
 
-    async def get_cookies(self):
-        res = await self.send("Network.getCookies", {})
-        return res.get("cookies", [])
+    async def get_cookies(self, urls=None):
+        if urls is None:
+            urls = ["https://www.instagram.com", "https://instagram.com"]
+        try:
+            res = await self.send("Storage.getCookies", {})
+            cookies = res.get("cookies", [])
+            if cookies:
+                return cookies
+        except Exception:
+            pass
+        try:
+            res = await self.send("Network.getCookies", {"urls": urls})
+            return res.get("cookies", [])
+        except Exception:
+            return []
 
     async def is_logged_in(self):
         cookies = await self.get_cookies()
-        sessionid = next((c for c in cookies if c.get("name") == "sessionid"), None)
-        return sessionid is not None
+        names = {c.get("name") for c in cookies}
+        return "sessionid" in names and "ds_user_id" in names
+
+    async def cleanup_extra_tabs(self):
+        try:
+            import urllib.request, json
+            req = urllib.request.Request(f"http://127.0.0.1:{self.port}/json")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                tabs = json.loads(resp.read().decode())
+            page_tabs = [t for t in tabs if t.get("type") == "page"]
+            ig_tabs = [t for t in page_tabs if "instagram.com" in t.get("url", "")]
+            target = ig_tabs[0] if ig_tabs else (page_tabs[0] if page_tabs else None)
+            if target:
+                for t in page_tabs:
+                    if t.get("id") != target.get("id"):
+                        try:
+                            urllib.request.urlopen(f"http://127.0.0.1:{self.port}/json/close/{t['id']}", timeout=1)
+                        except Exception:
+                            pass
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{self.port}/json/activate/{target['id']}", timeout=1)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     async def navigate(self, url, wait_sec=3):
         await self.send("Page.navigate", {"url": url})
