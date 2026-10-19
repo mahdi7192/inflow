@@ -596,7 +596,7 @@ export function InflowDashboard({
             }}
             onOpenLogs={(sc) => setLogsShortcode(sc)}
           />
-        ) : !loading && botStatus === "unprovisioned" && posts.length === 0 ? (
+        ) : !loading && posts.length === 0 && botStatus !== "live" ? (
           <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
             <BotSetupWizard
               account={currentAccount}

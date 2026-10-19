@@ -43,4 +43,5 @@ next-env.d.ts
 data/*.db
 data/*.db-wal
 data/*.db-shm
+/data/vnc_tokens/
 __pycache__/

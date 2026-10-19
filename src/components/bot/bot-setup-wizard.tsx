@@ -32,7 +32,7 @@ export function BotSetupWizard({
   // Determine current active step index (0, 1, 2)
   let currentStep = 0;
   if (botStatus === "provisioning") currentStep = 0;
-  else if (botStatus === "login_required") currentStep = 1;
+  else if (botStatus === "login_required" || botStatus === "checkpoint_required") currentStep = 1;
   else if (botStatus === "live") currentStep = 2;
 
   const handleStartProvisioning = async () => {
@@ -49,6 +49,7 @@ export function BotSetupWizard({
       const data = await res.json();
       if (data.success) {
         onStatusChange(data.status || "login_required");
+        onOpenVnc();
       } else {
         setErrorMsg(data.error || "خطا در برقراری ارتباط با سرور");
         onStatusChange("error");
@@ -257,7 +258,7 @@ export function BotSetupWizard({
         </div>
       )}
 
-      {botStatus === "login_required" && (
+      {(botStatus === "login_required" || botStatus === "checkpoint_required") && (
         <div className="bg-card border border-border rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">

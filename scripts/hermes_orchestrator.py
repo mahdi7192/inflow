@@ -366,7 +366,11 @@ def provision_profile(account: str, token: str):
 
     if os.path.exists(vnc_guard_path):
         target = "https://www.instagram.com/accounts/login/"
-        subprocess.Popen([sys.executable, vnc_guard_path, "start", target, vnc_token], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+        try:
+            subprocess.run([sys.executable, vnc_guard_path, "start", target, vnc_token],
+                           timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        except Exception:
+            pass
 
     return {
         "success": True,
@@ -410,9 +414,21 @@ def vnc_start(account: str, target_url: str = None):
         target = target_url or "https://www.instagram.com/"
         try:
             subprocess.run([sys.executable, vnc_guard_path, "start", target, vnc_token],
-                           timeout=6, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                           timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         except Exception:
             pass
+
+    # Ensure rfb.sock exists before returning, so websockify doesn't get Errno 2
+    for _ in range(50):
+        if os.path.exists(sock_path):
+            break
+        time.sleep(0.2)
+
+    if not os.path.exists(sock_path):
+        return {
+            "success": False,
+            "error": "سوکت نمایشگر مجازی ربات راه‌اندازی نشد. لطفاً چند لحظه بعد تلاش کنید."
+        }
 
     return {
         "success": True,
@@ -428,7 +444,7 @@ def vnc_stop(account: str):
     profile_dir = get_profile_dir(profile_name)
     vnc_guard_path = os.path.join(profile_dir, "bin", "vnc_guard.py")
     if os.path.exists(vnc_guard_path):
-        subprocess.run([vnc_guard_path, "stop"], check=False)
+        subprocess.run([sys.executable, vnc_guard_path, "stop"], check=False)
     else:
         pid_file = os.path.join(profile_dir, "bot-desktop", "websockify.pid")
         token_file = os.path.join(profile_dir, "bot-desktop", "vnc_token.cfg")
@@ -579,6 +595,14 @@ def destroy_profile(account: str):
         except Exception:
             subprocess.run(["rm", "-rf", profile_dir], check=False)
             deleted_dir = not os.path.exists(profile_dir)
+
+    # 5. Remove any leftover token files
+    sys_token_file = f"/opt/inflow/data/vnc_tokens/{account_clean}.token"
+    if os.path.exists(sys_token_file):
+        try:
+            os.remove(sys_token_file)
+        except Exception:
+            pass
 
     return {
         "success": True,
