@@ -112,6 +112,7 @@ export function InflowDashboard({
   const [botStatus, setBotStatus] = useState<BotStatus>(
     initialProfile?.bot_status || "unprovisioned"
   );
+  const [isSetupCompleted, setIsSetupCompleted] = useState<boolean>(false);
   const [botDrawerOpen, setBotDrawerOpen] = useState(false);
   const [vncModalOpen, setVncModalOpen] = useState(false);
   const [vncUrl, setVncUrl] = useState("");
@@ -250,6 +251,10 @@ export function InflowDashboard({
       fetchAccounts();
     }
   }, [fetchAccounts, initialAccounts]);
+
+  useEffect(() => {
+    setIsSetupCompleted(false);
+  }, [currentAccount]);
 
   useEffect(() => {
     if (currentAccount) {
@@ -596,7 +601,7 @@ export function InflowDashboard({
             }}
             onOpenLogs={(sc) => setLogsShortcode(sc)}
           />
-        ) : !loading && posts.length === 0 && botStatus !== "live" ? (
+        ) : !loading && posts.length === 0 && (botStatus !== "live" || !isSetupCompleted) ? (
           <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
             <BotSetupWizard
               account={currentAccount}
@@ -606,9 +611,11 @@ export function InflowDashboard({
               isVncLoading={isVncLoading}
               onStatusChange={(newStatus) => {
                 setBotStatus(newStatus);
-                if (newStatus === "live") {
-                  fetchPosts(currentAccount);
-                }
+              }}
+              onComplete={async () => {
+                setIsSetupCompleted(true);
+                await fetchPosts(currentAccount);
+                await fetchAccounts();
               }}
             />
           </div>
@@ -1110,7 +1117,6 @@ export function InflowDashboard({
         lang={lang}
         onSessionVerified={() => {
           setBotStatus("live");
-          handleSync();
         }}
       />
 

@@ -14,6 +14,7 @@ interface BotSetupWizardProps {
   onOpenVnc: () => void;
   isVncLoading?: boolean;
   onStatusChange: (newStatus: BotStatus) => void;
+  onComplete?: () => void;
 }
 
 export function BotSetupWizard({
@@ -23,9 +24,14 @@ export function BotSetupWizard({
   onOpenVnc,
   isVncLoading = false,
   onStatusChange,
+  onComplete,
 }: BotSetupWizardProps) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [syncState, setSyncState] = useState<"idle" | "syncing" | "completed" | "error">("idle");
+  const [syncedCount, setSyncedCount] = useState<number>(0);
+  const [syncedFollowers, setSyncedFollowers] = useState<string>("");
+  const [syncProgressMsg, setSyncProgressMsg] = useState<string>("");
   const rtl = isRTL(lang);
   const t = I18N[lang];
 
@@ -34,6 +40,40 @@ export function BotSetupWizard({
   if (botStatus === "provisioning") currentStep = 0;
   else if (botStatus === "login_required" || botStatus === "checkpoint_required") currentStep = 1;
   else if (botStatus === "live") currentStep = 2;
+
+  const handleStartSync = async () => {
+    setSyncState("syncing");
+    setErrorMsg(null);
+    setSyncProgressMsg(t.botSyncInProgress);
+
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account, wait: true, force_full: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const count = data.posts_synced ?? data.stats?.total ?? 0;
+        setSyncedCount(count);
+        if (data.followers_text) setSyncedFollowers(data.followers_text);
+        setSyncState("completed");
+      } else {
+        setSyncState("error");
+        setErrorMsg(data.error || "خطا در استخراج اولیه پست‌ها از اینستاگرام");
+      }
+    } catch (err: unknown) {
+      setSyncState("error");
+      setErrorMsg((err as Error).message || "خطا در شبکه هنگام سینک پست‌ها");
+    }
+  };
+
+  // Trigger sync as soon as Step 3 is reached
+  React.useEffect(() => {
+    if (botStatus === "live" && syncState === "idle") {
+      handleStartSync();
+    }
+  }, [botStatus, syncState]);
 
   const handleStartProvisioning = async () => {
     setLoading(true);
@@ -108,15 +148,27 @@ export function BotSetupWizard({
             <Badge
               variant="secondary"
               className={
-                botStatus === "login_required"
+                botStatus === "live"
+                  ? syncState === "completed"
+                    ? "bg-emerald-100 text-emerald-900 border-emerald-200"
+                    : "bg-blue-100 text-blue-900 border-blue-200"
+                  : botStatus === "login_required"
                   ? "bg-amber-100 text-amber-900 border-amber-200"
                   : botStatus === "provisioning"
                   ? "bg-blue-100 text-blue-900 border-blue-200"
                   : "bg-zinc-100 text-zinc-800"
               }
             >
-              {botStatus === "provisioning" && <Loader2 className="w-3 h-3 animate-spin me-1" />}
-              {botStatus === "login_required"
+              {(botStatus === "provisioning" || (botStatus === "live" && syncState === "syncing")) && (
+                <Loader2 className="w-3 h-3 animate-spin me-1" />
+              )}
+              {botStatus === "live"
+                ? syncState === "completed"
+                  ? t.botSyncSuccess
+                  : syncState === "syncing"
+                  ? t.botSyncInProgress
+                  : t.botStatusLive
+                : botStatus === "login_required"
                 ? t.botStatusLoginRequired
                 : botStatus === "provisioning"
                 ? t.botStatusProvisioning
@@ -182,9 +234,15 @@ export function BotSetupWizard({
             }`}
           >
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="w-5 h-5 rounded-full bg-zinc-200 text-zinc-800 text-xs flex items-center justify-center font-bold">
-                3
-              </span>
+              {syncState === "completed" ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              ) : syncState === "syncing" ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              ) : (
+                <span className="w-5 h-5 rounded-full bg-zinc-200 text-zinc-800 text-xs flex items-center justify-center font-bold">
+                  3
+                </span>
+              )}
               <h3 className="font-semibold text-sm text-foreground">{t.botStep3Title}</h3>
             </div>
             <p className="text-xs text-muted-foreground">{t.botStep3Desc}</p>
@@ -292,6 +350,130 @@ export function BotSetupWizard({
               {isVncLoading ? "در حال اتصال به دسکتاپ..." : t.botLoginNowBtn}
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Step 3: Initial Sync & Harvester */}
+      {botStatus === "live" && (
+        <div className="bg-card border border-border rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${
+                syncState === "completed"
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800"
+                  : syncState === "syncing"
+                  ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800"
+                  : syncState === "error"
+                  ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:border-rose-800"
+                  : "bg-zinc-100 text-zinc-900 border-zinc-200"
+              }`}
+            >
+              {syncState === "syncing" ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : syncState === "completed" ? (
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+              ) : syncState === "error" ? (
+                <AlertCircle className="w-6 h-6 text-rose-600" />
+              ) : (
+                <RefreshCw className="w-6 h-6" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-foreground">
+                {syncState === "completed" ? t.botSyncSuccess : t.botStep3Title}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {syncState === "completed" ? t.botSyncSuccessDesc : t.botStep3Desc}
+              </p>
+            </div>
+          </div>
+
+          {/* Syncing State */}
+          {syncState === "syncing" && (
+            <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="relative flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                <Bot className="w-7 h-7 text-primary absolute" />
+              </div>
+              <div className="space-y-1 max-w-md">
+                <p className="text-sm font-semibold text-foreground">
+                  {syncProgressMsg || t.botSyncInProgress}
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {rtl
+                    ? "ربات در حال استخراج آخرین پست‌ها، ریلزها، کاورها و آمار پیج از اینستاگرام است. این فرآیند چند لحظه زمان می‌برد..."
+                    : "The bot is harvesting latest posts, reels, covers, and profile stats from Instagram. Please wait a moment..."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Completed State */}
+          {syncState === "completed" && (
+            <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6 sm:p-8 space-y-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-100/90 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 px-3.5 py-1.5 text-sm font-bold flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                  <span>
+                    {rtl
+                      ? `تعداد پست‌های دریافت شده: ${syncedCount} پست`
+                      : `${syncedCount} posts harvested`}
+                  </span>
+                </Badge>
+                {syncedFollowers && (
+                  <Badge
+                    variant="outline"
+                    className="bg-zinc-100 text-zinc-800 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 px-3 py-1 text-sm font-medium"
+                  >
+                    {syncedFollowers}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {rtl
+                  ? "ارتباط و همگام‌سازی اکانت اینستاگرام با موفقیت کامل انجام شد. اکنون می‌توانید وارد لیست پست‌ها شوید و پاسخ‌های هوشمند به کامنت‌ها، دایرکت‌ها و کمپین‌های اتوماسیون را مدیریت نمایید."
+                  : "Instagram connection and sync completed successfully. You can now access your posts list to configure auto-replies, direct messages, and smart campaigns."}
+              </p>
+
+              <div className="pt-2">
+                <Button
+                  onClick={() => {
+                    if (onComplete) onComplete();
+                  }}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-2.5 rounded-lg shadow-sm transition-all text-sm cursor-pointer"
+                >
+                  <span>{t.botViewPostsBtn}</span>
+                  {rtl ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {syncState === "error" && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={handleStartSync}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>{t.botRetrySyncBtn}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (onComplete) onComplete();
+                  }}
+                >
+                  <span>{t.botViewPostsBtn}</span>
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

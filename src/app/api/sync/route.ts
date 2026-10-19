@@ -170,6 +170,36 @@ export async function POST(req: NextRequest) {
 
     // If no real-time SSE stream is listening, execute isolated sync via ServerOrchestrator
     if (streamsReached === 0) {
+      if (body.wait || body.await_sync) {
+        try {
+          const syncResult = await ServerOrchestrator.syncAccount(targetAccount);
+          const countRow = db
+            .prepare("SELECT COUNT(*) as total FROM posts WHERE account_username = ?")
+            .get(targetAccount) as { total: number } | undefined;
+          return NextResponse.json({
+            success: syncResult.success,
+            job_id: jobId,
+            status: syncResult.success ? "completed" : "failed",
+            posts_synced: syncResult.posts_synced || countRow?.total || 0,
+            followers_text: syncResult.followers_text || "",
+            error: syncResult.error,
+            stats: { total: countRow?.total || 0 },
+            message: syncResult.success
+              ? "Sync completed successfully"
+              : syncResult.error || "Sync failed",
+          });
+        } catch (err: unknown) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: (err as Error).message,
+              status: "failed",
+            },
+            { status: 500 }
+          );
+        }
+      }
+
       ServerOrchestrator.syncAccount(targetAccount).catch((err) => {
         console.error(`[Sync] Background sync failed for ${targetAccount}:`, err);
       });
