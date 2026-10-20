@@ -9,7 +9,13 @@ import datetime
 import os
 from typing import List, Dict, Any, Optional
 
-DB_PATH = "/opt/inflow/data/inflow.db"
+DB_PATH = os.environ.get("INFLOW_DB_PATH")
+if not DB_PATH or not os.path.exists(DB_PATH):
+    default_server_path = "/opt/inflow/data/inflow.db"
+    if os.path.exists(default_server_path):
+        DB_PATH = default_server_path
+    else:
+        DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "inflow.db")
 
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -236,4 +242,86 @@ def get_account_cdp_port(username: str) -> int:
     except Exception:
         pass
     return port
+
+def get_dm_automation(account_username: str) -> Optional[Dict[str, Any]]:
+    """Fetches DM automation settings for the given account."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM dm_automations WHERE account_username = ? LIMIT 1",
+            (account_username,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+def is_dm_processed(message_id: str) -> bool:
+    """Checks if a direct message_id has already been processed or logged."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM dm_logs WHERE message_id = ? LIMIT 1",
+            (str(message_id),)
+        )
+        return cursor.fetchone() is not None
+    finally:
+        conn.close()
+
+def record_dm_interaction(
+    message_id: str,
+    thread_id: str,
+    account_username: str,
+    sender_username: str,
+    sender_id: str,
+    incoming_text: str,
+    trigger_matched: bool,
+    reply_status: str,
+    reply_text: str = "",
+    is_story_reply: bool = False,
+    story_id: Optional[str] = None,
+    error_details: Optional[str] = None
+) -> Optional[int]:
+    """Records an interaction in dm_logs table with message_id idempotency."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        now = now_iso()
+        cursor.execute(
+            """
+            INSERT INTO dm_logs (
+                message_id, thread_id, account_username, sender_username, sender_id,
+                incoming_text, is_story_reply, story_id, trigger_matched,
+                reply_status, reply_text, error_details, processed_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(message_id) DO UPDATE SET
+                reply_status = excluded.reply_status,
+                reply_text = excluded.reply_text,
+                error_details = excluded.error_details,
+                processed_at = excluded.processed_at
+            """,
+            (
+                str(message_id),
+                str(thread_id),
+                account_username,
+                sender_username,
+                str(sender_id),
+                incoming_text,
+                1 if is_story_reply else 0,
+                story_id,
+                1 if trigger_matched else 0,
+                reply_status,
+                reply_text,
+                error_details,
+                now,
+                now
+            )
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
 

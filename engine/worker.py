@@ -30,10 +30,216 @@ def _resolve_reply_text(action_type: str, template: str, comment_text: str, capt
         return matcher.generate_ai_reply(comment_text, template, caption, channel=channel)
     return humanizer.pick_reply_text(template)
 
+def process_dm_inbox_pass(
+    client: InstagramClient,
+    account_username: str,
+    dm_config: Dict[str, Any],
+    stats: Dict[str, int],
+    max_dms_per_pass: int = 25
+):
+    """
+    Scans the account's direct message inbox, filters out outgoing messages and already processed DMs,
+    evaluates trigger conditions, checks follow gate (if required), and dispatches humanized replies.
+    """
+    logger.info(f"Scanning direct message inbox for @{account_username}...")
+    try:
+        threads = client.fetch_direct_inbox(limit=25)
+    except Exception as e:
+        logger.error(f"Failed to fetch direct inbox for @{account_username}: {e}")
+        return
+
+    if not threads:
+        logger.info(f"No threads found in inbox for @{account_username}")
+        return
+
+    trigger_type = dm_config.get("trigger_type", "all")
+    trigger_keywords = dm_config.get("trigger_keywords", "")
+    trigger_context = dm_config.get("trigger_context", "")
+    reply_mode = dm_config.get("reply_mode", "direct")
+    direct_reply_text = dm_config.get("direct_reply_text", "")
+    ai_instructions = dm_config.get("ai_prompt_instructions", "")
+    require_follow = bool(dm_config.get("require_follow", 0))
+    follow_prompt = dm_config.get("follow_prompt_text", "سلام! برای دریافت پاسخ، لطفاً ابتدا پیج را فالو کنید 🙏")
+    story_handling = dm_config.get("story_handling_mode", "auto")
+
+    # Filter messages that need processing
+    owner_id = str(client.ds_user_id or "")
+    candidate_messages = []
+
+    for item in threads:
+        msg_id = item.get("message_id")
+        sender_id = item.get("sender_id")
+        sender_username = item.get("sender_username", "")
+        is_outgoing = item.get("is_outgoing", False)
+        is_story_reply = item.get("is_story_reply", False)
+
+        # Skip outgoing messages sent by the bot itself
+        if is_outgoing:
+            continue
+
+        # Skip if from owner
+        if (owner_id and str(sender_id) == owner_id) or sender_username.lower() == account_username.lower():
+            continue
+
+        # Skip story reply if configured to ignore
+        if is_story_reply and story_handling == "ignore":
+            if not db.is_dm_processed(msg_id):
+                db.record_dm_interaction(
+                    message_id=msg_id,
+                    thread_id=item["thread_id"],
+                    account_username=account_username,
+                    sender_username=sender_username,
+                    sender_id=sender_id,
+                    incoming_text=item.get("text", ""),
+                    trigger_matched=False,
+                    reply_status="skipped",
+                    is_story_reply=True,
+                    story_id=item.get("story_id"),
+                    error_details="Story reply ignored per configuration"
+                )
+            continue
+
+        # Skip already processed
+        if db.is_dm_processed(msg_id):
+            continue
+
+        candidate_messages.append(item)
+
+    queue_len = len(candidate_messages)
+    logger.info(f"Inbox @{account_username}: {len(threads)} total threads examined, {queue_len} pending customer inquiries")
+
+    for item in candidate_messages[:max_dms_per_pass]:
+        msg_id = item["message_id"]
+        thread_id = item["thread_id"]
+        sender_id = item["sender_id"]
+        sender_uname = item["sender_username"]
+        text = item.get("text", "").strip()
+        is_story_reply = item.get("is_story_reply", False)
+        story_id = item.get("story_id")
+
+        stats["dms_scanned"] = stats.get("dms_scanned", 0) + 1
+
+        # 1. Evaluate trigger condition
+        is_matched = matcher.matches_trigger(
+            comment_text=text,
+            trigger_type=trigger_type,
+            trigger_keywords=trigger_keywords,
+            trigger_context=trigger_context,
+            post_caption=""
+        )
+
+        if not is_matched:
+            logger.info(f"DM from @{sender_uname} ('{text[:30]}...') did not match trigger '{trigger_type}'")
+            db.record_dm_interaction(
+                message_id=msg_id,
+                thread_id=thread_id,
+                account_username=account_username,
+                sender_username=sender_uname,
+                sender_id=sender_id,
+                incoming_text=text,
+                trigger_matched=False,
+                reply_status="skipped",
+                is_story_reply=is_story_reply,
+                story_id=story_id
+            )
+            continue
+
+        logger.info(f"DM trigger matched for @{sender_uname}: '{text[:40]}'")
+
+        # 2. Check Follow Gate
+        if require_follow:
+            is_following = client.check_following(sender_id) if sender_id else False
+            if not is_following:
+                logger.info(f"User @{sender_uname} is not following @{account_username}. Sending follow prompt.")
+                sent_ok = client.send_dm(
+                    recipient_user_id=sender_id,
+                    text=follow_prompt,
+                    username=sender_uname,
+                    thread_id=thread_id
+                )
+                db.record_dm_interaction(
+                    message_id=msg_id,
+                    thread_id=thread_id,
+                    account_username=account_username,
+                    sender_username=sender_uname,
+                    sender_id=sender_id,
+                    incoming_text=text,
+                    trigger_matched=True,
+                    reply_status="pending_follow",
+                    reply_text=follow_prompt,
+                    is_story_reply=is_story_reply,
+                    story_id=story_id
+                )
+                if sent_ok:
+                    stats["dms_sent"] = stats.get("dms_sent", 0) + 1
+                humanizer.human_sleep(queue_len, f"follow prompt sent to @{sender_uname}")
+                continue
+
+        # 3. Generate Reply Body
+        if reply_mode == "ai":
+            reply_body = matcher.generate_ai_dm_inbox_reply(
+                incoming_text=text,
+                prompt_instructions=ai_instructions or direct_reply_text,
+                sender_username=sender_uname,
+                is_story_reply=is_story_reply
+            )
+        else:
+            reply_body = humanizer.pick_reply_text(direct_reply_text)
+
+        if not reply_body:
+            logger.warning(f"No reply text resolved for DM from @{sender_uname}")
+            continue
+
+        # 4. Dispatch DM Reply via CDP
+        logger.info(f"Dispatching reply to @{sender_uname} in thread {thread_id}: '{reply_body[:50]}...'")
+        sent = client.send_dm(
+            recipient_user_id=sender_id,
+            text=reply_body,
+            username=sender_uname,
+            thread_id=thread_id
+        )
+
+        if sent:
+            logger.info(f"Successfully sent DM reply to @{sender_uname}")
+            db.record_dm_interaction(
+                message_id=msg_id,
+                thread_id=thread_id,
+                account_username=account_username,
+                sender_username=sender_uname,
+                sender_id=sender_id,
+                incoming_text=text,
+                trigger_matched=True,
+                reply_status="sent",
+                reply_text=reply_body,
+                is_story_reply=is_story_reply,
+                story_id=story_id
+            )
+            stats["dms_sent"] = stats.get("dms_sent", 0) + 1
+        else:
+            logger.warning(f"Failed to dispatch DM reply to @{sender_uname}")
+            db.record_dm_interaction(
+                message_id=msg_id,
+                thread_id=thread_id,
+                account_username=account_username,
+                sender_username=sender_uname,
+                sender_id=sender_id,
+                incoming_text=text,
+                trigger_matched=True,
+                reply_status="failed",
+                reply_text=reply_body,
+                is_story_reply=is_story_reply,
+                story_id=story_id,
+                error_details="Browser UI failed to submit message"
+            )
+
+        # 5. Anti-ban pacing
+        humanizer.human_sleep(queue_len, f"dm processed for @{sender_uname}")
+
 def process_account_pass(account_username: str, max_comments_per_post: int = 50) -> Dict[str, int]:
     stats = {
         "posts_scanned": 0,
         "comments_scanned": 0,
+        "dms_scanned": 0,
         "replies_sent": 0,
         "dms_sent": 0,
         "pending_follow_queued": 0,
@@ -74,14 +280,20 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
         message="اتصال فعال به اینستاگرام برقرار است"
     )
 
-    # 3. Retrieve active posts with automations enabled
+    # 3. Retrieve active posts and DM automations enabled
     active_posts = db.get_active_posts(account_username)
+    dm_config = db.get_dm_automation(account_username)
+    dm_enabled = bool(dm_config and dm_config.get("enabled", 0))
+
     stats["posts_scanned"] = len(active_posts)
-    if not active_posts:
-        logger.info(f"No active automations found for @{account_username}")
+    if not active_posts and not dm_enabled:
+        logger.info(f"No active comment or DM automations found for @{account_username}")
         return stats
 
-    logger.info(f"Found {len(active_posts)} active automations for @{account_username}")
+    if active_posts:
+        logger.info(f"Found {len(active_posts)} active comment automations for @{account_username}")
+    if dm_enabled:
+        logger.info(f"DM automation is enabled for @{account_username} (trigger={dm_config.get('trigger_type')}, mode={dm_config.get('reply_mode')})")
 
     for post in active_posts:
         shortcode = post.get("shortcode", "")
@@ -345,6 +557,10 @@ def process_account_pass(account_username: str, max_comments_per_post: int = 50)
 
             # Apply human anti-ban jitter
             humanizer.human_sleep(queue_len, f"action completed for @{uname}")
+
+    # 4. Direct Message Inbox Pass (if DM automation is enabled)
+    if dm_enabled:
+        process_dm_inbox_pass(client, account_username, dm_config, stats)
 
     logger.info(f"Pass completed for @{account_username}: {stats}")
     return stats

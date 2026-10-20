@@ -237,7 +237,7 @@ class CDPClient:
         await asyncio.sleep(deliberation_sec)
 
         click_script = """(() => {
-            const el = document.querySelector('div[role="textbox"]');
+            const el = document.querySelector('div[role="textbox"]') || document.querySelector('div[contenteditable="true"]') || document.querySelector('textarea');
             if (!el) return null;
             el.focus();
             const r = el.getBoundingClientRect();
@@ -283,7 +283,7 @@ class CDPClient:
             const sendBtn = btns.find(b => {
                 const t = (b.innerText || '').trim();
                 const aria = (b.getAttribute('aria-label') || '').trim();
-                return t === 'Send' || t === 'إرسال' || aria === 'Send' || aria === 'إرسال';
+                return t === 'Send' || t === 'إرسال' || t === 'ارسال' || aria === 'Send' || aria === 'إرسال' || aria === 'ارسال';
             });
             if (sendBtn) {
                 const r = sendBtn.getBoundingClientRect();
@@ -306,7 +306,7 @@ class CDPClient:
                 const sendBtn = btns.find(b => {
                     const t = (b.innerText || '').trim();
                     const aria = (b.getAttribute('aria-label') || '').trim();
-                    return t === 'Send' || t === 'إرسال' || aria === 'Send' || aria === 'إرسال';
+                    return t === 'Send' || t === 'إرسال' || t === 'ارسال' || aria === 'Send' || aria === 'إرسال' || aria === 'ارسال';
                 });
                 if (sendBtn) sendBtn.click();
             })()""")
@@ -487,3 +487,56 @@ class CDPClient:
         if isinstance(res, list):
             return res
         return []
+
+    async def fetch_direct_inbox(self, limit=20):
+        """Fetch latest direct message threads via Instagram Web API."""
+        try:
+            curr_url = await self.eval("window.location.href")
+            if not curr_url or "instagram.com" not in curr_url:
+                await self.navigate("https://www.instagram.com/", wait_sec=2)
+        except Exception:
+            pass
+
+        expr = f"""(async () => {{
+            try {{
+                const getCookie = (name) => {{
+                    const value = `; ${{document.cookie}}`;
+                    const parts = value.split(`; ${{name}}=`);
+                    if (parts.length === 2) return parts.pop().split(';').shift();
+                    return '';
+                }};
+                const csrf = getCookie('csrftoken');
+                const headers = {{
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-IG-App-ID': '936619743392459',
+                    'Accept': '*/*'
+                }};
+                if (csrf) headers['X-CSRFToken'] = csrf;
+
+                const res = await fetch('/api/v1/direct_v2/inbox/?persistentBadging=true&folder=&limit={int(limit)}&thread_message_limit=10', {{
+                    headers: headers
+                }});
+                if (!res.ok) return {{ error: 'HTTP ' + res.status }};
+                return await res.json();
+            }} catch (e) {{
+                return {{ error: String(e) }};
+            }}
+        }})()"""
+        res = await self.eval(expr, await_promise=True)
+        if isinstance(res, dict):
+            return res
+        return {}
+
+    async def open_dm_thread(self, thread_id):
+        """Navigate directly to a specific thread URL."""
+        url = f"https://www.instagram.com/direct/t/{thread_id}/"
+        await self.send("Page.navigate", {"url": url})
+        for _ in range(12):
+            await asyncio.sleep(random.uniform(0.8, 1.5))
+            curr_url = await self.eval("window.location.href")
+            if curr_url and "/direct/t/" in curr_url:
+                await self.simulate_human_glance()
+                await asyncio.sleep(random.uniform(0.8, 1.5))
+                return True, "Opened"
+        return False, "Timeout waiting for thread navigation"
+

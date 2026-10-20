@@ -1,10 +1,11 @@
 <!--
 Sync Impact Report:
-- Version Change: 1.5.0 -> 1.6.0 (MINOR: Added Principle XII for Canonical @username URL Scoping and Zero-Flash Account Routing)
+- Version Change: 1.6.0 -> 1.7.0 (MINOR: Added Principle XIII for Global UX Laws, Form State Lifecycles, Feedback Hierarchy & Information Architecture; Expanded Principle V for Brand Identity & Microcopy Tone, and Principle X for Persistent Workspace App Shell Architecture)
 - Modified Principles:
-  - Principle VI: Expanded to emphasize URL-driven tenancy scoping alongside minimalist page entity.
+  - Principle V: Expanded to include Brand Identity, Tone of Voice, Terminology Dictionary, and strict Bidirectional text isolation rules (<bdi>).
+  - Principle X: Expanded to mandate the Nested App Shell Architecture (WorkspaceShell) for all account-scoped routes, eliminating component remounting and layout shifts.
 - Added Principles / Sections:
-  - Principle XII: Canonical @username URL Scoping & Zero-Flash Account Selection (NON-NEGOTIABLE) (codified root-level account selector at `/`, deterministic `/@username` workspace routes, and strict zero-flash route-driven hydration)
+  - Principle XIII: Global UX Laws, Form State Lifecycles, Feedback Hierarchy & Information Architecture (NON-NEGOTIABLE) (codified universal form states, sticky save dock contract, progressive disclosure activation cards, unsaved changes guards, standardized confirmation dialogs, single scroll container law, and JSON localization store).
 - Removed Sections: None
 - Deferred TODOs: None
 -->
@@ -15,7 +16,7 @@ Sync Impact Report:
 
 ### I. Spec-Driven Development (NON-NEGOTIABLE)
 All development on `inFlow` follows the GitHub Spec-Kit workflow:
-1. **Specify (`/speckit-specify`)**: Define WHAT and WHY with clear user requirements and acceptance criteria before writing code.
+1. **Specify (`/speckit-specify`)**: Define WHAT and WHY with clear user requirements, exhaustive UX journeys, and acceptance criteria before writing code.
 2. **Plan (`/speckit-plan`)**: Establish architecture, database schema changes, and API contracts.
 3. **Tasks (`/speckit-tasks`)**: Break down the plan into ordered, testable, atomic tasks.
 4. **Implement (`/speckit-implement`)**: Execute tasks against the specification.
@@ -38,10 +39,14 @@ No direct, unplanned code modifications are permitted for new features or struct
 * Keep `better-sqlite3` in `serverExternalPackages` within `next.config.ts`.
 * SQLite database file resides at `data/inflow.db` with WAL mode enabled.
 
-### V. RTL Typography & BiDi Architecture
-* User-facing Persian and Arabic text must have explicit `dir="rtl"` and use the `Vazirmatn` font.
-* English and numbers must preserve proper bidirectional spacing without layout distortion.
-* All internationalized strings must be registered in `src/lib/i18n.ts`.
+### V. RTL Typography, BiDi Architecture & Tone of Voice
+* User-facing Persian and Arabic text must have explicit `dir="rtl"` and strictly use the `Vazirmatn` font. The font MUST be loaded globally across all HTML tags, inputs, and buttons without relying on uncompiled ad-hoc class utilities.
+* English, code, numbers, and Instagram handles (`@username`) must preserve proper bidirectional spacing without layout distortion or trailing punctuation flips. Bidirectional isolation (`<bdi>` or unicode directional controls) MUST wrap technical tags, handles, and acronyms (`AI`, `DM`, `MCP`, `API`).
+* **Microcopy & Tone of Voice Standard**:
+  - The voice of inFlow is professional, respectful, calm, and direct.
+  - Second-person polite address (شما، خدمتتان) MUST be used consistently across all prompts, feedback, and error messages.
+  - Arbitrary mixing of English and Persian (e.g. "اکشن پاسخ به کامنت (Comment Reply)") is prohibited. Use clear Persian terms accompanied by clean, muted secondary badges or subtle sub-labels where necessary for developer/technical clarity.
+  - Codified terminology dictionary (e.g., "اتوماسیون پاسخ کامنت", "دایرکت هوشمند", "پیشخوان", "اتصال ایجنت", "پست‌ها و ریلزها", "ذخیره تغییرات", "لغو تغییرات").
 
 ### VI. Multi-Tenant User Authentication, Account Ownership & Minimalist Page Entity
 * Users authenticate into `inFlow` via username/password credentials.
@@ -76,13 +81,15 @@ No direct, unplanned code modifications are permitted for new features or struct
   4. View, generate, and revoke page-specific API tokens and inspect/copy Hermes MCP configuration snippets.
 * Role-based access control (RBAC) strictly prevents standard tenants from accessing administrative routes or inspecting inter-plane credentials.
 
-### X. Unified Design System & shadcn/ui Light Mode Architecture (NON-NEGOTIABLE)
-* All UI components across inFlow (including buttons, inputs, forms, cards, dialogs/modals, switches, badges, and dropdowns) MUST strictly use or extend the standardized `shadcn/ui` primitives located in `src/components/ui/`.
+### X. Unified Design System, shadcn/ui Light Mode & Persistent App Shell (NON-NEGOTIABLE)
+* All UI components across inFlow MUST strictly use or extend standardized `shadcn/ui` primitives located in `src/components/ui/`.
 * **Canonical Light Mode Standard**: inFlow strictly uses **shadcn/ui Light Mode** as its primary and canonical visual standard (clean white `#ffffff` surfaces, `#fafafa` canvas, subtle `#e4e4e7` zinc borders, solid `#18181b` primary elements, and muted pastel badges). Dark mode, glowing purple/neon gradients, and ambient blur blobs are strictly prohibited.
-* Ad-hoc, hardcoded, or inline color styling and arbitrary background/border palettes across page routes are strictly prohibited.
-* Brand styling and themes MUST be token-driven and managed centrally through CSS custom properties in `src/app/globals.css` (e.g. `--background`, `--foreground`, `--card`, `--primary`, `--border`, `--ring`).
-* Visual identity and the inFlow official brand mark MUST remain consistent across all routes (Login, Dashboard, Back-Office) as a minimalist monochrome squircle with sleek typography. Rogue icons (such as Vercel triangle logos) or mismatched page headers MUST NOT be used.
-* All components in `src/components/ui/` MUST natively adhere to Principle V (RTL typography, Vazirmatn font, and bidirectional spacing).
+* Ad-hoc, hardcoded, or inline color styling and arbitrary background/border palettes across page routes are strictly prohibited. Brand styling and themes MUST be token-driven and managed centrally through CSS custom properties in `src/app/globals.css`.
+* Visual identity and the inFlow official brand mark MUST remain consistent across all routes (Login, Dashboard, Back-Office) as a minimalist monochrome squircle with sleek typography. Rogue icons or mismatched page headers MUST NOT be used.
+* **Persistent Workspace App Shell (`WorkspaceShell`)**:
+  - All account workspace routes (`/@[account]/*`) MUST be rendered within a single, persistent Next.js nested layout shell (`src/app/[account]/layout.tsx`).
+  - The `SidebarNav`, Top Navigation Toolbar, Bot Status Header, and global modals (Bot Monitor Drawer, VNC Viewer) MUST remain persistently mounted in the shell.
+  - Sub-page transitions (e.g. switching between Comment Automation, DM Automation, or Logs) MUST NOT remount or tear down the shell, completely eliminating visual flickering, state resets, and duplicate network requests.
 
 ### XI. Bot Lifecycle, Dynamic Self-Service Provisioning & On-Demand VNC Guard (NON-NEGOTIABLE)
 * **Deterministic Bot Lifecycle**: Every connected account tracks its dedicated bot state machine through explicit states:
@@ -103,8 +110,6 @@ No direct, unplanned code modifications are permitted for new features or struct
 * **Persistent Top-Toolbar Bot Monitor**:
   - The main dashboard navigation header MUST feature a persistent Bot Status button with dynamic state badges (e.g., `لایو`, `در انتظار لاگین`, `راه‌اندازی نشده`, `خطا`).
   - Clicking the bot button opens a slide-over drawer or dialog displaying real-time bot telemetry, heartbeat, recent execution logs, and an on-demand button to open the live browser screen via VNC Guard.
-* **Security & Sandboxing Transparency**:
-  - The onboarding UI MUST explicitly educate tenants that their bot operates on a dedicated virtual computer with its own sandboxed browser, dedicated IP, and zero cross-tenant contamination.
 
 ### XII. Canonical @username URL Scoping & Zero-Flash Account Selection (NON-NEGOTIABLE)
 * **Root Path Account Selector (`/`)**:
@@ -120,6 +125,43 @@ No direct, unplanned code modifications are permitted for new features or struct
   - Hard page refreshes on `/@username` MUST immediately fetch and display only that account's data.
   - Switching accounts via the sidebar selector MUST immediately transition the URL route to `/@{new_username}`.
 
+### XIII. Global UX Laws, Form State Lifecycles, Feedback Hierarchy & Information Architecture (NON-NEGOTIABLE)
+* **1. Universal UX Form State Lifecycle**:
+  Every configuration form across inFlow (Post triggers, DM automation, Account settings) MUST conform to an explicit state machine:
+  - `Pristine`: Form values match persisted server state. Save action is dormant/hidden; navigation is unrestricted.
+  - `Dirty`: One or more inputs diverge from persisted values. Standard **Sticky Save Dock** surfaces at the viewport bottom; unsaved changes guard activates.
+  - `Submitting`: Save is in-flight. Inputs and primary CTA show loading state; duplicate clicks or rapid navigation are disabled.
+  - `Success`: Server confirmed persistence. Form resets to `Pristine`; dock auto-dismisses; standardized success toast is emitted.
+  - `Error`: Mutation failed. Inputs retain entered values; error feedback is presented inline or via error toast; dock remains open for retry.
+* **2. The Sticky Save Dock Law**:
+  - Ad-hoc save buttons placed randomly inside individual cards or page tops are strictly prohibited.
+  - When a form enters the `Dirty` state, a standardized **Floating Sticky Save Bar** MUST appear anchored to the bottom of the viewport with:
+    1. Pulsating dirty status indicator with explicit count of modified rules.
+    2. "لغو تغییرات" (Cancel / Reset) button that restores the form to persisted server state.
+    3. "ذخیره تغییرات" (Save Changes) primary button showing a spinner during submission.
+  - Global keyboard shortcut `Cmd+S` (macOS) and `Ctrl+S` (Windows/Linux) MUST trigger save on active dirty forms.
+  - Navigation interception: Any attempt to transition routes, switch accounts, or close/refresh the tab with dirty changes MUST trigger a confirmation dialog blocking data loss.
+* **3. Feature Activation & Progressive Disclosure Law**:
+  - Master feature toggles (e.g., Comment Auto-Reply, DM Automation, Follow Gate) MUST use a universal `ActivationCard` component.
+  - Anatomy: Feature Icon, Bold Title, Status Badge (`روشن` / `خاموش`), Two-state explanatory subtitle, and Primary Switch.
+  - Inactive State Rule: When a feature is toggled OFF, all dependent child settings (triggers, prompts, actions) MUST be visually muted (opacity 50%, pointer-events disabled) with an informative alert banner explaining that the feature is currently dormant.
+* **4. Feedback & Alert Hierarchy Standard**:
+  The system MUST strictly enforce a 5-tier feedback hierarchy:
+  1. *Inline Field Errors*: For field validation (e.g., missing keyword, invalid URL, empty prompt).
+  2. *Global Toast Notifications*: For asynchronous action confirmations (`toast.success`, `toast.error`, `toast.info`). Replaces all ad-hoc local state alerts.
+  3. *Sticky Save Dock*: Exclusively for form dirty state and save lifecycle.
+  4. *Modal & Dialogs*: For focused auxiliary tasks (Logs Modal, Agent API inspect, VNC Viewer).
+  5. *Destructive Confirmation Dialogs*: Mandatory for irreversible actions (deleting an account, resetting prompt rules, revoking tokens). Must require explicit dual-action confirmation with destructive button styling.
+* **5. Single Scroll Container & Directional Predictability Law**:
+  - Nesting multiple vertical scrollbars or combining window scrolling with arbitrary container scrolling is strictly prohibited.
+  - The workspace content area MUST provide exactly ONE primary vertical scroll container.
+  - Scrollbar positioning is strictly directional: rendering on the left edge for RTL (`fa`, `ar`) and right edge for LTR (`en`), styled with sleek zinc aesthetics and zero layout jitter.
+* **6. Multilingual JSON Store & Parameterized Localization Law**:
+  - Hardcoded user-facing strings in TypeScript code or JSX are strictly prohibited.
+  - 100% of UI strings MUST reside in dedicated JSON assets (`src/locales/fa.json`, `src/locales/en.json`, `src/locales/ar.json`).
+  - Dynamic phrases MUST use parameterized interpolation tokens `{paramName}` (e.g., `{count}`, `{username}`).
+  - 100% key parity across all language files is mandatory, validated by automated linting.
+
 ## Governance
 
 This Constitution supersedes all ad-hoc coding practices in the repository. AI agents (Hermes, Claude, Cursor, Copilot) must verify compliance with this Constitution before proposing or merging code changes.
@@ -132,4 +174,4 @@ Amendments to this Constitution require:
    - **MINOR**: Addition of new principles or material expansions of existing guidance.
    - **PATCH**: Textual clarifications, wording improvements, and typo corrections.
 
-**Version**: 1.6.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.7.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-20

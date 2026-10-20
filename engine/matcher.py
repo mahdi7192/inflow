@@ -182,6 +182,60 @@ def generate_ai_reply(
         logger.error(f"Failed to generate AI reply with 9Router: {e}")
         return prompt_instructions
 
+def generate_ai_dm_inbox_reply(
+    incoming_text: str,
+    prompt_instructions: str,
+    sender_username: str = "",
+    is_story_reply: bool = False
+) -> str:
+    """
+    Generates a natural, helpful, human-like Persian reply to an incoming Instagram Direct Message
+    based on admin instructions.
+    """
+    story_ctx = "[این پیام در پاسخ به استوری ارسال شده است]\n" if is_story_reply else ""
+    user_label = f"@{sender_username}" if sender_username else "کاربر"
+
+    prompt = f"""شما ادمین صمیمی، محترم و پاسخگوی این پیج اینستاگرام هستید.
+شما هم‌اکنون در حال پاسخ به پیام خصوصی دریافتی در دایرکت از طرف {user_label} هستید.
+
+{story_ctx}پیام دریافتی از کاربر:
+"{incoming_text}"
+
+دستورالعمل و اطلاعات ادمین برای پاسخگویی:
+{prompt_instructions}
+
+قوانین الزامی:
+۱. شما مستقیماً در دایرکت با کاربر گفتگو می‌کنید؛ پس مستقیماً و گرم پاسخ سوال یا پیام را بدهید.
+۲. از نوشتن عباراتی مانند «دایرکت شد»، «دایرکت دادم»، «براتون فرستادم» یا «دایرکتتون رو چک کنید» اکیداً خودداری کنید.
+۳. لحن کاملاً صمیمی، محترمانه، روان و به زبان فارسی معیار/محاوره‌ای اینستاگرام باشد (حداکثر ۱ الی ۳ جمله کوتاه).
+۴. فقط و فقط متن پاسخ نهایی را بنویسید (بدون سلام مجدد اضافی اگر لازم نیست، بدون نقل قول یا توضیحات اضافه)."""
+
+    headers = {
+        "Authorization": f"Bearer {_get_api_key()}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": _AI_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 150,
+        "stream": False
+    }
+
+    try:
+        res = requests.post(_9ROUTER_URL, headers=headers, json=payload, timeout=15)
+        if res.status_code == 200:
+            content = res.json()["choices"][0]["message"]["content"].strip()
+            content = content.strip("\"'«»")
+            logger.info(f"AI DM Inbox Reply generated for @{sender_username}: '{content}'")
+            return content
+        else:
+            logger.error(f"9Router LLM DM reply generation error: {res.status_code}")
+            return prompt_instructions
+    except Exception as e:
+        logger.error(f"Failed to generate AI DM reply with 9Router: {e}")
+        return prompt_instructions
+
 def matches_trigger(
     comment_text: str,
     trigger_type: str,
@@ -190,9 +244,9 @@ def matches_trigger(
     post_caption: str = ""
 ) -> bool:
     """
-    Checks if a comment meets the trigger condition.
-    - trigger_type == 'all': matches every comment.
-    - trigger_type == 'keyword': matches if any specified keyword is in the comment.
+    Checks if a comment or DM meets the trigger condition.
+    - trigger_type == 'all': matches every comment/DM.
+    - trigger_type in ('keyword', 'keywords'): matches if any specified keyword is present.
     - trigger_type == 'ai_context': uses local LLM semantic evaluation.
     """
     if trigger_type == "all":
@@ -201,7 +255,7 @@ def matches_trigger(
     if trigger_type == "ai_context":
         return evaluate_ai_context(comment_text, trigger_context, post_caption)
 
-    if trigger_type == "keyword":
+    if trigger_type in ("keyword", "keywords"):
         if not trigger_keywords:
             return False
             

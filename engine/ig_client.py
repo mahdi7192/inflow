@@ -247,32 +247,138 @@ class InstagramClient:
 
         return _run_async(_reply())
 
-    def send_dm(self, recipient_user_id: str, text: str, username: Optional[str] = None) -> bool:
+    def fetch_direct_inbox(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Fetches incoming direct threads from the inbox via browser context.
+        Parses threads and extracts the latest incoming message item.
+        Returns a list of parsed thread/message dictionaries.
+        """
+        async def _fetch():
+            cdp = None
+            try:
+                cdp = await self._get_cdp()
+                raw = await cdp.fetch_direct_inbox(limit=limit)
+                threads = raw.get("inbox", {}).get("threads", [])
+                if not threads and isinstance(raw.get("threads"), list):
+                    threads = raw.get("threads")
+
+                my_uid = str(self.ds_user_id or "")
+                parsed: List[Dict[str, Any]] = []
+
+                for th in threads:
+                    thread_id = str(th.get("thread_id") or th.get("thread_v2_id") or "")
+                    if not thread_id:
+                        continue
+
+                    users = th.get("users", [])
+                    # Find the interlocutor (the customer user, not bot)
+                    other_user = None
+                    for u in users:
+                        if str(u.get("pk", "")) != my_uid:
+                            other_user = u
+                            break
+                    if not other_user and users:
+                        other_user = users[0]
+
+                    sender_id = str(other_user.get("pk", "")) if other_user else ""
+                    sender_username = str(other_user.get("username", "")) if other_user else ""
+
+                    # Extract latest message item
+                    items = th.get("items", [])
+                    last_item = th.get("last_permanent_item") or (items[0] if items else None)
+                    if not last_item:
+                        continue
+
+                    item_id = str(last_item.get("item_id", ""))
+                    item_user_id = str(last_item.get("user_id", ""))
+                    item_type = str(last_item.get("item_type", "text"))
+
+                    # If the latest item was sent by the bot itself, mark as outgoing
+                    is_outgoing = bool(my_uid and item_user_id == my_uid)
+
+                    text = ""
+                    is_story_reply = False
+                    story_id = None
+
+                    if item_type == "text":
+                        text = str(last_item.get("text", "")).strip()
+                    elif item_type == "story_share":
+                        is_story_reply = True
+                        story_share = last_item.get("story_share", {})
+                        text = str(story_share.get("text") or last_item.get("text") or "").strip()
+                        story_media = story_share.get("media", {})
+                        story_id = str(story_media.get("pk") or story_media.get("id") or "")
+                    elif item_type == "link":
+                        link_info = last_item.get("link", {})
+                        text = str(link_info.get("text") or "").strip()
+                    elif item_type == "clip":
+                        text = str(last_item.get("text") or "").strip()
+                    else:
+                        text = str(last_item.get("text", "")).strip()
+
+                    parsed.append({
+                        "thread_id": thread_id,
+                        "message_id": item_id,
+                        "sender_id": sender_id or item_user_id,
+                        "sender_username": sender_username,
+                        "text": text,
+                        "item_type": item_type,
+                        "is_story_reply": is_story_reply,
+                        "story_id": story_id,
+                        "is_outgoing": is_outgoing,
+                        "timestamp": last_item.get("timestamp", 0)
+                    })
+                return parsed
+            except Exception as e:
+                logger.error(f"Error fetching direct inbox for {self.account_username}: {e}")
+                return []
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_fetch())
+
+    def send_dm(
+        self,
+        recipient_user_id: str,
+        text: str,
+        username: Optional[str] = None,
+        thread_id: Optional[str] = None
+    ) -> bool:
         """Sends a Direct Message using humanized CDP UI interaction in the browser."""
         target_username = username or recipient_user_id
-        if not target_username:
-            logger.error("send_dm called without target username or recipient ID")
+        if not target_username and not thread_id:
+            logger.error("send_dm called without target username, recipient ID, or thread ID")
             return False
 
         async def _send():
             cdp = None
             try:
                 cdp = await self._get_cdp()
-                # 1. Open chat with target user
-                opened, reason = await cdp.open_dm_with_user(target_username)
+                opened = False
+                reason = ""
+
+                # 1. If thread_id is available, direct navigation is fastest and most reliable
+                if thread_id:
+                    opened, reason = await cdp.open_dm_thread(thread_id)
+
+                # 2. Fallback to username search if thread navigation didn't open
+                if not opened and target_username:
+                    opened, reason = await cdp.open_dm_with_user(target_username)
+
                 if not opened:
-                    logger.warning(f"Could not open direct chat with @{target_username}: {reason}")
+                    logger.warning(f"Could not open direct chat with @{target_username} (thread {thread_id}): {reason}")
                     return False
 
-                # 2. Type message with human jitter and send
+                # 3. Type message with human jitter and send
                 sent, reason = await cdp.send_dm_text(text)
                 if sent:
-                    logger.info(f"Successfully sent humanized DM to @{target_username}")
+                    logger.info(f"Successfully sent humanized DM to @{target_username or thread_id}")
                     return True
-                logger.warning(f"Failed to send DM to @{target_username}: {reason}")
+                logger.warning(f"Failed to send DM to @{target_username or thread_id}: {reason}")
                 return False
             except Exception as e:
-                logger.error(f"Error sending DM to @{target_username}: {e}")
+                logger.error(f"Error sending DM to @{target_username or thread_id}: {e}")
                 return False
             finally:
                 if cdp:
