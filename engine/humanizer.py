@@ -57,3 +57,68 @@ def pick_reply_text(template: str) -> str:
 def get_follow_request_reply() -> str:
     """Returns a randomized prompt asking the commenter to follow and confirm."""
     return random.choice(DEFAULT_FOLLOW_PROMPT_REPLIES)
+
+def parse_time_str_to_timestamp(time_val) -> Optional[float]:
+    """Converts relative time text (English & Persian) or ISO/epoch timestamps to UTC epoch seconds."""
+    if not time_val:
+        return None
+
+    if isinstance(time_val, (int, float)):
+        ts = float(time_val)
+        if ts > 1e14:  # microseconds
+            return ts / 1e6
+        if ts > 1e11:  # milliseconds
+            return ts / 1e3
+        return ts
+
+    s = str(time_val).strip()
+    if not s:
+        return None
+
+    # Try ISO or SQL date format
+    if "T" in s or ("-" in s and ":" in s):
+        try:
+            import datetime
+            dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except Exception:
+            pass
+
+    # Try numeric string
+    try:
+        ts = float(s)
+        if ts > 1e14:
+            return ts / 1e6
+        if ts > 1e11:
+            return ts / 1e3
+        return ts
+    except ValueError:
+        pass
+
+    import re
+    now = time.time()
+    low = s.lower()
+
+    # Persian digits to English
+    for p, e in [('۰','0'),('۱','1'),('۲','2'),('۳','3'),('۴','4'),('۵','5'),('۶','6'),('۷','7'),('۸','8'),('۹','9')]:
+        low = low.replace(p, e)
+
+    if any(w in low for w in ["now", "just now", "لحظه", "همین الان"]):
+        return now
+
+    if any(w in low for w in ["دیروز", "yesterday"]):
+        return now - 86400
+
+    m = re.search(r'(\d+)', low)
+    num = int(m.group(1)) if m else 1
+
+    if any(w in low for w in ["m", "دقیقه", "min"]):
+        return now - (num * 60)
+    if any(w in low for w in ["h", "ساعت", "hr"]):
+        return now - (num * 3600)
+    if any(w in low for w in ["d", "روز", "day"]):
+        return now - (num * 86400)
+    if any(w in low for w in ["w", "هفته", "week"]):
+        return now - (num * 7 * 86400)
+
+    return None

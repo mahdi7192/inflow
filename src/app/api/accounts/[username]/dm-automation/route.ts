@@ -147,6 +147,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const follow_prompt_text = body.follow_prompt_text !== undefined ? String(body.follow_prompt_text) : current.follow_prompt_text;
     const story_handling_mode = body.story_handling_mode !== undefined ? String(body.story_handling_mode) : current.story_handling_mode;
 
+    let activated_at = current.activated_at;
+    if (enabled === 1 && (!current.enabled || !current.activated_at)) {
+      activated_at = now;
+    } else if (enabled === 0) {
+      activated_at = null;
+    }
+
     db.prepare(`
       UPDATE dm_automations SET
         enabled = ?,
@@ -161,6 +168,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         require_follow = ?,
         follow_prompt_text = ?,
         story_handling_mode = ?,
+        activated_at = ?,
         updated_at = ?
       WHERE account_username = ?
     `).run(
@@ -176,6 +184,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       require_follow,
       follow_prompt_text,
       story_handling_mode,
+      activated_at,
       now,
       cleanUsername
     );

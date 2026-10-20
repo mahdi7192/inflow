@@ -136,6 +136,7 @@ export interface DMAutomationRow {
   require_follow: number; // 0 or 1
   follow_prompt_text: string;
   story_handling_mode: string;
+  activated_at: string | null;
   updated_at: string;
   created_at: string;
 }
@@ -264,6 +265,7 @@ function migrateSchema(db: Database.Database) {
       crawl_last_status TEXT NOT NULL DEFAULT 'idle',
       crawl_last_at TEXT DEFAULT NULL,
       crawl_pages_count INTEGER NOT NULL DEFAULT 0,
+      activated_at TEXT DEFAULT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -295,6 +297,11 @@ function migrateSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_dm_logs_sender ON dm_logs(sender_username, reply_status);
     CREATE INDEX IF NOT EXISTS idx_dm_logs_processed_at ON dm_logs(processed_at DESC);
   `);
+
+  const dmCols = (db.prepare("PRAGMA table_info(dm_automations)").all() as { name: string }[]).map(c => c.name);
+  if (!dmCols.includes("activated_at")) {
+    db.exec("ALTER TABLE dm_automations ADD COLUMN activated_at TEXT DEFAULT NULL");
+  }
 
   // Drop deprecated dm_knowledge_pages table if exists
   try {

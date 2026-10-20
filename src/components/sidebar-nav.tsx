@@ -12,7 +12,6 @@ import {
   Plus,
   LayoutGrid,
   X,
-  Radio,
   Trash2,
   MessageSquare,
   Send,
@@ -38,8 +37,8 @@ export interface SidebarNavProps {
   onLogout: () => void;
   lang: Lang;
   onCloseMobileDrawer?: () => void;
-  isCatalogActive?: boolean;
   activePlugin?: "comments" | "dms";
+  isCatalogActive?: boolean;
   onNavigateCatalog?: () => void;
   onOpenDeleteAccount?: () => void;
 }
@@ -56,7 +55,6 @@ export function SidebarNav({
   onLogout,
   lang,
   onCloseMobileDrawer,
-  isCatalogActive = true,
   activePlugin = "comments",
   onNavigateCatalog,
   onOpenDeleteAccount,
@@ -118,7 +116,7 @@ export function SidebarNav({
           >
             <div className="flex items-center gap-2 truncate">
               <InstagramIcon className="w-3.5 h-3.5 text-zinc-700 shrink-0" />
-              <span className="truncate">@{currentAccount || "---"}</span>
+              <span className="truncate font-mono"><bdi>@{currentAccount || "---"}</bdi></span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -154,7 +152,7 @@ export function SidebarNav({
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                        <span className="truncate font-mono">@{acc.username}</span>
+                        <span className="truncate font-mono"><bdi>@{acc.username}</bdi></span>
                       </div>
                       {isSelected && (
                         <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />

@@ -62,6 +62,11 @@ def process_dm_inbox_pass(
     follow_prompt = dm_config.get("follow_prompt_text", "سلام! برای دریافت پاسخ، لطفاً ابتدا پیج را فالو کنید 🙏")
     story_handling = dm_config.get("story_handling_mode", "auto")
 
+    # Activation cutoff timestamp: ONLY reply to DMs received AFTER activation
+    activation_ts = db.get_dm_activation_timestamp(dm_config)
+    cutoff_date_str = dm_config.get("activated_at") or dm_config.get("updated_at") or "None"
+    logger.info(f"DM automation activation cutoff for @{account_username}: {activation_ts} (date: {cutoff_date_str})")
+
     # Filter messages that need processing
     owner_id = str(client.ds_user_id or "")
     candidate_messages = []
@@ -72,6 +77,7 @@ def process_dm_inbox_pass(
         sender_username = item.get("sender_username", "")
         is_outgoing = item.get("is_outgoing", False)
         is_story_reply = item.get("is_story_reply", False)
+        time_str = item.get("time_str", "")
 
         # Skip outgoing messages sent by the bot itself
         if is_outgoing:
@@ -79,6 +85,29 @@ def process_dm_inbox_pass(
 
         # Skip if from owner
         if (owner_id and str(sender_id) == owner_id) or sender_username.lower() == account_username.lower():
+            continue
+
+        # CRITICAL RULE: Skip messages received BEFORE automation was activated
+        msg_ts = item.get("timestamp")
+        if not msg_ts and time_str:
+            msg_ts = humanizer.parse_time_str_to_timestamp(time_str)
+
+        if activation_ts and msg_ts and msg_ts < activation_ts:
+            logger.info(f"Skipping DM thread from @{sender_username} (time: '{time_str}', ts: {msg_ts} is before activation cutoff {activation_ts})")
+            if not db.is_dm_processed(msg_id):
+                db.record_dm_interaction(
+                    message_id=msg_id,
+                    thread_id=item["thread_id"],
+                    account_username=account_username,
+                    sender_username=sender_username,
+                    sender_id=sender_id,
+                    incoming_text=item.get("text", ""),
+                    trigger_matched=False,
+                    reply_status="skipped",
+                    is_story_reply=is_story_reply,
+                    story_id=item.get("story_id"),
+                    error_details="پیام قبل از تاریخ فعال‌سازی اتوماسیون دریافت شده است"
+                )
             continue
 
         # Skip story reply if configured to ignore
@@ -119,7 +148,20 @@ def process_dm_inbox_pass(
 
         stats["dms_scanned"] = stats.get("dms_scanned", 0) + 1
 
-        # 1. Evaluate trigger condition
+        # 1. Open chat and inspect active chat view
+        chat_info = client.read_thread_last_message(thread_id)
+        if chat_info:
+            if chat_info.get("is_outgoing"):
+                logger.info(f"Thread {thread_id} with @{sender_uname} already has outgoing reply from us. Skipping.")
+                continue
+            if chat_info.get("text"):
+                text = chat_info["text"]
+            chat_time = humanizer.parse_time_str_to_timestamp(chat_info.get("time_str"))
+            if activation_ts and chat_time and chat_time < activation_ts:
+                logger.info(f"Last message in thread {thread_id} is older than activation cutoff. Skipping.")
+                continue
+
+        # 2. Evaluate trigger condition
         is_matched = matcher.matches_trigger(
             comment_text=text,
             trigger_type=trigger_type,

@@ -257,6 +257,25 @@ def get_dm_automation(account_username: str) -> Optional[Dict[str, Any]]:
     finally:
         conn.close()
 
+def get_dm_activation_timestamp(dm_config: Dict[str, Any]) -> float:
+    """
+    Returns the UTC epoch timestamp of when DM automation was activated.
+    Uses activated_at, falling back to updated_at or created_at.
+    """
+    if not dm_config:
+        return 0.0
+    act_str = dm_config.get("activated_at") or dm_config.get("updated_at") or dm_config.get("created_at")
+    if not act_str:
+        return 0.0
+    try:
+        s = str(act_str).strip()
+        dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return 0.0
+
 def is_dm_processed(message_id: str) -> bool:
     """Checks if a direct message_id has already been processed or logged."""
     conn = get_connection()

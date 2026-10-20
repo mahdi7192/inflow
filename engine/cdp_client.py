@@ -488,12 +488,175 @@ class CDPClient:
             return res
         return []
 
+    async def fetch_direct_inbox_from_dom(self):
+        """
+        Extracts direct inbox threads directly from the Instagram Web DOM sidebar.
+        Returns a list of structured thread objects visible in the browser.
+        """
+        try:
+            curr_url = await self.eval("window.location.href")
+            if not curr_url or "instagram.com/direct" not in curr_url:
+                await self.navigate("https://www.instagram.com/direct/inbox/", wait_sec=3)
+        except Exception:
+            pass
+
+        expr = """(() => {
+            const results = [];
+            // Target conversation links in the direct inbox sidebar
+            let links = Array.from(document.querySelectorAll('a[href^="/direct/t/"]'));
+            if (links.length === 0) {
+                const listItems = Array.from(document.querySelectorAll('div[role="listitem"], div[role="button"]'));
+                for (const item of listItems) {
+                    const a = item.querySelector('a[href^="/direct/t/"]');
+                    if (a && !links.includes(a)) links.push(a);
+                }
+            }
+
+            for (const a of links) {
+                try {
+                    const href = a.getAttribute('href') || '';
+                    const match = href.match(/\\/direct\\/t\\/([^\\/\\?]+)/);
+                    if (!match) continue;
+                    const threadId = match[1];
+
+                    const container = a.closest('div[role="listitem"]') || a;
+                    const lines = (container.innerText || a.innerText || '')
+                        .split('\\n')
+                        .map(t => t.trim())
+                        .filter(Boolean);
+
+                    if (lines.length === 0) continue;
+
+                    const displayName = lines[0] || '';
+                    const snippet = lines.length > 1 ? lines[1] : '';
+
+                    let timeStr = '';
+                    const timeTag = container.querySelector('time');
+                    if (timeTag) {
+                        timeStr = timeTag.getAttribute('datetime') || timeTag.innerText || '';
+                    }
+                    if (!timeStr && lines.length > 2) {
+                        timeStr = lines[2];
+                    }
+
+                    // Check unread status
+                    const hasUnreadText = lines.some(l => /جدید|خوانده نشده|unread|new message/i.test(l));
+                    const isBold = Array.from(container.querySelectorAll('span, div')).some(el => {
+                        try {
+                            const fw = parseInt(window.getComputedStyle(el).fontWeight || '400', 10);
+                            return fw >= 600;
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+                    const hasDot = Boolean(container.querySelector('div[class*="x1y1aw1k"], span[aria-label*="unread"], span[aria-label*="خوانده"]'));
+                    const isUnread = Boolean(hasUnreadText || isBold || hasDot);
+
+                    // React Fiber inspection
+                    let fiberInfo = null;
+                    const fiberKey = Object.keys(a).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
+                    if (fiberKey) {
+                        let f = a[fiberKey];
+                        for (let d = 0; d < 12 && f; d++) {
+                            const p = f.memoizedProps;
+                            if (p && (p.thread || p.conversation)) {
+                                const th = p.thread || p.conversation;
+                                fiberInfo = {
+                                    threadId: th.thread_id || th.thread_v2_id,
+                                    lastActivityAt: th.last_activity_at || th.last_permanent_item?.timestamp,
+                                    lastItemText: th.last_permanent_item?.text,
+                                    lastItemUser: th.last_permanent_item?.user_id
+                                };
+                                break;
+                            }
+                            f = f.return;
+                        }
+                    }
+
+                    results.push({
+                        thread_id: threadId,
+                        display_name: displayName,
+                        snippet: snippet,
+                        time_str: timeStr,
+                        is_unread: isUnread,
+                        all_text: lines,
+                        fiber: fiberInfo
+                    });
+                } catch (e) {}
+            }
+            return results;
+        })()"""
+        res = await self.eval(expr)
+        if isinstance(res, list):
+            return res
+        return []
+
+    async def read_active_chat_last_message(self):
+        """
+        Reads the latest message from the active conversation view.
+        Distinguishes between outgoing (us) and incoming (customer) messages.
+        """
+        expr = """(() => {
+            const main = document.querySelector('div[role="main"]') || document.body;
+            const candidates = Array.from(main.querySelectorAll('div[dir="auto"], span[dir="auto"]'))
+                .filter(el => {
+                    const txt = (el.innerText || '').trim();
+                    if (!txt || txt.length < 1) return false;
+                    if (['Active now', 'آنلاین', 'Reply', 'پاسخ', 'Send', 'ارسال', 'Message...', 'پیام...'].includes(txt)) return false;
+                    if (el.closest('a[href^="/direct/t/"]')) return false;
+                    return true;
+                });
+
+            if (candidates.length === 0) return null;
+
+            const lastBubble = candidates[candidates.length - 1];
+            const text = (lastBubble.innerText || '').trim();
+
+            let isOutgoing = false;
+            let p = lastBubble;
+            for (let i = 0; i < 8 && p && p !== main; i++) {
+                const style = window.getComputedStyle(p);
+                if (style.justifyContent === 'flex-end' || style.alignSelf === 'flex-end' || style.marginLeft === 'auto') {
+                    isOutgoing = true;
+                    break;
+                }
+                const bg = style.backgroundColor || '';
+                if (bg.includes('rgb(0, 149, 246)') || bg.includes('rgb(55, 151, 240)')) {
+                    isOutgoing = true;
+                    break;
+                }
+                p = p.parentElement;
+            }
+
+            let timeStr = '';
+            const timeEl = lastBubble.closest('div[role="row"]')?.querySelector('time') || lastBubble.parentElement?.querySelector('time');
+            if (timeEl) {
+                timeStr = timeEl.getAttribute('datetime') || timeEl.innerText || '';
+            }
+
+            return {
+                text: text,
+                is_outgoing: isOutgoing,
+                time_str: timeStr
+            };
+        })()"""
+        res = await self.eval(expr)
+        if isinstance(res, dict):
+            return res
+        return None
+
     async def fetch_direct_inbox(self, limit=20):
-        """Fetch latest direct message threads via Instagram Web API."""
+        """Fetch latest direct message threads, prioritizing live DOM extraction."""
+        # 1. Primary: live DOM extraction (immune to 404s and GraphQL rotation)
+        dom_threads = await self.fetch_direct_inbox_from_dom()
+        if dom_threads:
+            return {"dom_threads": dom_threads}
+
+        # 2. Secondary fallback attempt
         try:
             curr_url = await self.eval("window.location.href")
             if not curr_url or "instagram.com" not in curr_url:
-                await self.navigate("https://www.instagram.com/", wait_sec=2)
+                await self.navigate("https://www.instagram.com/direct/inbox/", wait_sec=2)
         except Exception:
             pass
 
@@ -528,15 +691,33 @@ class CDPClient:
         return {}
 
     async def open_dm_thread(self, thread_id):
-        """Navigate directly to a specific thread URL."""
+        """Navigate directly to a specific thread URL with instant SPA click fallback."""
+        # 1. Try instant SPA click if thread link is visible in sidebar
+        click_script = f"""(() => {{
+            const a = document.querySelector('a[href*="/direct/t/{thread_id}/"]');
+            if (a) {{
+                a.click();
+                return true;
+            }}
+            return false;
+        }})()"""
+        clicked = await self.eval(click_script)
+        if clicked:
+            await asyncio.sleep(random.uniform(1.2, 2.0))
+            curr_url = await self.eval("window.location.href")
+            if curr_url and f"/direct/t/{thread_id}" in curr_url:
+                await self.simulate_human_glance()
+                return True, "Opened via SPA click"
+
+        # 2. Fallback to direct navigation
         url = f"https://www.instagram.com/direct/t/{thread_id}/"
         await self.send("Page.navigate", {"url": url})
         for _ in range(12):
             await asyncio.sleep(random.uniform(0.8, 1.5))
             curr_url = await self.eval("window.location.href")
-            if curr_url and "/direct/t/" in curr_url:
+            if curr_url and f"/direct/t/{thread_id}" in curr_url:
                 await self.simulate_human_glance()
                 await asyncio.sleep(random.uniform(0.8, 1.5))
-                return True, "Opened"
+                return True, "Opened via Page.navigate"
         return False, "Timeout waiting for thread navigation"
 

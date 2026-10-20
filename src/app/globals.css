@@ -76,6 +76,18 @@
   --font-mono: var(--font-geist-mono), monospace;
 }
 
+@utility font-vazir {
+  font-family: var(--font-vazirmatn), var(--font-geist-sans), sans-serif;
+}
+
+@utility font-geist {
+  font-family: var(--font-geist-sans), var(--font-vazirmatn), sans-serif;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

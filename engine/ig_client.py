@@ -20,6 +20,11 @@ except ImportError:
     from . import db
 
 try:
+    import humanizer
+except ImportError:
+    from . import humanizer
+
+try:
     from engine.cdp_client import CDPClient
 except ImportError:
     from cdp_client import CDPClient
@@ -250,20 +255,59 @@ class InstagramClient:
     def fetch_direct_inbox(self, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Fetches incoming direct threads from the inbox via browser context.
-        Parses threads and extracts the latest incoming message item.
-        Returns a list of parsed thread/message dictionaries.
+        Prioritizes live DOM extraction, falling back to internal API endpoints.
         """
         async def _fetch():
             cdp = None
             try:
                 cdp = await self._get_cdp()
                 raw = await cdp.fetch_direct_inbox(limit=limit)
+                my_uid = str(self.ds_user_id or "")
+                parsed: List[Dict[str, Any]] = []
+
+                # 1. Primary: Parse live DOM threads extracted from sidebar
+                dom_threads = raw.get("dom_threads", [])
+                if dom_threads:
+                    for th in dom_threads:
+                        thread_id = str(th.get("thread_id", ""))
+                        if not thread_id:
+                            continue
+
+                        disp_name = th.get("display_name", "")
+                        snippet = th.get("snippet", "")
+                        time_str = th.get("time_str", "")
+                        fiber = th.get("fiber") or {}
+
+                        # Calculate epoch timestamp
+                        ts = None
+                        if fiber.get("lastActivityAt"):
+                            ts = humanizer.parse_time_str_to_timestamp(fiber["lastActivityAt"])
+                        if not ts:
+                            ts = humanizer.parse_time_str_to_timestamp(time_str)
+
+                        # Idempotency message key
+                        msg_key = f"dom_{thread_id}_{abs(hash(snippet + time_str))}"
+
+                        parsed.append({
+                            "thread_id": thread_id,
+                            "message_id": msg_key,
+                            "sender_id": str(fiber.get("lastItemUser", "")),
+                            "sender_username": disp_name,
+                            "text": fiber.get("lastItemText") or snippet,
+                            "item_type": "text",
+                            "is_story_reply": False,
+                            "story_id": None,
+                            "is_outgoing": fiber.get("isOutgoing", False),
+                            "is_unread": th.get("is_unread", False),
+                            "time_str": time_str,
+                            "timestamp": ts,
+                        })
+                    return parsed
+
+                # 2. Secondary: Parse API threads if returned
                 threads = raw.get("inbox", {}).get("threads", [])
                 if not threads and isinstance(raw.get("threads"), list):
                     threads = raw.get("threads")
-
-                my_uid = str(self.ds_user_id or "")
-                parsed: List[Dict[str, Any]] = []
 
                 for th in threads:
                     thread_id = str(th.get("thread_id") or th.get("thread_v2_id") or "")
@@ -316,6 +360,9 @@ class InstagramClient:
                     else:
                         text = str(last_item.get("text", "")).strip()
 
+                    ts_val = last_item.get("timestamp", 0)
+                    ts = humanizer.parse_time_str_to_timestamp(ts_val)
+
                     parsed.append({
                         "thread_id": thread_id,
                         "message_id": item_id,
@@ -326,7 +373,9 @@ class InstagramClient:
                         "is_story_reply": is_story_reply,
                         "story_id": story_id,
                         "is_outgoing": is_outgoing,
-                        "timestamp": last_item.get("timestamp", 0)
+                        "is_unread": True,
+                        "time_str": "",
+                        "timestamp": ts,
                     })
                 return parsed
             except Exception as e:
@@ -337,6 +386,29 @@ class InstagramClient:
                     await cdp.close()
 
         return _run_async(_fetch())
+
+    def read_thread_last_message(self, thread_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Navigates or clicks into thread_id and reads the latest message from the active chat view.
+        """
+        async def _read():
+            cdp = None
+            try:
+                cdp = await self._get_cdp()
+                opened, _ = await cdp.open_dm_thread(thread_id)
+                if not opened:
+                    return None
+                await asyncio.sleep(random.uniform(0.8, 1.4))
+                msg_info = await cdp.read_active_chat_last_message()
+                return msg_info
+            except Exception as e:
+                logger.error(f"Error reading thread {thread_id} for {self.account_username}: {e}")
+                return None
+            finally:
+                if cdp:
+                    await cdp.close()
+
+        return _run_async(_read())
 
     def send_dm(
         self,

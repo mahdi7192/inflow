@@ -58,9 +58,14 @@ export function LanguageDropdown({
   const handleSelect = (code: Lang) => {
     onLangChange(code);
     if (typeof window !== "undefined") {
-      localStorage.setItem("inflow_lang", code);
-      document.documentElement.dir = code === "en" ? "ltr" : "rtl";
-      document.documentElement.lang = code;
+      try {
+        localStorage.setItem("inflow_lang", code);
+        document.cookie = `inflow_lang=${code}; path=/; max-age=31536000; SameSite=Lax`;
+        document.documentElement.dir = code === "en" ? "ltr" : "rtl";
+        document.documentElement.lang = code;
+      } catch {
+        // ignore
+      }
     }
     setOpen(false);
   };

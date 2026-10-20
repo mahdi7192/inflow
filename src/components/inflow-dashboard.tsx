@@ -34,6 +34,7 @@ import { BotSetupWizard } from "./bot/bot-setup-wizard";
 import { BotToolbarButton } from "./bot/bot-toolbar-button";
 import { BotMonitorDrawer } from "./bot/bot-monitor-drawer";
 import { VncViewerModal } from "./bot/vnc-viewer-modal";
+import { useWorkspace } from "@/components/layout/workspace-context";
 import { cn } from "@/lib/utils";
 
 export interface InflowDashboardProps {
@@ -43,21 +44,33 @@ export interface InflowDashboardProps {
   initialPosts?: PostRow[];
   initialAccounts?: AccountRow[];
   initialSelectedShortcode?: string | null;
+  embeddedInShell?: boolean;
 }
 
 export function InflowDashboard({
-  currentUser,
+  currentUser: propUser,
   initialAccount,
   initialProfile = null,
   initialPosts = [],
   initialAccounts = [],
   initialSelectedShortcode = null,
+  embeddedInShell = false,
 }: InflowDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const workspace = useWorkspace();
 
-  const [lang, setLang] = useState<Lang>("fa");
+  const currentUser = workspace ? workspace.currentUser : propUser;
+  const [internalLang, setInternalLang] = useState<Lang>("fa");
+  const lang = workspace ? workspace.lang : internalLang;
+  const setLang = (l: Lang) => {
+    if (workspace) {
+      workspace.setLang(l);
+    } else {
+      setInternalLang(l);
+    }
+  };
   const [accounts, setAccounts] = useState<AccountRow[]>(initialAccounts);
   const [currentAccount, setCurrentAccount] = useState<string>(
     initialAccount || (initialAccounts.length > 0 ? initialAccounts[0].username : "")
@@ -350,11 +363,13 @@ export function InflowDashboard({
   };
 
   // Quick toggle on master switch from card
-  const handleQuickToggle = async (shortcode: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleQuickToggle = async (shortcode: string, e?: React.MouseEvent | boolean) => {
+    if (e && typeof e === "object" && "stopPropagation" in e) {
+      e.stopPropagation();
+    }
     const target = posts.find((p) => p.shortcode === shortcode);
     if (!target) return;
-    const nextState = target.auto_reply !== 1;
+    const nextState = typeof e === "boolean" ? e : target.auto_reply !== 1;
 
     // Optimistic update
     setPosts((prev) =>
@@ -416,6 +431,365 @@ export function InflowDashboard({
       p.auto_reply === 1 &&
       (p.comment_action_type !== "none" || p.dm_action_type !== "none")
   ).length;
+
+  if (embeddedInShell) {
+    return (
+      <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {selectedShortcode && activeDetailPost ? (
+          <PostDetailView
+            post={activeDetailPost}
+            lang={lang}
+            onBack={handleBackToList}
+            onSaveSuccess={(updated) => {
+              setPosts((prev) =>
+                prev.map((p) => (p.shortcode === updated.shortcode ? updated : p))
+              );
+            }}
+            onOpenLogs={(sc) => setLogsShortcode(sc)}
+          />
+        ) : !loading && posts.length === 0 && (botStatus !== "live" || !isSetupCompleted) ? (
+          <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
+            <BotSetupWizard
+              account={currentAccount}
+              botStatus={botStatus}
+              lang={lang}
+              onOpenVnc={handleOpenVnc}
+              isVncLoading={isVncLoading}
+              onStatusChange={(status) => {
+                setBotStatus(status);
+                if (status === "live") fetchPosts(currentAccount);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Account Meta & KPI Metrics Strip */}
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name || currentAccount}
+                      className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-bold font-mono text-muted-foreground shrink-0">
+                      {(currentAccount || "IN").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <span>{profile?.display_name || currentAccount}</span>
+                      <span className="text-xs font-mono text-muted-foreground font-normal">
+                        <bdi>@{currentAccount}</bdi>
+                      </span>
+                    </h1>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                      {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("totalPosts")}</div>
+                  <div className="text-xl font-bold font-mono text-foreground mt-1">
+                    {posts.length}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("activeAutomations")}</div>
+                  <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
+                    {activeCount}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("configuredRules")}</div>
+                  <div className="text-xl font-bold font-mono text-amber-700 mt-1">
+                    {configuredCount}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground">{t("totalActions")}</div>
+                  <div className="text-xl font-bold font-mono text-sky-700 mt-1">
+                    {posts.reduce(
+                      (acc, p) =>
+                        acc +
+                        Number(
+                          (p as unknown as { logs_count: number }).logs_count || 0
+                        ),
+                      0
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Search, Filter Tabs & View Mode Toolbar */}
+            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  icon={<Search className="w-4 h-4 text-muted-foreground" />}
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              {/* View Mode & Filter Tabs */}
+              <div className="flex items-center gap-2 shrink-0 justify-between md:justify-end">
+                <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-lg border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("all")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                      filterTab === "all"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t("filterAll")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("active")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                      filterTab === "active"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t("filterActive")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("inactive")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                      filterTab === "inactive"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t("filterInactive")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("reels")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                      filterTab === "reels"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t("filterReels")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("posts")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                      filterTab === "posts"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t("filterPosts")}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-lg border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("cards")}
+                    className={cn(
+                      "p-1 rounded-md transition-colors cursor-pointer",
+                      viewMode === "cards"
+                        ? "bg-card text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    aria-label={t("viewCards")}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                    className={cn(
+                      "p-1 rounded-md transition-colors cursor-pointer",
+                      viewMode === "grid"
+                        ? "bg-card text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    aria-label={t("viewGrid")}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Post Feed */}
+            {filteredPosts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
+                  <FolderOpen className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("noPostsMatch")}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    فیلتر یا عبارت جستجوی دیگری را امتحان کنید.
+                  </p>
+                </div>
+              </div>
+            ) : viewMode === "cards" ? (
+              <div className="space-y-3">
+                {filteredPosts.map((post) => {
+                  const isActive = post.auto_reply === 1;
+                  return (
+                    <div
+                      key={post.id}
+                      onClick={() => handleSelectPost(post.shortcode)}
+                      className={cn(
+                        "group rounded-xl border p-4 transition-all duration-150 cursor-pointer flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center",
+                        isActive
+                          ? "border-emerald-200/60 bg-card hover:border-emerald-300 hover:shadow-xs"
+                          : "border-border bg-card hover:border-zinc-300 hover:shadow-2xs"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {post.thumbnail_url ? (
+                          <img
+                            src={post.thumbnail_url}
+                            alt=""
+                            className="w-14 h-14 rounded-lg object-cover border border-border shrink-0 bg-secondary"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-secondary border border-border flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">
+                            {post.post_type}
+                          </div>
+                        )}
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-semibold text-foreground">
+                              {post.shortcode}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                              {post.post_type}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {post.caption || t("noCaption")}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLogsShortcode(post.shortcode);
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2.5 py-1 rounded-md border border-border hover:bg-secondary transition-colors cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-sky-600" />
+                          <span>لاگ‌ها</span>
+                        </button>
+
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-2"
+                        >
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={(checked) => handleQuickToggle(post.shortcode, checked)}
+                            className="cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredPosts.map((post) => {
+                  const isActive = post.auto_reply === 1;
+                  return (
+                    <div
+                      key={post.id}
+                      onClick={() => handleSelectPost(post.shortcode)}
+                      className="group rounded-xl border border-border bg-card overflow-hidden hover:border-zinc-300 hover:shadow-xs transition-all cursor-pointer flex flex-col"
+                    >
+                      <div className="aspect-square bg-secondary relative overflow-hidden">
+                        {post.thumbnail_url ? (
+                          <img
+                            src={post.thumbnail_url}
+                            alt=""
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : null}
+                        <div className="absolute top-2 start-2">
+                          <Badge variant="secondary" className="text-[10px] uppercase font-mono backdrop-blur-md">
+                            {post.post_type}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="p-3 flex items-center justify-between gap-2 border-t border-border">
+                        <span className="text-xs font-mono font-medium truncate">
+                          {post.shortcode}
+                        </span>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={(checked) => handleQuickToggle(post.shortcode, checked)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Logs Modal */}
+        {logsShortcode && activeLogPost && (
+          <LogsModal
+            post={activeLogPost}
+            lang={lang}
+            onClose={() => setLogsShortcode(null)}
+            onLogsUpdated={() => fetchPosts(currentAccount)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-zinc-50/50 text-foreground">

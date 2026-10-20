@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Menu,
-  Save,
   Clock,
   Sparkles,
   MessageSquare,
   Check,
   AlertCircle,
   ExternalLink,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,11 @@ import type { SafeUser } from "@/lib/auth";
 import { BotToolbarButton } from "@/components/bot/bot-toolbar-button";
 import { BotMonitorDrawer } from "@/components/bot/bot-monitor-drawer";
 import { VncViewerModal } from "@/components/bot/vnc-viewer-modal";
-import { DmHeaderToggle } from "./dm-header-toggle";
+import { ActivationCard, ProgressiveDisclosureContainer } from "@/components/ui/activation-card";
+import { StickySaveBar } from "@/components/ui/sticky-save-bar";
+import { PageContainer, PageHeader, PageBody } from "@/components/layout/page-layout";
+import { useWorkspace } from "@/components/layout/workspace-context";
+import { toast } from "@/components/ui/sonner";
 import { DmTriggerSelector } from "./dm-trigger-selector";
 import { DmDirectReplyCard } from "./dm-direct-reply-card";
 import { DmAiPromptEditor } from "./dm-ai-prompt-editor";
@@ -33,53 +37,24 @@ import { cn } from "@/lib/utils";
 export interface DmAutomationViewProps {
   currentUser?: SafeUser | null;
   account: string;
-  profile: AccountRow;
-  accounts: AccountRow[];
+  profile?: AccountRow;
+  accounts?: AccountRow[];
   initialAutomation: DMAutomationRow;
   initialLogs?: DMLogRow[];
+  embeddedInShell?: boolean;
 }
 
 export function DmAutomationView({
-  currentUser,
-  account,
-  profile,
-  accounts,
+  account: propAccount,
   initialAutomation,
+  embeddedInShell = false,
 }: DmAutomationViewProps) {
   const router = useRouter();
-  const [lang, setLang] = useState<Lang>("fa");
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const workspace = useWorkspace();
 
-  // Bot Drawer & VNC States
-  const [botDrawerOpen, setBotDrawerOpen] = useState(false);
-  const [vncModalOpen, setVncModalOpen] = useState(false);
-  const [vncUrl, setVncUrl] = useState("");
-  const [vncExpiresInSec, setVncExpiresInSec] = useState(600);
-  const [isVncLoading, setIsVncLoading] = useState(false);
-  const [botStatus, setBotStatus] = useState<BotStatus>(profile.bot_status || "unprovisioned");
-
-  const handleOpenVnc = async () => {
-    setIsVncLoading(true);
-    try {
-      const res = await fetch("/api/bot/vnc-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setVncUrl(data.vnc_url);
-        setVncExpiresInSec(data.timeout_seconds || 600);
-        setVncModalOpen(true);
-      } else {
-        alert("خطا در باز کردن نشست مانیتور: " + data.error);
-      }
-    } catch (err) {
-      console.error("VNC launch error:", err);
-    } finally {
-      setIsVncLoading(false);
-    }
-  };
+  const account = workspace ? workspace.account : propAccount;
+  const lang = workspace ? workspace.lang : "fa";
+  const t = (key: string) => (workspace ? workspace.t(key) : I18N[lang]?.[key] || I18N.fa[key] || key);
 
   // Form State
   const [enabled, setEnabled] = useState(initialAutomation.enabled === 1);
@@ -101,7 +76,6 @@ export function DmAutomationView({
   const [aiPromptInstructions, setAiPromptInstructions] = useState(
     initialAutomation.ai_prompt_instructions || ""
   );
-
   const [requireFollow, setRequireFollow] = useState(
     initialAutomation.require_follow === 1
   );
@@ -110,19 +84,18 @@ export function DmAutomationView({
       "سلام! برای دریافت پاسخ و مشاوره کامل، لطفاً ابتدا پیج را فالو کنید 🙏"
   );
 
-  // Saving state
+  // Saving & Dirty State
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
+  // Sync isDirty with Workspace Context if available
+  useEffect(() => {
+    if (workspace) {
+      workspace.setIsDirty(isDirty);
+    }
+  }, [isDirty, workspace]);
 
-  const showToast = (text: string, type: "success" | "error" = "success") => {
-    setToastMsg({ type, text });
-    setTimeout(() => setToastMsg(null), 3500);
-  };
-
-  // Instant Master Toggle
+  // Master Toggle
   const handleToggleMaster = async (nextState: boolean) => {
     setEnabled(nextState);
     try {
@@ -134,14 +107,36 @@ export function DmAutomationView({
       const data = await res.json();
       if (!data.success) {
         setEnabled(!nextState);
-        return false;
+        toast.error("خطا در تغییر وضعیت اتوماسیون");
+        return;
       }
-      return true;
-    } catch (err) {
-      console.error("Master toggle request failed:", err);
+      toast.success(
+        nextState
+          ? "اتوماسیون دایرکت با موفقیت فعال شد"
+          : "اتوماسیون دایرکت غیرفعال شد"
+      );
+    } catch {
       setEnabled(!nextState);
-      return false;
+      toast.error("خطای شبکه در تغییر وضعیت");
     }
+  };
+
+  // Reset form to initial server values
+  const handleResetConfig = () => {
+    setEnabled(initialAutomation.enabled === 1);
+    setTriggerType(initialAutomation.trigger_type || "all");
+    setTriggerKeywords(initialAutomation.trigger_keywords || "");
+    setTriggerContext(initialAutomation.trigger_context || "");
+    setReplyMode(initialAutomation.reply_mode || "direct");
+    setDirectReplyText(initialAutomation.direct_reply_text || "");
+    setAiPromptInstructions(initialAutomation.ai_prompt_instructions || "");
+    setRequireFollow(initialAutomation.require_follow === 1);
+    setFollowPromptText(
+      initialAutomation.follow_prompt_text ||
+        "سلام! برای دریافت پاسخ و مشاوره کامل، لطفاً ابتدا پیج را فالو کنید 🙏"
+    );
+    setIsDirty(false);
+    toast.info("تغییرات لغو و به مقادیر اولیه بازگردانده شدند.");
   };
 
   // Save Full Configuration
@@ -167,184 +162,74 @@ export function DmAutomationView({
       const data = await res.json();
       if (data.success) {
         setIsDirty(false);
-        showToast(t("dmSaveSuccess"), "success");
+        toast.success(t("dmSaveSuccess") || "تنظیمات دایرکت با موفقیت ذخیره شد");
       } else {
-        showToast(data.error || "خطا در ذخیره تنظیمات", "error");
+        toast.error(data.error || "خطا در ذخیره تنظیمات");
       }
-    } catch (err) {
-      console.error("Save config error:", err);
-      showToast("خطا در برقراری ارتباط با سرور", "error");
+    } catch {
+      toast.error("خطا در برقراری ارتباط با سرور");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSelectAccount = (username: string) => {
-    router.push(`/@${username}/dms`);
-  };
-
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  };
-
-  return (
-    <div
-      dir={lang === "fa" || lang === "ar" ? "rtl" : "ltr"}
-      className="flex h-screen bg-zinc-50 overflow-hidden font-vazir"
-    >
-      {/* Toast Notification */}
-      {toastMsg && (
-        <div
-          className={`fixed bottom-6 end-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl font-medium text-xs shadow-xl animate-in fade-in slide-in-from-bottom-3 ${
-            toastMsg.type === "success"
-              ? "bg-zinc-900 text-white border border-zinc-700"
-              : "bg-rose-600 text-white border border-rose-500"
-          }`}
-        >
-          {toastMsg.type === "success" ? (
-            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-white shrink-0" />
-          )}
-          <span>{toastMsg.text}</span>
-        </div>
-      )}
-
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block h-full shrink-0">
-        <SidebarNav
-          currentAccount={account}
-          accounts={accounts}
-          onSelectAccount={handleSelectAccount}
-          onOpenAddAccount={() => {}}
-          onOpenAgentApi={() => {}}
-          onSync={async () => {}}
-          syncing={false}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          lang={lang}
-          activePlugin="dms"
-        />
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileDrawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs animate-in fade-in"
-            onClick={() => setMobileDrawerOpen(false)}
-          />
-          <div className="relative w-64 max-w-[80vw] h-full bg-card z-10 shadow-2xl animate-in slide-in-from-start">
-            <SidebarNav
-              currentAccount={account}
-              accounts={accounts}
-              onSelectAccount={(usr) => {
-                handleSelectAccount(usr);
-                setMobileDrawerOpen(false);
-              }}
-              onOpenAddAccount={() => {}}
-              onOpenAgentApi={() => {}}
-              onSync={async () => {}}
-              syncing={false}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-              lang={lang}
-              onCloseMobileDrawer={() => setMobileDrawerOpen(false)}
-              activePlugin="dms"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        {/* Top Header */}
-        <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
+  const content = (
+    <PageContainer maxWidth="5xl">
+      <PageHeader
+        title={t("smartDmTitle") || "دایرکت هوشمند"}
+        subtitle={
+          t("dmPluginSubtitle") ||
+          "مدیریت خودکار پاسخ به پیام‌های خصوصی، استعلامات کاربران و مشاوره هوشمند"
+        }
+        badge={
+          <Badge variant="outline" className="text-xs font-mono font-normal">
+            <bdi>@{account}</bdi>
+          </Badge>
+        }
+        actions={
+          <Link href={`/@${account}/dms/logs`}>
+            <Button
               type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-1.5 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors cursor-pointer"
-              aria-label={t("openMenu")}
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold text-foreground">
-                {t("navDms")}
-              </span>
-              <span className="text-zinc-300">/</span>
-              <span className="font-mono text-muted-foreground">
-                @{account}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <BotToolbarButton
-              account={account}
-              botStatus={botStatus}
-              lang={lang}
-              onClick={() => setBotDrawerOpen(true)}
-            />
-            <LanguageDropdown
-              currentLang={lang}
-              onLangChange={(l) => setLang(l)}
+              variant="outline"
               size="sm"
-            />
-          </div>
-        </header>
+              className="text-xs gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Clock className="w-3.5 h-3.5 text-sky-600" />
+              <span>{t("dmLogsTitle")}</span>
+            </Button>
+          </Link>
+        }
+      />
 
-        {/* Workspace Body */}
-        <main className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-6">
-          {/* Sub-header Navigation with View Logs button */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-foreground">
-                {t("dmPluginTitle")}
-              </span>
-              <Badge variant="outline" className="text-[11px] font-mono font-medium text-muted-foreground">
-                @{account}
-              </Badge>
-            </div>
+      <PageBody>
+        {/* ۱. کارت سراسری فعال‌سازی (ActivationCard) */}
+        <ActivationCard
+          title={t("smartDmTitle") || "دایرکت هوشمند"}
+          subtitleOn="پاسخگویی خودکار به پیام‌های دریافتی دایرکت اینستاگرام فعال است."
+          subtitleOff="اتوماسیون دایرکت غیرفعال است. پیام‌های جدید بدون پاسخ خودکار باقی می‌مانند."
+          enabled={enabled}
+          onToggle={handleToggleMaster}
+          icon={<Send className="w-5 h-5" />}
+          disabledNotice={t("activationBannerNotice")}
+        />
 
-            <Link href={`/@${account}/dms/logs`}>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="text-xs gap-1.5 cursor-pointer border-border"
-              >
-                <Clock className="w-3.5 h-3.5 text-sky-600" />
-                <span>{t("dmLogsTitle")}</span>
-              </Button>
-            </Link>
-          </div>
-
-          {/* Top Master Switch Toggle */}
-          <DmHeaderToggle
-            enabled={enabled}
-            onToggle={handleToggleMaster}
-            lang={lang}
-          />
-
-          {/* ۱. شرط فعال‌سازی (Trigger) */}
+        {/* بخش‌های وابسته با آشکارسازی تدریجی */}
+        <ProgressiveDisclosureContainer enabled={enabled} className="space-y-6">
+          {/* ۲. شرط فعال‌سازی (Trigger) */}
           <DmTriggerSelector
             triggerType={triggerType}
             triggerKeywords={triggerKeywords}
             triggerContext={triggerContext}
-            onChangeType={(t) => {
-              setTriggerType(t);
+            onChangeType={(typ) => {
+              setTriggerType(typ);
               setIsDirty(true);
             }}
-            onChangeKeywords={(k) => {
-              setTriggerKeywords(k);
+            onChangeKeywords={(kw) => {
+              setTriggerKeywords(kw);
               setIsDirty(true);
             }}
-            onChangeContext={(c) => {
-              setTriggerContext(c);
+            onChangeContext={(ctx) => {
+              setTriggerContext(ctx);
               setIsDirty(true);
             }}
             lang={lang}
@@ -426,8 +311,8 @@ export function DmAutomationView({
             </div>
           </div>
 
-          {/* Reply Mode: Direct */}
-          {replyMode === "direct" && (
+          {/* ۳. بخش پاسخ مستقیم یا پرامپت هوش مصنوعی */}
+          {replyMode === "direct" ? (
             <DmDirectReplyCard
               directReplyText={directReplyText}
               onChangeText={(txt) => {
@@ -436,21 +321,18 @@ export function DmAutomationView({
               }}
               lang={lang}
             />
-          )}
-
-          {/* Reply Mode: AI Prompt Instructions & Context */}
-          {replyMode === "ai" && (
+          ) : (
             <DmAiPromptEditor
               promptInstructions={aiPromptInstructions}
-              onChangePrompt={(ins) => {
-                setAiPromptInstructions(ins);
+              onChangePrompt={(inst) => {
+                setAiPromptInstructions(inst);
                 setIsDirty(true);
               }}
               lang={lang}
             />
           )}
 
-          {/* ۳. شرط فالو داشتن (Follow Gate) */}
+          {/* ۴. شرط دنبال کردن پیج (Follow Gate) */}
           <DmFollowGateCard
             requireFollow={requireFollow}
             followPromptText={followPromptText}
@@ -464,59 +346,30 @@ export function DmAutomationView({
             }}
             lang={lang}
           />
+        </ProgressiveDisclosureContainer>
+      </PageBody>
 
-          {/* Non-sticky Save Configuration Action */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <Button
-              type="button"
-              variant="default"
-              size="lg"
-              disabled={saving}
-              onClick={handleSaveConfig}
-              className="w-full sm:w-auto px-8 gap-2 shadow-sm cursor-pointer"
-            >
-              <Save className={`w-4 h-4 ${saving ? "animate-spin" : ""}`} />
-              <span>{saving ? "در حال ذخیره..." : t("dmSaveConfigBtn")}</span>
-            </Button>
-
-            <div className="text-xs text-muted-foreground self-start sm:self-center">
-              {isDirty ? (
-                <span className="text-amber-600 font-medium flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  تغییرات ذخیره‌نشده وجود دارد
-                </span>
-              ) : (
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  تنظیمات با سرور هماهنگ است
-                </span>
-              )}
-            </div>
-          </div>
-        </main>
-      </div>
-
-      {/* Bot Telemetry & Monitoring Drawer */}
-      <BotMonitorDrawer
-        isOpen={botDrawerOpen}
-        onClose={() => setBotDrawerOpen(false)}
-        account={account}
-        botStatus={botStatus}
-        lang={lang}
-        onOpenVnc={handleOpenVnc}
-        isVncLoading={isVncLoading}
-        onStatusChange={(status) => setBotStatus(status)}
+      {/* داک ذخیره چسبان شناور در پایین صفحه */}
+      <StickySaveBar
+        isDirty={isDirty}
+        isSaving={saving}
+        onSave={handleSaveConfig}
+        onReset={handleResetConfig}
+        saveLabel={t("saveChanges")}
+        resetLabel={t("cancelChanges")}
+        dirtyMessage={t("unsavedChangesTitle")}
       />
+    </PageContainer>
+  );
 
-      {/* Ephemeral VNC Viewer Modal */}
-      <VncViewerModal
-        isOpen={vncModalOpen}
-        onClose={() => setVncModalOpen(false)}
-        account={account}
-        vncUrl={vncUrl}
-        initialExpiresInSeconds={vncExpiresInSec}
-        lang={lang}
-      />
+  if (embeddedInShell) {
+    return content;
+  }
+
+  // Fallback for standalone rendering outside shell
+  return (
+    <div className="min-h-screen bg-zinc-50 flex flex-col font-vazir" dir={lang === "en" ? "ltr" : "rtl"}>
+      {content}
     </div>
   );
 }
