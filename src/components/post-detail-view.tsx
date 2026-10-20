@@ -120,7 +120,7 @@ export function PostDetailView({
         toast.success(checked ? t("toastTurnedOn") : t("toastTurnedOff"));
       } else {
         setAutoReply(!checked);
-        toast.error("خطا در تغییر وضعیت پاسخ خودکار");
+        toast.error(data.error || "خطا در تغییر وضعیت پاسخ خودکار");
       }
     } catch {
       setAutoReply(!checked);

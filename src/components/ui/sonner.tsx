@@ -13,20 +13,28 @@ export function Toaster({ ...props }: ToasterProps) {
       ? "ltr"
       : "rtl");
 
+  const isRtl = dir === "rtl";
+
   return (
     <Sonner
       dir={dir}
-      position={dir === "rtl" ? "bottom-left" : "bottom-right"}
+      position={isRtl ? "bottom-left" : "bottom-right"}
       className="toaster group font-vazir"
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-white group-[.toaster]:text-zinc-950 group-[.toaster]:border-zinc-200 group-[.toaster]:shadow-lg group-[.toaster]:rounded-xl text-xs",
-          description: "group-[.toast]:text-zinc-500 text-[11px]",
+            "group toast group-[.toaster]:bg-white group-[.toaster]:text-zinc-950 group-[.toaster]:border-zinc-200 group-[.toaster]:shadow-lg group-[.toaster]:rounded-xl text-xs font-vazir",
+          title: "font-vazir text-xs font-medium text-zinc-900",
+          description: "group-[.toast]:text-zinc-500 text-[11px] font-vazir",
           actionButton:
-            "group-[.toast]:bg-zinc-900 group-[.toast]:text-zinc-50 text-xs font-medium rounded-lg",
+            "group-[.toast]:bg-zinc-900 group-[.toast]:text-zinc-50 text-xs font-medium rounded-lg font-vazir",
           cancelButton:
-            "group-[.toast]:bg-zinc-100 group-[.toast]:text-zinc-500 text-xs rounded-lg",
+            "group-[.toast]:bg-zinc-100 group-[.toast]:text-zinc-500 text-xs rounded-lg font-vazir",
+        },
+        style: {
+          fontFamily: isRtl
+            ? "var(--font-vazirmatn), var(--font-geist-sans), sans-serif"
+            : "var(--font-geist-sans), var(--font-vazirmatn), sans-serif",
         },
       }}
       {...props}

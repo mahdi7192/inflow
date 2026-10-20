@@ -107,7 +107,7 @@ export function DmAutomationView({
       const data = await res.json();
       if (!data.success) {
         setEnabled(!nextState);
-        toast.error("خطا در تغییر وضعیت اتوماسیون");
+        toast.error(data.error || "خطا در تغییر وضعیت اتوماسیون");
         return;
       }
       toast.success(
@@ -115,7 +115,7 @@ export function DmAutomationView({
           ? "اتوماسیون دایرکت با موفقیت فعال شد"
           : "اتوماسیون دایرکت غیرفعال شد"
       );
-    } catch {
+    } catch (err) {
       setEnabled(!nextState);
       toast.error("خطای شبکه در تغییر وضعیت");
     }
