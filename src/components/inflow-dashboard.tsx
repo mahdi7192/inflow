@@ -42,6 +42,7 @@ export interface InflowDashboardProps {
   initialProfile?: AccountRow | null;
   initialPosts?: PostRow[];
   initialAccounts?: AccountRow[];
+  initialSelectedShortcode?: string | null;
 }
 
 export function InflowDashboard({
@@ -50,6 +51,7 @@ export function InflowDashboard({
   initialProfile = null,
   initialPosts = [],
   initialAccounts = [],
+  initialSelectedShortcode = null,
 }: InflowDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,7 +88,9 @@ export function InflowDashboard({
   const [viewMode, setViewMode] = useState<"cards" | "grid">("cards");
 
   // Selected post for detail configuration screen
-  const [selectedShortcode, setSelectedShortcode] = useState<string | null>(null);
+  const [selectedShortcode, setSelectedShortcode] = useState<string | null>(
+    initialSelectedShortcode || null
+  );
 
   // Modals
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
@@ -271,49 +275,34 @@ export function InflowDashboard({
     }
   }, [currentAccount, profile, fetchPosts, checkAgentStatus]);
 
-  // Synchronize URL query parameter with selectedShortcode state (Deep Linking)
+  // Synchronize route prop with selectedShortcode state
   useEffect(() => {
-    if (postParam) {
-      if (posts.length > 0) {
-        const found = posts.some((p) => p.shortcode === postParam);
-        if (found) {
-          setSelectedShortcode(postParam);
-        } else if (!loading) {
-          // Graceful fallback for non-existent shortcode in URL (T011)
-          console.warn(`Post with shortcode "${postParam}" not found. Falling back to catalog.`);
-          setSelectedShortcode(null);
-          const params = new URLSearchParams(searchParams.toString());
-          params.delete("post");
-          const q = params.toString();
-          router.replace(q ? `${pathname}?${q}` : pathname);
-        }
-      } else if (loading) {
-        setSelectedShortcode(postParam);
-      }
-    } else {
-      setSelectedShortcode(null);
+    if (initialSelectedShortcode !== undefined) {
+      setSelectedShortcode(initialSelectedShortcode || null);
     }
-  }, [postParam, posts, loading, pathname, router, searchParams]);
+  }, [initialSelectedShortcode]);
+
+  // Migrate legacy query parameter to clean route (e.g. ?post=... -> /comments/...)
+  useEffect(() => {
+    if (postParam && !initialSelectedShortcode && currentAccount) {
+      router.replace(`/@${currentAccount}/comments/${postParam}`);
+    }
+  }, [postParam, initialSelectedShortcode, currentAccount, router]);
 
   // Navigation handlers that update browser history and URL
   const handleSelectPost = (shortcode: string) => {
     setSelectedShortcode(shortcode);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("post", shortcode);
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`/@${currentAccount}/comments/${shortcode}`);
   };
 
   const handleBackToList = () => {
     setSelectedShortcode(null);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("post");
-    const q = params.toString();
-    router.push(q ? `${pathname}?${q}` : pathname);
+    router.push(`/@${currentAccount}/comments`);
   };
 
   const handleSelectAccount = (username: string) => {
     setSelectedShortcode(null);
-    router.push(`/@${username}`);
+    router.push(`/@${username}/comments`);
   };
 
   // Sync action with real-time job polling
@@ -497,7 +486,7 @@ export function InflowDashboard({
       {/* Main Content Viewport */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Decluttered Top Header Navigation */}
-        <header className="sticky top-0 z-20 h-14 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
+        <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Mobile Hamburger Drawer Toggle */}
             <button

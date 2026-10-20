@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, PostRow } from "@/lib/db";
+import { getDb, PostRow, DMAutomationRow } from "@/lib/db";
 
 /**
  * Hermes Agent Control Plane Polling Endpoint
@@ -113,11 +113,47 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    let dmAutomationPayload: any = null;
+    let processedDmIds: string[] = [];
+
+    if (account) {
+      const dmRow = db
+        .prepare("SELECT * FROM dm_automations WHERE account_username = ?")
+        .get(account) as DMAutomationRow | undefined;
+
+      if (dmRow) {
+        dmAutomationPayload = {
+          enabled: dmRow.enabled,
+          trigger_type: dmRow.trigger_type,
+          trigger_context: dmRow.trigger_context,
+          trigger_keywords: dmRow.trigger_keywords
+            ? dmRow.trigger_keywords
+                .split(",")
+                .map((k) => k.trim())
+                .filter(Boolean)
+            : [],
+          reply_mode: dmRow.reply_mode,
+          direct_reply_text: dmRow.direct_reply_text,
+          ai_prompt_instructions: dmRow.ai_prompt_instructions,
+          require_follow: dmRow.require_follow,
+          follow_prompt_text: dmRow.follow_prompt_text,
+          story_handling_mode: dmRow.story_handling_mode,
+        };
+
+        const recentDmLogs = db
+          .prepare("SELECT message_id FROM dm_logs WHERE account_username = ? ORDER BY processed_at DESC LIMIT 200")
+          .all(account) as { message_id: string }[];
+        processedDmIds = recentDmLogs.map((l) => l.message_id);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       polled_at: now,
       active_count: payload.length,
       active_posts: payload,
+      dm_automation: dmAutomationPayload,
+      processed_dm_ids: processedDmIds,
     });
   } catch (error) {
     return NextResponse.json(

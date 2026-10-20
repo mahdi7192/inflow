@@ -1,0 +1,187 @@
+openapi: 3.1.0
+info:
+  title: inFlow DM Automation UI API
+  version: 1.0.0
+  description: Dashboard endpoints for managing DM Automation rules, instant master switch, and viewing DM interaction logs.
+
+paths:
+  /api/accounts/{username}/dm-automation:
+    get:
+      summary: Retrieve DM Automation Configuration
+      description: Returns the current DM automation settings for the account. Auto-creates default disabled row if not present.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  automation:
+                    $ref: '#/components/schemas/DMAutomation'
+
+    post:
+      summary: Update DM Automation Settings or Flip Master Switch
+      description: |
+        Updates full configuration or performs an instant optimistic toggle of the master switch.
+        Supports partial or full updates.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: integer
+                  enum: [0, 1]
+                trigger_type:
+                  type: string
+                  enum: [all, keywords, ai_context]
+                trigger_context:
+                  type: string
+                trigger_keywords:
+                  type: string
+                reply_mode:
+                  type: string
+                  enum: [direct, ai]
+                direct_reply_text:
+                  type: string
+                ai_prompt_instructions:
+                  type: string
+                web_context_urls:
+                  type: array
+                  items:
+                    type: string
+                mcp_servers_config:
+                  type: array
+                  items:
+                    type: string
+                require_follow:
+                  type: integer
+                  enum: [0, 1]
+                follow_prompt_text:
+                  type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  automation:
+                    $ref: '#/components/schemas/DMAutomation'
+
+  /api/accounts/{username}/dm-logs:
+    get:
+      summary: Fetch DM Automation Interaction Logs
+      description: Returns paginated recent DM interaction logs for audit, troubleshooting, and analytics.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, sent, skipped, pending_follow, failed]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        message_id:
+                          type: string
+                        sender_username:
+                          type: string
+                        incoming_text:
+                          type: string
+                        is_story_reply:
+                          type: integer
+                        reply_status:
+                          type: string
+                        reply_text:
+                          type: string
+                        processed_at:
+                          type: string
+
+components:
+  schemas:
+    DMAutomation:
+      type: object
+      properties:
+        id:
+          type: integer
+        account_username:
+          type: string
+        enabled:
+          type: integer
+          enum: [0, 1]
+        trigger_type:
+          type: string
+          enum: [all, keywords, ai_context]
+        trigger_context:
+          type: string
+        trigger_keywords:
+          type: string
+        reply_mode:
+          type: string
+          enum: [direct, ai]
+        direct_reply_text:
+          type: string
+        ai_prompt_instructions:
+          type: string
+        web_context_urls:
+          type: array
+          items:
+            type: string
+        mcp_servers_config:
+          type: array
+          items:
+            type: string
+        require_follow:
+          type: integer
+          enum: [0, 1]
+        follow_prompt_text:
+          type: string
+        story_handling_mode:
+          type: string
+        updated_at:
+          type: string

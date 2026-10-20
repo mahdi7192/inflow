@@ -1,0 +1,167 @@
+openapi: 3.1.0
+info:
+  title: inFlow DM Automation Agent API
+  version: 1.0.0
+  description: Background Worker & Execution Plane polling and DM interaction logging endpoints.
+
+paths:
+  /api/agent/poll:
+    get:
+      summary: Poll for Active Automation Tasks & DM Configuration
+      description: |
+        Polled by background worker every 1-2 minutes. Returns active post comment rules
+        and active DM automation configuration for the specified account, along with recent
+        processed comment and message IDs for idempotent skipping.
+      parameters:
+        - name: account
+          in: query
+          required: true
+          schema:
+            type: string
+          example: mahdiketabdar
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active tasks and configurations successfully returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  polled_at:
+                    type: string
+                  paused:
+                    type: boolean
+                  active_count:
+                    type: integer
+                  active_posts:
+                    type: array
+                    items:
+                      type: object
+                  dm_automation:
+                    type: object
+                    nullable: true
+                    properties:
+                      enabled:
+                        type: integer
+                        enum: [0, 1]
+                      trigger_type:
+                        type: string
+                        enum: [all, keywords, ai_context]
+                      trigger_context:
+                        type: string
+                      trigger_keywords:
+                        type: array
+                        items:
+                          type: string
+                      reply_mode:
+                        type: string
+                        enum: [direct, ai]
+                      direct_reply_text:
+                        type: string
+                      ai_prompt_instructions:
+                        type: string
+                      web_context_urls:
+                        type: array
+                        items:
+                          type: string
+                      mcp_servers_config:
+                        type: array
+                        items:
+                          type: string
+                      require_follow:
+                        type: integer
+                        enum: [0, 1]
+                      follow_prompt_text:
+                        type: string
+                  processed_dm_ids:
+                    type: array
+                    items:
+                      type: string
+                    description: Recent 200 message IDs already processed to eliminate round-trips.
+
+  /api/accounts/{username}/dm-logs:
+    post:
+      summary: Record Incoming DM Processing Outcome & Idempotency Lock
+      description: |
+        Called by execution worker after processing an incoming Instagram DM.
+        Enforces strict idempotency based on message_id.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message_id
+                - thread_id
+                - sender_username
+                - incoming_text
+                - reply_status
+              properties:
+                message_id:
+                  type: string
+                  description: Instagram unique message identifier
+                thread_id:
+                  type: string
+                sender_username:
+                  type: string
+                sender_id:
+                  type: string
+                incoming_text:
+                  type: string
+                is_story_reply:
+                  type: integer
+                  enum: [0, 1]
+                story_id:
+                  type: string
+                  nullable: true
+                story_content:
+                  type: string
+                  nullable: true
+                trigger_matched:
+                  type: integer
+                  enum: [0, 1]
+                reply_status:
+                  type: string
+                  enum: [sent, pending_follow, skipped, failed, locked]
+                reply_text:
+                  type: string
+                tools_invoked:
+                  type: array
+                  items:
+                    type: string
+                error_details:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Log recorded successfully or already processed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  already_processed:
+                    type: boolean
+                  log_id:
+                    type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer

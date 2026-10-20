@@ -14,6 +14,8 @@ import {
   X,
   Radio,
   Trash2,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -37,6 +39,7 @@ export interface SidebarNavProps {
   lang: Lang;
   onCloseMobileDrawer?: () => void;
   isCatalogActive?: boolean;
+  activePlugin?: "comments" | "dms";
   onNavigateCatalog?: () => void;
   onOpenDeleteAccount?: () => void;
 }
@@ -54,6 +57,7 @@ export function SidebarNav({
   lang,
   onCloseMobileDrawer,
   isCatalogActive = true,
+  activePlugin = "comments",
   onNavigateCatalog,
   onOpenDeleteAccount,
 }: SidebarNavProps) {
@@ -207,23 +211,42 @@ export function SidebarNav({
 
       {/* Main Navigation Items */}
       <div className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {/* Catalog Navigation Link */}
-        <button
-          type="button"
+        {/* Comment Automation Link */}
+        <Link
+          href={`/@${currentAccount}/comments`}
           onClick={() => {
             if (onNavigateCatalog) onNavigateCatalog();
             if (onCloseMobileDrawer) onCloseMobileDrawer();
           }}
           className={cn(
             "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer text-start",
-            isCatalogActive
+            activePlugin === "comments"
               ? "bg-primary text-primary-foreground shadow-2xs"
               : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
           )}
         >
-          <LayoutGrid className="w-4 h-4 shrink-0" />
-          <span className="flex-1 truncate">{t("navCatalog")}</span>
-        </button>
+          <MessageSquare className="w-4 h-4 shrink-0" />
+          <span className="flex-1 truncate">{t("navComments")}</span>
+        </Link>
+
+        {/* DM Automation Link */}
+        <Link
+          href={`/@${currentAccount}/dms`}
+          onClick={() => {
+            if (onCloseMobileDrawer) onCloseMobileDrawer();
+          }}
+          className={cn(
+            "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer text-start",
+            activePlugin === "dms"
+              ? "bg-primary text-primary-foreground shadow-2xs"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+          )}
+        >
+          <Send className="w-4 h-4 shrink-0" />
+          <span className="flex-1 truncate">{t("navDms")}</span>
+        </Link>
+
+        <div className="h-px bg-border my-2" />
 
         {/* Hermes Agent API Trigger (Superadmin Only) */}
         {currentUser?.role === "superadmin" && (

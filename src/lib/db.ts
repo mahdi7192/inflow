@@ -121,6 +121,45 @@ export interface CommentLogRow {
   processed_at: string;
 }
 
+export interface DMAutomationRow {
+  id: number;
+  account_username: string;
+  enabled: number; // 0 or 1
+  trigger_type: "all" | "keywords" | "ai_context";
+  trigger_context: string;
+  trigger_keywords: string;
+  reply_mode: "direct" | "ai";
+  direct_reply_text: string;
+  ai_prompt_instructions: string;
+  web_context_urls: string; // JSON array string
+  mcp_servers_config: string; // JSON array string
+  require_follow: number; // 0 or 1
+  follow_prompt_text: string;
+  story_handling_mode: string;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface DMLogRow {
+  id: number;
+  message_id: string;
+  thread_id: string;
+  account_username: string;
+  sender_username: string;
+  sender_id: string;
+  incoming_text: string;
+  is_story_reply: number; // 0 or 1
+  story_id: string | null;
+  story_content: string | null;
+  trigger_matched: number; // 0 or 1
+  reply_status: "none" | "sent" | "pending_follow" | "skipped" | "failed" | "locked";
+  reply_text: string;
+  tools_invoked: string | null; // JSON array string
+  error_details: string | null;
+  processed_at: string;
+  created_at: string;
+}
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "inflow.db");
 
@@ -203,7 +242,66 @@ function migrateSchema(db: Database.Database) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_bot_activity_logs_acc ON bot_activity_logs(account_username, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS dm_automations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT UNIQUE NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      trigger_type TEXT NOT NULL DEFAULT 'all',
+      trigger_context TEXT NOT NULL DEFAULT '',
+      trigger_keywords TEXT NOT NULL DEFAULT '',
+      reply_mode TEXT NOT NULL DEFAULT 'direct',
+      direct_reply_text TEXT NOT NULL DEFAULT '',
+      ai_prompt_instructions TEXT NOT NULL DEFAULT '',
+      web_context_urls TEXT NOT NULL DEFAULT '[]',
+      mcp_servers_config TEXT NOT NULL DEFAULT '[]',
+      require_follow INTEGER NOT NULL DEFAULT 0,
+      follow_prompt_text TEXT NOT NULL DEFAULT 'سلام! برای دریافت پاسخ و مشاوره کامل، لطفاً ابتدا پیج را فالو کنید 🙏',
+      story_handling_mode TEXT NOT NULL DEFAULT 'auto',
+      crawl_depth INTEGER NOT NULL DEFAULT 2,
+      crawl_max_pages INTEGER NOT NULL DEFAULT 40,
+      crawl_spa_enabled INTEGER NOT NULL DEFAULT 1,
+      crawl_last_status TEXT NOT NULL DEFAULT 'idle',
+      crawl_last_at TEXT DEFAULT NULL,
+      crawl_pages_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_automations_account ON dm_automations(account_username);
+
+    CREATE TABLE IF NOT EXISTS dm_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id TEXT UNIQUE NOT NULL,
+      thread_id TEXT NOT NULL,
+      account_username TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+      sender_username TEXT NOT NULL,
+      sender_id TEXT NOT NULL DEFAULT '',
+      incoming_text TEXT NOT NULL DEFAULT '',
+      is_story_reply INTEGER NOT NULL DEFAULT 0,
+      story_id TEXT DEFAULT NULL,
+      story_content TEXT DEFAULT NULL,
+      trigger_matched INTEGER NOT NULL DEFAULT 1,
+      reply_status TEXT NOT NULL DEFAULT 'sent',
+      reply_text TEXT NOT NULL DEFAULT '',
+      tools_invoked TEXT DEFAULT NULL,
+      error_details TEXT DEFAULT NULL,
+      processed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_logs_message_id ON dm_logs(message_id);
+    CREATE INDEX IF NOT EXISTS idx_dm_logs_account_thread ON dm_logs(account_username, thread_id);
+    CREATE INDEX IF NOT EXISTS idx_dm_logs_sender ON dm_logs(sender_username, reply_status);
+    CREATE INDEX IF NOT EXISTS idx_dm_logs_processed_at ON dm_logs(processed_at DESC);
   `);
+
+  // Drop deprecated dm_knowledge_pages table if exists
+  try {
+    db.exec("DROP TABLE IF EXISTS dm_knowledge_pages;");
+  } catch {
+    // ignore
+  }
 }
 
 function initSchema(db: Database.Database) {
@@ -275,6 +373,52 @@ function initSchema(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_logs_shortcode ON comment_logs(shortcode);
     CREATE INDEX IF NOT EXISTS idx_logs_account ON comment_logs(account_username);
+
+    CREATE TABLE IF NOT EXISTS dm_automations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT UNIQUE NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      trigger_type TEXT NOT NULL DEFAULT 'all',
+      trigger_context TEXT NOT NULL DEFAULT '',
+      trigger_keywords TEXT NOT NULL DEFAULT '',
+      reply_mode TEXT NOT NULL DEFAULT 'direct',
+      direct_reply_text TEXT NOT NULL DEFAULT '',
+      ai_prompt_instructions TEXT NOT NULL DEFAULT '',
+      web_context_urls TEXT NOT NULL DEFAULT '[]',
+      mcp_servers_config TEXT NOT NULL DEFAULT '[]',
+      require_follow INTEGER NOT NULL DEFAULT 0,
+      follow_prompt_text TEXT NOT NULL DEFAULT 'سلام! برای دریافت پاسخ و مشاوره کامل، لطفاً ابتدا پیج را فالو کنید 🙏',
+      story_handling_mode TEXT NOT NULL DEFAULT 'auto',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_automations_account ON dm_automations(account_username);
+
+    CREATE TABLE IF NOT EXISTS dm_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id TEXT UNIQUE NOT NULL,
+      thread_id TEXT NOT NULL,
+      account_username TEXT NOT NULL REFERENCES accounts(username) ON DELETE CASCADE,
+      sender_username TEXT NOT NULL,
+      sender_id TEXT NOT NULL DEFAULT '',
+      incoming_text TEXT NOT NULL DEFAULT '',
+      is_story_reply INTEGER NOT NULL DEFAULT 0,
+      story_id TEXT DEFAULT NULL,
+      story_content TEXT DEFAULT NULL,
+      trigger_matched INTEGER NOT NULL DEFAULT 1,
+      reply_status TEXT NOT NULL DEFAULT 'sent',
+      reply_text TEXT NOT NULL DEFAULT '',
+      tools_invoked TEXT DEFAULT NULL,
+      error_details TEXT DEFAULT NULL,
+      processed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_logs_message_id ON dm_logs(message_id);
+    CREATE INDEX IF NOT EXISTS idx_dm_logs_account_thread ON dm_logs(account_username, thread_id);
+    CREATE INDEX IF NOT EXISTS idx_dm_logs_sender ON dm_logs(sender_username, reply_status);
+    CREATE INDEX IF NOT EXISTS idx_dm_logs_processed_at ON dm_logs(processed_at DESC);
 
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

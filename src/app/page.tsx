@@ -45,5 +45,10 @@ export default async function Home() {
       .all(user.id) as AccountRow[];
   }
 
+  // If user has accounts, redirect directly to their primary account workspace (Comment Automation)
+  if (accounts.length > 0) {
+    redirect(`/@${accounts[0].username}/comments`);
+  }
+
   return <AccountSelectorHub user={user} accounts={accounts} />;
 }

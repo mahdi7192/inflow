@@ -260,7 +260,7 @@ export function AccountSelectorHub({ user, accounts }: AccountSelectorHubProps) 
                 </div>
 
                 {/* Enter Button */}
-                <Link href={`/@${acc.username}`} className="w-full">
+                <Link href={`/@${acc.username}/comments`} className="w-full">
                   <Button
                     variant="default"
                     className="w-full h-10 text-xs font-medium gap-2 justify-center group-hover:bg-primary/95 cursor-pointer shadow-2xs"
