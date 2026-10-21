@@ -1,4 +1,9 @@
-import { getDb, type AppSettingRow } from "@/lib/db";
+import {
+  getDb,
+  getAppLanguage,
+  type AppSettingRow,
+  type DmHistoryExchange,
+} from "@/lib/db";
 
 export interface AiConfig {
   provider: "gemini" | "openai";
@@ -6,6 +11,11 @@ export interface AiConfig {
   hasKey: boolean;
   model: string;
   baseUrl?: string;
+}
+
+export interface ChatTurnMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 export function getAiConfig(): AiConfig {
@@ -165,9 +175,13 @@ export async function testAiConnection(params: {
 }
 
 /**
- * Direct LLM Completion Helper (8s hard timeout)
+ * Direct LLM Completion Helper (10s timeout) with optional multi-turn chat history
  */
-async function callLlmCompletion(systemPrompt: string, userPrompt: string): Promise<string | null> {
+async function callLlmCompletion(
+  systemPrompt: string,
+  userPrompt: string,
+  historyMessages: ChatTurnMessage[] = []
+): Promise<string | null> {
   const config = getAiConfig();
   if (!config.hasKey) {
     console.warn("[AiClient] No AI API key configured.");
@@ -175,23 +189,30 @@ async function callLlmCompletion(systemPrompt: string, userPrompt: string): Prom
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
     if (config.provider === "gemini") {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+      const contents = [
+        ...historyMessages.map((m) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        })),
+        {
+          role: "user",
+          parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+        },
+      ];
+
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
-            },
-          ],
+          contents,
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 350,
+            maxOutputTokens: 450,
           },
         }),
         signal: controller.signal,
@@ -207,6 +228,12 @@ async function callLlmCompletion(systemPrompt: string, userPrompt: string): Prom
     } else {
       const base = (config.baseUrl || "http://127.0.0.1:20128/v1").replace(/\/+$/, "");
       const url = `${base}/chat/completions`;
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...historyMessages.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user", content: userPrompt },
+      ];
+
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -215,12 +242,9 @@ async function callLlmCompletion(systemPrompt: string, userPrompt: string): Prom
         },
         body: JSON.stringify({
           model: config.model || "ag/gemini-3.8-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
+          messages,
           temperature: 0.4,
-          max_tokens: 350,
+          max_tokens: 450,
           stream: false,
         }),
         signal: controller.signal,
@@ -243,94 +267,324 @@ async function callLlmCompletion(systemPrompt: string, userPrompt: string): Prom
   }
 }
 
+export interface EvaluateTriggerParams {
+  caption?: string;
+  postCaption?: string;
+  commentText?: string;
+  incomingText?: string;
+  triggerContext?: string;
+  triggerCondition?: string;
+  username?: string;
+  userFullName?: string;
+  appLanguage?: "fa" | "en" | "ar";
+}
+
 /**
- * Evaluate whether an incoming comment or DM matches an `ai_context` rule
+ * Evaluate whether an incoming comment or DM matches an `ai_context` concept rule via 9Router/LLM.
  */
-export async function evaluateTriggerWithAi(params: {
-  caption: string;
-  commentText: string;
-  triggerContext: string;
-}): Promise<boolean> {
-  const sys =
-    "You are an Instagram intent classifier. Respond ONLY with 'YES' if the user message matches the trigger condition, or 'NO' if it does not.";
-  const usr = `Post Caption: ${params.caption || "N/A"}\nTrigger Condition: ${params.triggerContext}\nIncoming User Text: ${params.commentText}\n\nDoes this message match the trigger condition? Answer YES or NO:`;
+export async function evaluateTriggerWithAi(params: EvaluateTriggerParams): Promise<boolean> {
+  const caption = params.postCaption ?? params.caption ?? "";
+  const incomingText = (params.incomingText ?? params.commentText ?? "").trim();
+  const triggerCondition = (params.triggerCondition ?? params.triggerContext ?? "").trim();
+
+  if (!incomingText) return false;
+  if (!triggerCondition) return true;
+
+  const langLabel =
+    params.appLanguage === "en"
+      ? "English"
+      : params.appLanguage === "ar"
+      ? "Arabic"
+      : "Persian (Farsi)";
+
+  const sys = `You are a high-precision Instagram intent classifier for an automation engine (Panel language: ${langLabel}).
+Determine whether the user's incoming message or comment semantically matches the admin's Trigger Concept / Condition.
+Respond ONLY with 'YES' if it matches the concept, or 'NO' if it does not.`;
+
+  const usr = [
+    `Post Caption / Page Context: ${caption || "N/A"}`,
+    params.userFullName || params.username
+      ? `Sender Info: ${params.userFullName || ""} (@${(params.username || "").replace(/^@/, "")})`
+      : "",
+    `Admin Trigger Concept / Condition: ${triggerCondition}`,
+    `Incoming User Trigger Text: "${incomingText}"`,
+    "",
+    "Does this incoming text match the trigger condition? Answer YES or NO:",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const result = await callLlmCompletion(sys, usr);
   if (!result) {
-    // Fallback if AI key not configured or timed out: match non-empty text
-    return params.commentText.trim().length > 0;
+    return incomingText.length > 0;
   }
-  return result.toUpperCase().includes("YES");
+  const normalized = result.trim().toUpperCase();
+  if (normalized.startsWith("NO") || normalized === "خیر") return false;
+  return normalized.includes("YES") || normalized.includes("بله");
 }
 
 export interface GenerateReplyParams {
-  caption: string;
+  mode?: "comment" | "dm" | "comment_dm" | "dm_chat";
+  accountUsername?: string;
+  caption?: string;
+  postCaption?: string;
   username: string;
+  userFullName?: string;
+  followerCount?: number;
+  isFollowing?: boolean;
+  appLanguage?: "fa" | "en" | "ar";
   incomingText: string;
   instructions: string;
-  fallbackText: string;
-  mode?: "comment" | "dm";
+  fallbackText?: string;
+  conversationHistory?: DmHistoryExchange[];
+}
+
+function resolveUserAddressing(username?: string, userFullName?: string): {
+  cleanUsername: string;
+  cleanFullName: string;
+  displayLabel: string;
+  hasRealIdentity: boolean;
+} {
+  const rawUser = (username || "").replace(/^@/, "").trim();
+  const isGenericUser =
+    !rawUser ||
+    rawUser.toLowerCase() === "user" ||
+    rawUser.toLowerCase() === "instagram_user" ||
+    rawUser.startsWith("ig_");
+
+  const cleanUsername = isGenericUser ? "" : rawUser;
+  const rawName = (userFullName || "").trim();
+  const isGenericName =
+    !rawName ||
+    rawName.toLowerCase() === "user" ||
+    rawName.toLowerCase() === "instagram_user" ||
+    rawName.startsWith("ig_");
+  const cleanFullName = isGenericName ? "" : rawName;
+
+  if (cleanFullName && cleanUsername && cleanFullName.toLowerCase() !== cleanUsername.toLowerCase()) {
+    return {
+      cleanUsername,
+      cleanFullName,
+      displayLabel: `${cleanFullName} (@${cleanUsername})`,
+      hasRealIdentity: true,
+    };
+  }
+  if (cleanFullName) {
+    return {
+      cleanUsername,
+      cleanFullName,
+      displayLabel: cleanFullName,
+      hasRealIdentity: true,
+    };
+  }
+  if (cleanUsername) {
+    return {
+      cleanUsername,
+      cleanFullName: "",
+      displayLabel: `@${cleanUsername}`,
+      hasRealIdentity: true,
+    };
+  }
+  return {
+    cleanUsername: "",
+    cleanFullName: "",
+    displayLabel: "کاربر گرامی",
+    hasRealIdentity: false,
+  };
+}
+
+function getLanguageDirective(lang: "fa" | "en" | "ar"): string {
+  if (lang === "en") {
+    return "زبان پنل برنامه: انگلیسی (English). مگر اینکه در دستورالعمل ادمین یا پیام کاربر صراحتاً زبان دیگری خواسته شده باشد، به زبان انگلیسی طبیعی پاسخ دهید.";
+  }
+  if (lang === "ar") {
+    return "زبان پنل برنامه: عربی (العربية). مگر اینکه در دستورالعمل ادمین یا پیام کاربر صراحتاً زبان دیگری خواسته شده باشد، به زبان عربی طبیعی پاسخ دهید.";
+  }
+  return "زبان پنل برنامه: فارسی (fa). پاسخ را به زبان فارسی روان، طبیعی و محترمانه بنویسید (مگر اینکه در دستورالعمل ادمین زبان دیگری خواسته شده باشد).";
 }
 
 /**
- * Generate a contextual Persian/multilingual reply for a comment or DM using AI instructions.
- * Carefully injects commenter username, incoming comment text, post caption, and admin instructions.
+ * Generate a contextual reply for a Comment, Comment-triggered Private Reply, or Direct Message Chat.
+ * Injects:
+ * 1. Admin's instructions from panel config (`instructions`)
+ * 2. Triggered user's profile info (`userFullName`, `username`, `followerCount`, `isFollowing`)
+ * 3. Active application language from panel (`appLanguage`)
+ * 4. User's incoming trigger text (`incomingText`)
+ * 5. Multi-turn Conversation History (`conversationHistory`) for DM AI chats so it never repeats greetings!
  */
 export async function generateContextualReplyWithAi(params: GenerateReplyParams): Promise<string> {
-  const isDm = params.mode === "dm";
-  const userHandle = params.username ? `@${params.username.replace(/^@/, "")}` : "کاربر";
+  const caption = params.postCaption ?? params.caption ?? "";
+  const appLang = params.appLanguage || getAppLanguage(params.accountUsername);
+  const langDirective = getLanguageDirective(appLang);
+  const identity = resolveUserAddressing(params.username, params.userFullName);
+
+  const history = params.conversationHistory || [];
+  const hasPriorHistory = history.length > 0;
+
+  const resolvedMode: "comment" | "comment_dm" | "dm_chat" =
+    params.mode === "comment"
+      ? "comment"
+      : params.mode === "comment_dm"
+      ? "comment_dm"
+      : params.mode === "dm_chat"
+      ? "dm_chat"
+      : hasPriorHistory
+      ? "dm_chat"
+      : "comment_dm";
+
+  const userMetadataLines = [
+    `- نام نمایشی کاربر: ${identity.cleanFullName || "نامشخص"}`,
+    `- نام کاربری اینستاگرام: ${identity.cleanUsername ? `@${identity.cleanUsername}` : "نامشخص"}`,
+    params.followerCount !== undefined ? `- تعداد دنبال‌کنندگان کاربر: ${params.followerCount}` : "",
+    params.isFollowing !== undefined
+      ? `- وضعیت فالو پیج: ${params.isFollowing ? "فالو کرده است" : "هنوز فالو نکرده است"}`
+      : "",
+    `- زبان انتخاب‌شده در پنل برنامه: ${appLang === "fa" ? "فارسی (fa)" : appLang === "en" ? "انگلیسی (en)" : "عربی (ar)"}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   let sys: string;
   let usr: string;
+  const chatHistoryMessages: ChatTurnMessage[] = [];
 
-  if (isDm) {
-    sys = `شما دستیار هوشمند و رسمی پیج اینستاگرام هستید.
-وظیفه شما این است که یک پیام خصوصی در دایرکت به کاربری که زیر پست اینستاگرام کامنت گذاشته، ارسال کنید.
+  if (resolvedMode === "comment") {
+    sys = `شما ادمین حرفه‌ای و هوشمند پیج اینستاگرام ${params.accountUsername ? `@${params.accountUsername}` : ""} هستید.
+وظیفه شما نوشتن یک پاسخ عمومی کوتاه، صمیمی و دقیق زیر کامنت کاربر در پست اینستاگرام است.
+${langDirective}
 قوانین الزامی:
-۱. نام کاربری مخاطب در اینستاگرام ${userHandle} است؛ در شروع پیام با سلام محترمانه و لحن دوستانه و طبیعی به زبان فارسی خطابش قرار دهید.
-۲. با توجه به متنی که کاربر در کامنت گذاشته و موضوع پست، دقیقاً به سوال یا نیاز او پاسخ بدهید یا راهنمایی لازم را ارائه کنید.
-۳. دستورالعمل ادمین پیج را کاملاً در پیام لحاظ کنید.
-۴. پیام باید روان، خوانا، بدون زیاده‌گویی و کاملاً آماده ارسال باشد.
-۵. خروجی فقط و فقط متن نهایی پیام دایرکت باشد؛ بدون هیچ توضیح اضافی، بدون پیشوند و بدون گیومه.`;
+۱. اطلاعات کاربر تریگرشده، متن کامنت ارسالی او و دستورالعمل ادمین در پنل را دقیقاً در نظر بگیرید.
+${
+  identity.hasRealIdentity
+    ? `۲. نام مخاطب «${identity.cleanFullName || identity.cleanUsername}» است؛ در صورت تناسب می‌توانید از نامش به شکل طبیعی استفاده کنید (هرگز از عبارت مصنوعی @user استفاده نکنید).`
+    : `۲. نام دقیق کاربر مشخص نیست؛ هرگز از عبارت @user استفاده نکنید.`
+}
+۳. پاسخ باید ۱ تا ۲ جمله کوتاه، طبیعی و کاملاً منطبق با دستورالعمل ادمین باشد.
+۴. خروجی فقط و فقط متن نهایی پاسخ کامنت باشد؛ بدون هیچ توضیح اضافه و بدون گیومه.`;
 
-    usr = `[مشخصات پست اینستاگرام]
-کپشن و موضوع پست: ${params.caption || "ندارد"}
+    usr = `[اطلاعات پست]
+کپشن پست: ${caption || "ندارد"}
 
-[مشخصات کاربر و کامنت دریافتی]
-نام کاربری مخاطب: ${userHandle}
-متن کامنتی که کاربر در پست گذاشته بود: "${params.incomingText}"
+[اطلاعات کاربر تریگر شده]
+${userMetadataLines}
 
-[دستورالعمل ادمین برای متن دایرکت]
-${params.instructions || "سلام کن و بر اساس کامنت کاربر، راهنمایی کامل و صمیمی در دایرکت ارائه بده."}
+[متن تریگر ارسالی توسط کاربر (کامنت)]
+"${params.incomingText}"
 
-متن پیام دایرکت:`;
+[دستورالعمل ادمین در کانفیگ پنل]
+${params.instructions || "یک پاسخ کوتاه، صمیمی و محترمانه متناسب با کامنت کاربر بنویس."}
+
+متن نهایی پاسخ کامنت:`;
+  } else if (resolvedMode === "comment_dm") {
+    sys = `شما دستیار هوشمند پیج اینستاگرام ${params.accountUsername ? `@${params.accountUsername}` : ""} هستید.
+وظیفه شما ارسال یک پیام خصوصی (دایرکت) به کاربری است که زیر پست اینستاگرام کامنت گذاشته است.
+${langDirective}
+قوانین الزامی:
+۱. دستورالعمل ادمین در کانفیگ پنل را با دقت کامل اجرا کنید.
+${
+  identity.cleanFullName
+    ? `۲. نام کاربر «${identity.cleanFullName}»${identity.cleanUsername ? ` (یوزرنیم: @${identity.cleanUsername})` : ""} است؛ در ابتدای پیام با نام خودش («${identity.cleanFullName} عزیز») محترمانه و صمیمی خطابش قرار دهید.`
+    : identity.cleanUsername
+    ? `۲. نام کاربری مخاطب @${identity.cleanUsername} است؛ با لحنی صمیمی و محترمانه خطابش قرار دهید.`
+    : `۲. در ابتدای پیام بدون استفاده از کلمه @user، سلام و احوال‌پرسی صمیمی داشته باشید.`
+}
+۳. به متن کامنت ارسالی کاربر و موضوع پست توجه کنید تا پیام کاملاً شخصی‌سازی‌شده و مرتبط باشد.
+۴. خروجی فقط و فقط متن نهایی پیام دایرکت باشد؛ بدون توضیح اضافه و بدون گیومه.`;
+
+    usr = `[اطلاعات پست اینستاگرام]
+کپشن پست: ${caption || "ندارد"}
+
+[اطلاعات کاربر تریگر شده]
+${userMetadataLines}
+
+[متن تریگر ارسالی توسط کاربر (کامنت زیر پست)]
+"${params.incomingText}"
+
+[دستورالعمل ادمین در کانفیگ پنل]
+${params.instructions || "بر اساس کامنت کاربر و موضوع پست، راهنمایی کامل و محترمانه در دایرکت ارائه بده."}
+
+متن نهایی پیام دایرکت:`;
   } else {
-    sys = `شما ادمین حرفه‌ای و صمیمی یک پیج اینستاگرام هستید.
-وظیفه شما ثبت یک پاسخ عمومی کوتاه، جذاب و محترمانه زیر کامنت کاربر در پست اینستاگرام است.
+    for (const turn of history.slice(-8)) {
+      if (turn.incomingText?.trim()) {
+        chatHistoryMessages.push({
+          role: "user",
+          content: turn.incomingText.trim(),
+        });
+      }
+      if (turn.replyText?.trim()) {
+        chatHistoryMessages.push({
+          role: "assistant",
+          content: turn.replyText.trim(),
+        });
+      }
+    }
+
+    const historyTranscript =
+      history.length > 0
+        ? history
+            .slice(-8)
+            .map(
+              (h, idx) =>
+                `[${idx + 1}] کاربر: ${h.incomingText}\n    شما (ادمین): ${h.replyText}`
+            )
+            .join("\n")
+        : "این اولین پیام کاربر در این گفتگو است (سابقه‌ای وجود ندارد).";
+
+    const greetingRule = hasPriorHistory
+      ? `۲. قانون حیاتی تداوم گفتگو (بسیار مهم): این پیام در ادامه یک گفتگوی قبلی است و شما در پیام‌های قبلی به کاربر سلام کرده‌اید. **اکیداً ممنوع است که دوباره سلام، وقت‌بخیر، روزبخیر یا احوال‌پرسی تکراری در شروع پیام بنویسید!** مستقیماً و طبیعی در ادامه مکالمه قبلی به پیام جدید کاربر پاسخ دهید.`
+      : identity.cleanFullName
+      ? `۲. این اولین پیام گفتگو است؛ نام کاربر «${identity.cleanFullName}» است و می‌توانید در شروع گفتگو با نام خودش صمیمانه سلام کنید (هرگز از @user استفاده نکنید).`
+      : identity.cleanUsername
+      ? `۲. این اولین پیام گفتگو است؛ نام کاربری مخاطب ${identity.cleanUsername} است و می‌توانید در شروع گفتگو صمیمانه سلام کنید (هرگز از @user استفاده نکنید).`
+      : `۲. این اولین پیام گفتگو است؛ با لحنی صمیمی سلام کنید و هرگز از عبارت @user استفاده نکنید.`;
+
+    sys = `شما دستیار هوشمند پاسخگویی دایرکت پیج اینستاگرام ${params.accountUsername ? `@${params.accountUsername}` : ""} هستید و در حال چت با کاربر در دایرکت می‌باشید.
+${langDirective}
 قوانین الزامی:
-۱. نام کاربری مخاطب ${userHandle} است. می‌توانید او را منشن کنید یا با لحنی صمیمی پاسخش را بدهید.
-۲. پاسخ شما باید ۱ تا ۲ جمله کوتاه، فارسی، پرانرژی و متناسب با متن کامنت کاربر باشد.
-۳. دستورالعمل ادمین پیج را دقیقاً رعایت کنید.
-۴. خروجی فقط و فقط متن نهایی پاسخ کامنت باشد؛ بدون هیچ توضیح اضافی، بدون پیشوند و بدون گیومه.`;
+۱. دستورالعمل ادمین در کانفیگ پنل را به صورت کامل رعایت کنید.
+${greetingRule}
+۳. به کانتکست و تاریخچه پیام‌های قبلی گفتگو کاملاً توجه کنید تا پاسخ شما منسجم، هوشمندانه و در ادامه بحث قبلی باشد.
+۴. هرگز از عبارت مصنوعی @user استفاده نکنید.
+۵. خروجی فقط و فقط متن نهایی پاسخ شما به آخرین پیام کاربر باشد؛ بدون پیشوند، بدون توضیح اضافه و بدون گیومه.`;
 
-    usr = `[مشخصات پست اینستاگرام]
-کپشن و موضوع پست: ${params.caption || "ندارد"}
+    usr = `[زمینه پیج / استوری]
+${caption || "گفتگوی مستقیم در دایرکت اینستاگرام"}
 
-[مشخصات کاربر و کامنت دریافتی]
-نام کاربری مخاطب: ${userHandle}
-متن کامنت کاربر: "${params.incomingText}"
+[اطلاعات کاربر تریگر شده]
+${userMetadataLines}
 
-[دستورالعمل ادمین برای پاسخ کامنت]
-${params.instructions || "یک پاسخ کوتاه، محترمانه و پرانرژی بنویس و از همراهی او تشکر کن."}
+[دستورالعمل ادمین در کانفیگ پنل]
+${params.instructions || "به عنوان ادمین پیج با لحنی محترمانه، طبیعی و مفید پاسخ کاربر را بده."}
 
-متن پاسخ کامنت:`;
+[تاریخچه گفتگوی قبلی با این کاربر]
+${historyTranscript}
+
+[آخرین پیام ارسالی کاربر که الان باید به آن پاسخ دهید]
+"${params.incomingText}"
+
+${
+  hasPriorHistory
+    ? "پاسخ مستقیم شما در ادامه گفتگو (بدون سلام و احوال‌پرسی مجدد):"
+    : "پاسخ شما به کاربر:"
+}`;
   }
 
-  const generated = await callLlmCompletion(sys, usr);
+  const generated = await callLlmCompletion(sys, usr, chatHistoryMessages);
   if (generated && generated.length > 0) {
-    return generated.replace(/^["'«]+|["'»]+$/g, "").trim();
+    return generated
+      .replace(/^["'«]+|["'»]+$/g, "")
+      .replace(/@user\b/gi, identity.cleanFullName || identity.cleanUsername || "دوست")
+      .trim();
   }
 
-  return params.fallbackText || (isDm ? "سلام! در خدمت شما هستیم 🙏" : "پاسخ خدمتتان ارسال شد 🙏");
+  return (
+    params.fallbackText ||
+    (resolvedMode === "comment"
+      ? "ممنون از همراهی شما 🙏"
+      : hasPriorHistory
+      ? "در خدمتتان هستم، لطفاً بفرمایید 🙏"
+      : "سلام! در خدمت شما هستیم 🙏")
+  );
 }
 

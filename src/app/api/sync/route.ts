@@ -8,7 +8,7 @@ import {
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { authenticateMcpRequest } from "@/lib/mcp/auth-guard";
 import { SocialApiClient, SocialApiError, type SocialApiPost } from "@/lib/social-api";
-import { processIncomingComment } from "@/lib/instagram-automation";
+import { pollActiveAccountsAndPosts } from "@/lib/instagram/aggregator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -353,38 +353,11 @@ export async function POST(req: NextRequest) {
 
       tx(remotePosts);
 
-      // 2.3 Poll & process recent unprocessed comments on active posts (`auto_reply = 1`)
-      const activePosts = db
-        .prepare("SELECT * FROM posts WHERE account_username = ? AND auto_reply = 1")
-        .all(targetAccount) as PostRow[];
-
-      let processedCommentsCount = 0;
-      for (const activePost of activePosts) {
-        const postId = activePost.media_id || activePost.shortcode;
-        try {
-          const commentsRes = await client.listPostComments(postId, socialAccountId);
-          for (const cmt of commentsRes.data) {
-            const cmtId = String(cmt.id || cmt.comment_id || "");
-            if (!cmtId) continue;
-            const res = await processIncomingComment({
-              commentId: cmtId,
-              postId,
-              shortcode: activePost.shortcode,
-              accountUsername: targetAccount,
-              socialAccountId,
-              commenterUsername:
-                cmt.username || cmt.author_username || cmt.author_name || "user",
-              commenterUserId: cmt.user_id || cmt.author_id || "",
-              commentText: cmt.text || "",
-            });
-            if (res.processed && !res.already_processed) {
-              processedCommentsCount++;
-            }
-          }
-        } catch {
-          // Continue syncing remaining active posts
-        }
-      }
+      // 2.3 Poll & process recent unprocessed comments/DMs and drain queue via Aggregator
+      const pollSummary = await pollActiveAccountsAndPosts({
+        accountUsername: targetAccount,
+      });
+      const processedCommentsCount = pollSummary.commentsIngested;
 
       db.prepare(
         "UPDATE accounts SET last_sync_at = ?, last_heartbeat_at = ?, updated_at = ? WHERE username = ?"

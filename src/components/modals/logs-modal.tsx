@@ -356,10 +356,13 @@ export function LogsModal({
 
                   {/* Executed Actions */}
                   {(log.comment_reply_status === "sent" ||
+                    log.comment_reply_status === "queued" ||
                     log.dm_status === "sent" ||
+                    log.dm_status === "queued" ||
                     log.dm_status === "pending_follow") && (
                     <div className="grid grid-cols-1 gap-2 pt-1">
-                      {log.comment_reply_status === "sent" &&
+                      {(log.comment_reply_status === "sent" ||
+                        log.comment_reply_status === "queued") &&
                         log.comment_reply_text && (
                           <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs space-y-1">
                             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-700">
@@ -372,7 +375,8 @@ export function LogsModal({
                           </div>
                         )}
 
-                      {log.dm_status === "sent" && log.dm_text && (
+                      {(log.dm_status === "sent" || log.dm_status === "queued") &&
+                        log.dm_text && (
                         <div className="rounded-lg border border-purple-200 bg-purple-50/60 px-3 py-2 text-xs space-y-1">
                           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-700">
                             <Send className="w-3.5 h-3.5" />

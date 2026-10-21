@@ -112,7 +112,10 @@ export function PostDetailView({
       const res = await fetch(`/api/posts/${post.shortcode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_reply: checked }),
+        body: JSON.stringify({
+          auto_reply: checked,
+          app_language: workspace?.lang || lang,
+        }),
       });
       const data = await res.json();
       if (data.success && data.post) {
@@ -152,6 +155,7 @@ export function PostDetailView({
         dm_action_type: dmActionType,
         dm_action_text: dmActionText,
         dm_require_follow: dmRequireFollow ? 1 : 0,
+        app_language: workspace?.lang || lang,
       };
 
       const res = await fetch(`/api/posts/${post.shortcode}`, {

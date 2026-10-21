@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, PostRow } from "@/lib/db";
+import { getDb, saveAppLanguage, PostRow } from "@/lib/db";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 
 export async function GET(
@@ -110,6 +110,15 @@ async function handleUpdate(
           : 0
         : existing.dm_require_follow;
 
+    const appLanguage =
+      body.app_language && ["fa", "en", "ar"].includes(String(body.app_language))
+        ? (String(body.app_language) as "fa" | "en" | "ar")
+        : existing.app_language || "fa";
+
+    if (body.app_language) {
+      saveAppLanguage(appLanguage, existing.account_username);
+    }
+
     db.prepare(`
       UPDATE posts SET
         auto_reply = @auto_reply,
@@ -121,6 +130,7 @@ async function handleUpdate(
         dm_action_type = @dm_action_type,
         dm_action_text = @dm_action_text,
         dm_require_follow = @dm_require_follow,
+        app_language = @app_language,
         updated_at = @updated_at
       WHERE shortcode = @shortcode
     `).run({
@@ -134,6 +144,7 @@ async function handleUpdate(
       dm_action_type: dmActionType,
       dm_action_text: dmActionText,
       dm_require_follow: dmRequireFollow,
+      app_language: appLanguage,
       updated_at: now,
     });
 

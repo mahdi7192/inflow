@@ -128,6 +128,8 @@ export interface PostRow {
   dm_action_type: "none" | "direct" | "ai";
   dm_action_text: string;
   dm_require_follow: number; // 0 or 1
+  app_language?: "fa" | "en" | "ar";
+  automation_enabled_at?: string | null;
   synced_at: string;
   updated_at: string;
   sort_index: number;
@@ -141,11 +143,12 @@ export interface CommentLogRow {
   media_id: string;
   user_id: string;
   username: string;
+  author_full_name?: string;
   comment_text: string;
   trigger_matched: number; // 0 or 1
-  comment_reply_status: "none" | "sent" | "failed" | "skipped" | "locked";
+  comment_reply_status: "none" | "queued" | "sent" | "failed" | "skipped" | "locked";
   comment_reply_text: string;
-  dm_status: "none" | "sent" | "pending_follow" | "failed" | "skipped";
+  dm_status: "none" | "queued" | "sent" | "pending_follow" | "failed" | "skipped";
   dm_text: string;
   created_at: string;
   processed_at: string;
@@ -166,6 +169,7 @@ export interface DMAutomationRow {
   require_follow: number; // 0 or 1
   follow_prompt_text: string;
   story_handling_mode: string;
+  app_language?: "fa" | "en" | "ar";
   activated_at: string | null;
   updated_at: string;
   created_at: string;
@@ -177,18 +181,70 @@ export interface DMLogRow {
   thread_id: string;
   account_username: string;
   sender_username: string;
+  sender_full_name?: string;
   sender_id: string;
   incoming_text: string;
   is_story_reply: number; // 0 or 1
   story_id: string | null;
   story_content: string | null;
   trigger_matched: number; // 0 or 1
-  reply_status: "none" | "sent" | "pending_follow" | "skipped" | "failed" | "locked";
+  reply_status: "none" | "queued" | "sent" | "pending_follow" | "skipped" | "failed" | "locked";
   reply_text: string;
   tools_invoked: string | null; // JSON array string
   error_details: string | null;
   processed_at: string;
   created_at: string;
+}
+
+export interface IncomingEventRow {
+  id: number;
+  account_username: string;
+  event_type: "comment" | "dm" | "postback" | "mention";
+  post_shortcode: string | null;
+  post_media_id: string | null;
+  event_id: string;
+  conversation_id: string | null;
+  author_username: string;
+  author_full_name: string;
+  author_id: string;
+  event_text: string;
+  payload_json: string | null;
+  source: "webhook" | "polling" | "sync";
+  event_timestamp: number;
+  status: "pending" | "processed" | "skipped" | "failed";
+  processed_at: string | null;
+  created_at: string;
+}
+
+export interface ActionQueueRow {
+  id: number;
+  dedupe_key: string | null;
+  account_username: string;
+  social_account_id: string | null;
+  event_id: string;
+  action_type:
+    | "COMMENT_REPLY"
+    | "PRIVATE_REPLY"
+    | "DM_SEND"
+    | "FOLLOW_GATE_PROMPT"
+    | "FOLLOW_RETRY_PROMPT";
+  target_username: string;
+  target_user_id: string | null;
+  target_post_shortcode: string | null;
+  target_media_id: string | null;
+  target_comment_id: string | null;
+  target_conversation_id: string | null;
+  payload_text: string;
+  metadata_json: string | null;
+  priority: number;
+  scheduled_at: string;
+  status: "pending" | "processing" | "sent" | "failed";
+  retry_count: number;
+  max_retries: number;
+  error_message: string | null;
+  executed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -351,6 +407,125 @@ function migrateSchema(db: Database.Database) {
   if (!dmCols.includes("activated_at")) {
     db.exec("ALTER TABLE dm_automations ADD COLUMN activated_at TEXT DEFAULT NULL");
   }
+  if (!dmCols.includes("app_language")) {
+    db.exec("ALTER TABLE dm_automations ADD COLUMN app_language TEXT NOT NULL DEFAULT 'fa'");
+  }
+
+  const postCols = (db.prepare("PRAGMA table_info(posts)").all() as { name: string }[]).map(c => c.name);
+  if (!postCols.includes("automation_enabled_at")) {
+    db.exec("ALTER TABLE posts ADD COLUMN automation_enabled_at TEXT DEFAULT NULL");
+  }
+  if (!postCols.includes("app_language")) {
+    db.exec("ALTER TABLE posts ADD COLUMN app_language TEXT NOT NULL DEFAULT 'fa'");
+  }
+
+  const commentLogCols = (db.prepare("PRAGMA table_info(comment_logs)").all() as { name: string }[]).map(c => c.name);
+  if (!commentLogCols.includes("author_full_name")) {
+    db.exec("ALTER TABLE comment_logs ADD COLUMN author_full_name TEXT NOT NULL DEFAULT ''");
+  }
+
+  const dmLogCols = (db.prepare("PRAGMA table_info(dm_logs)").all() as { name: string }[]).map(c => c.name);
+  if (!dmLogCols.includes("sender_full_name")) {
+    db.exec("ALTER TABLE dm_logs ADD COLUMN sender_full_name TEXT NOT NULL DEFAULT ''");
+  }
+
+  // Ensure incoming_events & action_queue tables and columns exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS incoming_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT NOT NULL,
+      event_type TEXT NOT NULL DEFAULT 'comment',
+      post_shortcode TEXT,
+      post_media_id TEXT,
+      event_id TEXT UNIQUE NOT NULL,
+      conversation_id TEXT DEFAULT NULL,
+      author_username TEXT NOT NULL,
+      author_full_name TEXT NOT NULL DEFAULT '',
+      author_id TEXT NOT NULL DEFAULT '',
+      event_text TEXT NOT NULL DEFAULT '',
+      payload_json TEXT DEFAULT NULL,
+      source TEXT NOT NULL DEFAULT 'webhook',
+      event_timestamp INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      processed_at TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_incoming_events_event_id ON incoming_events(event_id);
+    CREATE INDEX IF NOT EXISTS idx_incoming_events_account_status ON incoming_events(account_username, status);
+
+    CREATE TABLE IF NOT EXISTS action_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dedupe_key TEXT DEFAULT NULL,
+      account_username TEXT NOT NULL,
+      social_account_id TEXT DEFAULT NULL,
+      event_id TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      target_username TEXT NOT NULL,
+      target_user_id TEXT DEFAULT NULL,
+      target_post_shortcode TEXT,
+      target_media_id TEXT,
+      target_comment_id TEXT,
+      target_conversation_id TEXT DEFAULT NULL,
+      payload_text TEXT NOT NULL,
+      metadata_json TEXT DEFAULT NULL,
+      priority INTEGER NOT NULL DEFAULT 1,
+      scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      max_retries INTEGER NOT NULL DEFAULT 3,
+      error_message TEXT,
+      executed_at TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_action_queue_status_sched ON action_queue(status, scheduled_at, priority, id);
+    CREATE INDEX IF NOT EXISTS idx_action_queue_account_status ON action_queue(account_username, status, updated_at);
+  `);
+
+  const incCols = (db.prepare("PRAGMA table_info(incoming_events)").all() as { name: string }[]).map(c => c.name);
+  if (!incCols.includes("conversation_id")) {
+    db.exec("ALTER TABLE incoming_events ADD COLUMN conversation_id TEXT DEFAULT NULL");
+  }
+  if (!incCols.includes("author_full_name")) {
+    db.exec("ALTER TABLE incoming_events ADD COLUMN author_full_name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!incCols.includes("payload_json")) {
+    db.exec("ALTER TABLE incoming_events ADD COLUMN payload_json TEXT DEFAULT NULL");
+  }
+  if (!incCols.includes("source")) {
+    db.exec("ALTER TABLE incoming_events ADD COLUMN source TEXT NOT NULL DEFAULT 'webhook'");
+  }
+  if (!incCols.includes("processed_at")) {
+    db.exec("ALTER TABLE incoming_events ADD COLUMN processed_at TEXT DEFAULT NULL");
+  }
+
+  const aqCols = (db.prepare("PRAGMA table_info(action_queue)").all() as { name: string }[]).map(c => c.name);
+  if (!aqCols.includes("dedupe_key")) {
+    db.exec("ALTER TABLE action_queue ADD COLUMN dedupe_key TEXT DEFAULT NULL");
+  }
+  if (!aqCols.includes("social_account_id")) {
+    db.exec("ALTER TABLE action_queue ADD COLUMN social_account_id TEXT DEFAULT NULL");
+  }
+  if (!aqCols.includes("target_user_id")) {
+    db.exec("ALTER TABLE action_queue ADD COLUMN target_user_id TEXT DEFAULT NULL");
+  }
+  if (!aqCols.includes("target_conversation_id")) {
+    db.exec("ALTER TABLE action_queue ADD COLUMN target_conversation_id TEXT DEFAULT NULL");
+  }
+  if (!aqCols.includes("metadata_json")) {
+    db.exec("ALTER TABLE action_queue ADD COLUMN metadata_json TEXT DEFAULT NULL");
+  }
+  if (!aqCols.includes("executed_at")) {
+    db.exec("ALTER TABLE action_queue ADD COLUMN executed_at TEXT DEFAULT NULL");
+  }
+
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_action_queue_dedupe_key
+    ON action_queue(dedupe_key)
+    WHERE dedupe_key IS NOT NULL;
+  `);
 
   // Drop deprecated dm_knowledge_pages table if exists
   try {
@@ -1328,6 +1503,129 @@ export function getUnifiedBotActivityLogs(accountUsername: string, limit: number
   items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return items.slice(0, limit);
 }
+
+export function getAppLanguage(accountUsername?: string): "fa" | "en" | "ar" {
+  const db = getDb();
+  try {
+    if (accountUsername) {
+      const dmRow = db
+        .prepare("SELECT app_language FROM dm_automations WHERE account_username = ?")
+        .get(accountUsername) as { app_language?: string } | undefined;
+      if (dmRow?.app_language && ["fa", "en", "ar"].includes(dmRow.app_language)) {
+        return dmRow.app_language as "fa" | "en" | "ar";
+      }
+      const postRow = db
+        .prepare("SELECT app_language FROM posts WHERE account_username = ? AND app_language IS NOT NULL ORDER BY updated_at DESC LIMIT 1")
+        .get(accountUsername) as { app_language?: string } | undefined;
+      if (postRow?.app_language && ["fa", "en", "ar"].includes(postRow.app_language)) {
+        return postRow.app_language as "fa" | "en" | "ar";
+      }
+    }
+    const globalLang = db
+      .prepare("SELECT value FROM app_settings WHERE key = 'app_language'")
+      .get() as { value?: string } | undefined;
+    if (globalLang?.value && ["fa", "en", "ar"].includes(globalLang.value)) {
+      return globalLang.value as "fa" | "en" | "ar";
+    }
+  } catch {
+    // ignore
+  }
+  return "fa";
+}
+
+export function saveAppLanguage(lang: string, accountUsername?: string): void {
+  const normalized = ["fa", "en", "ar"].includes(lang) ? lang : "fa";
+  const db = getDb();
+  const now = nowTimestamp();
+  try {
+    db.prepare(`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES ('app_language', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(normalized, now);
+
+    if (accountUsername) {
+      db.prepare("UPDATE dm_automations SET app_language = ? WHERE account_username = ?").run(
+        normalized,
+        accountUsername
+      );
+      db.prepare("UPDATE posts SET app_language = ? WHERE account_username = ?").run(
+        normalized,
+        accountUsername
+      );
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export interface DmHistoryExchange {
+  incomingText: string;
+  replyText: string;
+  createdAt: string;
+}
+
+export function getRecentDmConversationHistory(params: {
+  accountUsername: string;
+  threadId?: string;
+  senderId?: string;
+  senderUsername?: string;
+  excludeMessageId?: string;
+  limit?: number;
+}): DmHistoryExchange[] {
+  const db = getDb();
+  const limit = Math.min(Math.max(params.limit || 8, 1), 20);
+  const cleanSender = (params.senderUsername || "").replace(/^@/, "").toLowerCase();
+
+  const rows = db
+    .prepare(`
+      SELECT incoming_text, reply_text, created_at
+      FROM dm_logs
+      WHERE account_username = @account_username
+        AND (
+          (@thread_id != '' AND thread_id = @thread_id)
+          OR (@sender_id != '' AND sender_id = @sender_id)
+          OR (@sender_username != '' AND @sender_username != 'user' AND LOWER(sender_username) = @sender_username)
+        )
+        AND message_id != @exclude_message_id
+        AND reply_status IN ('sent', 'queued')
+        AND incoming_text != ''
+        AND reply_text != ''
+        AND reply_text NOT LIKE '[%'
+      ORDER BY id DESC
+      LIMIT @limit
+    `)
+    .all({
+      account_username: params.accountUsername,
+      thread_id: params.threadId || "",
+      sender_id: params.senderId || "",
+      sender_username: cleanSender,
+      exclude_message_id: params.excludeMessageId || "",
+      limit,
+    }) as Array<{ incoming_text: string; reply_text: string; created_at: string }>;
+
+  // Filter out follow confirmation control clicks from conversational history
+  const followControlTokens = new Set([
+    "follow_confirmed",
+    "فالو کردم",
+    "فالو شد",
+    "followed",
+    "done",
+  ]);
+
+  return rows
+    .filter((r) => {
+      const norm = r.incoming_text.trim().toLowerCase();
+      return !followControlTokens.has(norm) && !norm.startsWith("follow_confirmed");
+    })
+    .reverse()
+    .map((r) => ({
+      incomingText: r.incoming_text,
+      replyText: r.reply_text,
+      createdAt: r.created_at,
+    }));
+}
+
 
 
 

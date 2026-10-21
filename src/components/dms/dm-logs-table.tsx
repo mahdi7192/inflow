@@ -31,6 +31,13 @@ export function DmLogsTable({
             <span>ارسال شد</span>
           </Badge>
         );
+      case "queued":
+        return (
+          <Badge variant="outline" className="text-[10px] bg-sky-50 text-sky-700 border-sky-200 gap-1">
+            <Clock className="w-2.5 h-2.5" />
+            <span>در صف ارسال</span>
+          </Badge>
+        );
       case "pending_follow":
         return (
           <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 gap-1">

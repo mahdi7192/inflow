@@ -102,7 +102,10 @@ export function DmAutomationView({
       const res = await fetch(`/api/accounts/${account}/dm-automation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: nextState ? 1 : 0 }),
+        body: JSON.stringify({
+          enabled: nextState ? 1 : 0,
+          app_language: workspace?.lang || lang,
+        }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -156,6 +159,7 @@ export function DmAutomationView({
           ai_prompt_instructions: aiPromptInstructions,
           require_follow: requireFollow ? 1 : 0,
           follow_prompt_text: followPromptText,
+          app_language: workspace?.lang || lang,
         }),
       });
 

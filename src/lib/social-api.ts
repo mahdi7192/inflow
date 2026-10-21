@@ -63,11 +63,28 @@ export interface SocialApiComment {
 
 export interface SocialApiConversationMessage {
   id: string;
+  conversation_id?: string;
+  platform_id?: string;
+  direction?: "incoming" | "outgoing";
   text: string;
   sender_id?: string;
+  sender_name?: string;
   sender_username?: string;
+  attachment_type?: string | null;
+  attachment_url?: string | null;
   is_from_me?: boolean;
   created_at?: string;
+}
+
+export interface SocialApiParticipantProfile {
+  id: string;
+  username?: string;
+  name?: string;
+  profile_pic?: string;
+  follower_count?: number;
+  is_user_follow_business?: boolean;
+  is_business_follow_user?: boolean;
+  is_verified_user?: boolean;
 }
 
 export interface SocialApiConversation {
@@ -92,13 +109,21 @@ export class SocialApiError extends Error {
   status: number;
   code: string;
   platform?: string;
+  retryAfterSec?: number;
 
-  constructor(message: string, status: number = 500, code: string = "api_error", platform?: string) {
+  constructor(
+    message: string,
+    status: number = 500,
+    code: string = "api_error",
+    platform?: string,
+    retryAfterSec?: number
+  ) {
     super(message);
     this.name = "SocialApiError";
     this.status = status;
     this.code = code;
     this.platform = platform;
+    this.retryAfterSec = retryAfterSec;
   }
 }
 
@@ -185,7 +210,11 @@ export class SocialApiClient {
             `خطای ارتباط با SocialAPI (کد ${res.status})`
         );
         const platform = errObj.platform ? String(errObj.platform) : undefined;
-        throw new SocialApiError(message, res.status, code, platform);
+        const retryHeader = res.headers.get("retry-after") || res.headers.get("Retry-After");
+        const retryAfterSec = retryHeader && !Number.isNaN(Number(retryHeader))
+          ? Math.max(1, Number(retryHeader))
+          : undefined;
+        throw new SocialApiError(message, res.status, code, platform, retryAfterSec);
       }
 
       return json as T;
@@ -508,6 +537,38 @@ export class SocialApiClient {
   }
 
   /**
+   * List messages inside a DM conversation (`GET /v1/inbox/conversations/{id}/messages`)
+   */
+  async listConversationMessages(
+    conversationId: string,
+    accountId?: string,
+    cursor?: string
+  ): Promise<{
+    data: SocialApiConversationMessage[];
+    pagination?: SocialApiPagination;
+  }> {
+    const params = new URLSearchParams();
+    if (accountId) params.set("account_id", accountId);
+    if (cursor) params.set("cursor", cursor);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+
+    const res = await this.request<{
+      data?: SocialApiConversationMessage[];
+      messages?: SocialApiConversationMessage[];
+      pagination?: SocialApiPagination;
+    }>(`/v1/inbox/conversations/${encodeURIComponent(conversationId)}/messages${qs}`);
+
+    return {
+      data: Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.messages)
+        ? res.messages
+        : [],
+      pagination: res.pagination,
+    };
+  }
+
+  /**
    * Send a Direct Message (`POST /v1/inbox/conversations/{id}/messages`)
    */
   async sendConversationMessage(params: {
@@ -536,6 +597,77 @@ export class SocialApiClient {
         body: JSON.stringify(payload),
       }
     );
+  }
+
+  /**
+   * Get an Instagram messaging participant's profile & live follow status
+   * (`GET /v1/platforms/instagram/accounts/{id}/participants/{participantId}/profile`)
+   *
+   * Official fields:
+   * - `id`: string (IGSID)
+   * - `username`: string
+   * - `name`: string (user's full display name)
+   * - `follower_count`: number
+   * - `is_user_follow_business`: boolean (true when user follows business account; omitted/false when not)
+   * - `is_business_follow_user`: boolean
+   * - `is_verified_user`: boolean
+   */
+  async getParticipantProfile(
+    accountId: string,
+    participantId: string
+  ): Promise<SocialApiParticipantProfile | null> {
+    if (!accountId || !participantId) return null;
+    try {
+      const res = await this.request<
+        SocialApiParticipantProfile & { data?: SocialApiParticipantProfile }
+      >(
+        `/v1/platforms/instagram/accounts/${encodeURIComponent(
+          accountId
+        )}/participants/${encodeURIComponent(participantId)}/profile`
+      );
+      const profile = (res && typeof res.data === "object" && res.data ? res.data : res) as SocialApiParticipantProfile;
+      if (!profile || (!profile.id && !profile.username)) {
+        return null;
+      }
+      return profile;
+    } catch (err) {
+      if (err instanceof SocialApiError && (err.status === 403 || err.status === 404)) {
+        // 403 platform.instagram.230 means user hasn't messaged/tapped button yet
+        return null;
+      }
+      console.warn(
+        `[SocialApiClient] getParticipantProfile(${accountId}, ${participantId}) failed:`,
+        (err as Error).message
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Verify live follow status via `getParticipantProfile`
+   */
+  async checkFollowStatus(
+    accountId: string,
+    participantId: string
+  ): Promise<{
+    verified: boolean;
+    profile: SocialApiParticipantProfile | null;
+    reason: "following" | "not_following" | "profile_unavailable";
+  }> {
+    const profile = await this.getParticipantProfile(accountId, participantId);
+    if (!profile) {
+      return {
+        verified: false,
+        profile: null,
+        reason: "profile_unavailable",
+      };
+    }
+    const isFollowing = Boolean(profile.is_user_follow_business);
+    return {
+      verified: isFollowing,
+      profile,
+      reason: isFollowing ? "following" : "not_following",
+    };
   }
 
   // ============================================================================
@@ -567,7 +699,12 @@ export class SocialApiClient {
       method: "POST",
       body: JSON.stringify({
         url: params.url,
-        events: params.events || ["comment.received", "dm.received", "mention.received"],
+        events: params.events || [
+          "comment.received",
+          "dm.received",
+          "dm.postback",
+          "mention.received",
+        ],
       }),
     });
   }

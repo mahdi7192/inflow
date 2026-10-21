@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
-import { getDb, DMAutomationRow } from "@/lib/db";
+import { getDb, saveAppLanguage, DMAutomationRow } from "@/lib/db";
 
 interface RouteParams {
   params: Promise<{
@@ -146,6 +146,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const require_follow = body.require_follow !== undefined ? (body.require_follow ? 1 : 0) : current.require_follow;
     const follow_prompt_text = body.follow_prompt_text !== undefined ? String(body.follow_prompt_text) : current.follow_prompt_text;
     const story_handling_mode = body.story_handling_mode !== undefined ? String(body.story_handling_mode) : current.story_handling_mode;
+    const app_language =
+      body.app_language && ["fa", "en", "ar"].includes(String(body.app_language))
+        ? String(body.app_language)
+        : current.app_language || "fa";
+
+    if (body.app_language) {
+      saveAppLanguage(app_language, cleanUsername);
+    }
 
     let activated_at = current.activated_at;
     if (enabled === 1 && (!current.enabled || !current.activated_at)) {
@@ -168,6 +176,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         require_follow = ?,
         follow_prompt_text = ?,
         story_handling_mode = ?,
+        app_language = ?,
         activated_at = ?,
         updated_at = ?
       WHERE account_username = ?
@@ -184,6 +193,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       require_follow,
       follow_prompt_text,
       story_handling_mode,
+      app_language,
       activated_at,
       now,
       cleanUsername
