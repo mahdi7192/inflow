@@ -12,17 +12,15 @@ import {
   AlertCircle,
   ExternalLink,
   Send,
+  Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { I18N, Lang } from "@/lib/i18n";
-import type { AccountRow, DMAutomationRow, DMLogRow, BotStatus } from "@/lib/db";
+import type { AccountRow, DMAutomationRow, DMLogRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
-import { BotToolbarButton } from "@/components/bot/bot-toolbar-button";
-import { BotMonitorDrawer } from "@/components/bot/bot-monitor-drawer";
-import { VncViewerModal } from "@/components/bot/vnc-viewer-modal";
 import { ActivationCard, ProgressiveDisclosureContainer } from "@/components/ui/activation-card";
 import { StickySaveBar } from "@/components/ui/sticky-save-bar";
 import { PageContainer, PageHeader, PageBody } from "@/components/layout/page-layout";
@@ -32,6 +30,7 @@ import { DmTriggerSelector } from "./dm-trigger-selector";
 import { DmDirectReplyCard } from "./dm-direct-reply-card";
 import { DmAiPromptEditor } from "./dm-ai-prompt-editor";
 import { DmFollowGateCard } from "./dm-follow-gate-card";
+import { DmLiveInboxModal } from "./dm-live-inbox-modal";
 import { cn } from "@/lib/utils";
 
 export interface DmAutomationViewProps {
@@ -87,6 +86,7 @@ export function DmAutomationView({
   // Saving & Dirty State
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [liveInboxOpen, setLiveInboxOpen] = useState(false);
 
   // Sync isDirty with Workspace Context if available
   useEffect(() => {
@@ -187,17 +187,29 @@ export function DmAutomationView({
           </Badge>
         }
         actions={
-          <Link href={`/@${account}/dms/logs`}>
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
+              onClick={() => setLiveInboxOpen(true)}
               className="text-xs gap-1.5 cursor-pointer shadow-2xs"
             >
-              <Clock className="w-3.5 h-3.5 text-sky-600" />
-              <span>{t("dmLogsTitle")}</span>
+              <Inbox className="w-3.5 h-3.5 text-purple-600" />
+              <span>صندوق پیام‌های زنده</span>
             </Button>
-          </Link>
+            <Link href={`/@${account}/dms/logs`}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Clock className="w-3.5 h-3.5 text-sky-600" />
+                <span>{t("dmLogsTitle")}</span>
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -358,6 +370,13 @@ export function DmAutomationView({
         saveLabel={t("saveChanges")}
         resetLabel={t("cancelChanges")}
         dirtyMessage={t("unsavedChangesTitle")}
+      />
+
+      {/* مودال صندوق پیام‌های زنده */}
+      <DmLiveInboxModal
+        isOpen={liveInboxOpen}
+        onClose={() => setLiveInboxOpen(false)}
+        account={account}
       />
     </PageContainer>
   );

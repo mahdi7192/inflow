@@ -3,18 +3,14 @@
 import React, { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Menu,
-} from "lucide-react";
+import { Menu } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
-import { BotToolbarButton } from "@/components/bot/bot-toolbar-button";
-import { BotMonitorDrawer } from "@/components/bot/bot-monitor-drawer";
-import { VncViewerModal } from "@/components/bot/vnc-viewer-modal";
+import { SessionHealthBadge } from "@/components/layout/session-health-badge";
+import { SessionExpiryBanner } from "@/components/layout/session-expiry-banner";
+import { AccountLoginDialog } from "@/components/auth/account-login-dialog";
 import { Toaster, toast } from "@/components/ui/sonner";
 import { UnsavedChangesModal } from "@/components/ui/unsaved-changes-modal";
-import { AddAccountModal } from "@/components/modals/create-modals";
-import { AgentApiModal } from "@/components/modals/agent-api-modal";
 import { DeleteAccountModal } from "@/components/modals/delete-account-modal";
 import { WorkspaceProvider, useRequiredWorkspace } from "./workspace-context";
 import type { AccountRow } from "@/lib/db";
@@ -34,21 +30,12 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
   const {
     account,
     accounts,
+    profile,
     currentUser,
     lang,
     dir,
     setLang,
     t,
-    botStatus,
-    setBotStatus,
-    botDrawerOpen,
-    setBotDrawerOpen,
-    vncModalOpen,
-    setVncModalOpen,
-    vncUrl,
-    vncExpiresInSec,
-    isVncLoading,
-    openVncSession,
     isDirty,
     pendingNavigation,
     setPendingNavigation,
@@ -59,9 +46,11 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false);
 
   // Auxiliary modals
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
-  const [agentApiOpen, setAgentApiOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+
+  // Session status from active profile
+  const sessionStatus = profile?.session_status || "unauthenticated";
 
   // Derive active plugin from pathname
   const activePlugin = pathname.includes("/dms") ? "dms" : "comments";
@@ -88,7 +77,10 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         toast.success(t("syncSuccess") || "همگام‌سازی با موفقیت انجام شد");
         router.refresh();
       } else {
-        toast.error(data.error || "خطا در همگام‌سازی با اینستاگرام");
+        toast.error(data.error || "خطا در همگام‌سازی");
+        if (data.session_required) {
+          setLoginModalOpen(true);
+        }
       }
     } catch {
       toast.error("خطای شبکه در همگام‌سازی");
@@ -117,8 +109,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           currentAccount={account}
           accounts={accounts}
           onSelectAccount={handleSelectAccount}
-          onOpenAddAccount={() => setAddAccountOpen(true)}
-          onOpenAgentApi={() => setAgentApiOpen(true)}
+          onOpenAddAccount={() => setLoginModalOpen(true)}
           onSync={handleSync}
           syncing={syncing}
           currentUser={currentUser}
@@ -146,11 +137,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
               }}
               onOpenAddAccount={() => {
                 setMobileDrawerOpen(false);
-                setAddAccountOpen(true);
-              }}
-              onOpenAgentApi={() => {
-                setMobileDrawerOpen(false);
-                setAgentApiOpen(true);
+                setLoginModalOpen(true);
               }}
               onSync={handleSync}
               syncing={syncing}
@@ -170,6 +157,14 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
       {/* 3. Main Workspace Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Banner if session requires re-login */}
+        {sessionStatus === "reauth_required" && (
+          <SessionExpiryBanner
+            account={account}
+            onReLogin={() => setLoginModalOpen(true)}
+          />
+        )}
+
         {/* Persistent Top Navigation Bar */}
         <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-card/85 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -202,18 +197,17 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <BotToolbarButton
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Zero-Bot Standard: Session Health Badge */}
+            <SessionHealthBadge
               account={account}
-              botStatus={botStatus}
-              lang={lang}
-              onClick={() => setBotDrawerOpen(true)}
+              status={sessionStatus}
+              onReLogin={() => setLoginModalOpen(true)}
             />
 
             <LanguageDropdown
               currentLang={lang}
               onLangChange={(l) => setLang(l)}
-              size="sm"
             />
           </div>
         </header>
@@ -224,27 +218,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* 5. Persistent Global Modals & Drawers */}
-      <BotMonitorDrawer
-        isOpen={botDrawerOpen}
-        onClose={() => setBotDrawerOpen(false)}
-        account={account}
-        botStatus={botStatus}
-        lang={lang}
-        onOpenVnc={openVncSession}
-        isVncLoading={isVncLoading}
-        onStatusChange={(status) => setBotStatus(status)}
-      />
-
-      <VncViewerModal
-        isOpen={vncModalOpen}
-        onClose={() => setVncModalOpen(false)}
-        account={account}
-        vncUrl={vncUrl}
-        initialExpiresInSeconds={vncExpiresInSec}
-        lang={lang}
-      />
-
+      {/* 5. Persistent Global Modals */}
       <UnsavedChangesModal
         isOpen={pendingNavigation !== null}
         onStay={() => setPendingNavigation(null)}
@@ -258,25 +232,18 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
       {/* Global Toast Provider */}
       <Toaster />
 
-      {/* Account Management Modals */}
-      {addAccountOpen && (
-        <AddAccountModal
-          open={addAccountOpen}
-          onClose={() => setAddAccountOpen(false)}
-          onCreated={(newUsername) => {
-            router.push(`/@${newUsername}/comments`);
-            router.refresh();
-          }}
-        />
-      )}
-
-      {agentApiOpen && (
-        <AgentApiModal
-          open={agentApiOpen}
-          onClose={() => setAgentApiOpen(false)}
-          accountUsername={account}
-        />
-      )}
+      {/* Direct In-App Login Modal (Zero Password Storage) */}
+      <AccountLoginDialog
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        defaultUsername={account}
+        lockUsername={true}
+        onSuccess={(usr) => {
+          toast.success(`اکانت @${usr} با موفقیت متصل شد`);
+          router.push(`/@${usr}/comments`);
+          router.refresh();
+        }}
+      />
 
       {deleteAccountOpen && (
         <DeleteAccountModal

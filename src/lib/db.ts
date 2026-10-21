@@ -13,9 +13,35 @@ export type BotStatus =
   | "paused"
   | "error";
 
+export type SessionStatus =
+  | "unauthenticated"
+  | "active"
+  | "reauth_required"
+  | "paused"
+  | "error";
+
+export interface AccountSessionRow {
+  id: number;
+  account_username: string;
+  encrypted_session_data: string;
+  encryption_iv: string;
+  encryption_tag: string;
+  is_valid: number;
+  last_validated_at: string | null;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface AppSettingRow {
+  key: string;
+  value: string;
+  updated_at: string;
+}
+
 export interface AccountRow {
   id: number;
   username: string;
+  social_account_id?: string | null;
   display_name: string;
   avatar_url: string;
   bio: string;
@@ -24,6 +50,9 @@ export interface AccountRow {
   status: "active" | "paused";
   agent_interval_sec: number;
   last_heartbeat_at: string | null;
+  session_status?: SessionStatus;
+  proxy_url?: string | null;
+  last_sync_at?: string | null;
   bot_profile_name?: string | null;
   bot_status?: BotStatus;
   bot_vnc_active?: number;
@@ -64,6 +93,7 @@ export interface BackofficeAccountItem {
   followers_text: string | null;
   posts_count: number;
   status: "active" | "paused";
+  session_status?: string | null;
   created_at: string;
   updated_at: string;
   assigned_user: {
@@ -198,6 +228,9 @@ export function getDb(): Database.Database {
 
 function migrateSchema(db: Database.Database) {
   const accountCols = (db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[]).map(c => c.name);
+  if (!accountCols.includes("social_account_id")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN social_account_id TEXT DEFAULT NULL");
+  }
   if (!accountCols.includes("bot_profile_name")) {
     db.exec("ALTER TABLE accounts ADD COLUMN bot_profile_name TEXT DEFAULT NULL");
   }
@@ -215,6 +248,13 @@ function migrateSchema(db: Database.Database) {
   }
   if (!accountCols.includes("bot_last_error")) {
     db.exec("ALTER TABLE accounts ADD COLUMN bot_last_error TEXT DEFAULT NULL");
+  }
+
+  // Drop legacy private-protocol cookie vault table
+  try {
+    db.exec("DROP TABLE IF EXISTS account_sessions;");
+  } catch {
+    // ignore
   }
 
   db.exec(`
@@ -316,6 +356,7 @@ function initSchema(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
+      social_account_id TEXT DEFAULT NULL,
       display_name TEXT NOT NULL DEFAULT '',
       avatar_url TEXT NOT NULL DEFAULT '',
       bio TEXT NOT NULL DEFAULT '',
@@ -330,8 +371,17 @@ function initSchema(db: Database.Database) {
       bot_vnc_token TEXT DEFAULT NULL,
       bot_vnc_expires_at TEXT DEFAULT NULL,
       bot_last_error TEXT DEFAULT NULL,
+      session_status TEXT NOT NULL DEFAULT 'unauthenticated',
+      proxy_url TEXT DEFAULT NULL,
+      last_sync_at TEXT DEFAULT NULL,
       updated_at TEXT NOT NULL,
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS posts (
@@ -783,6 +833,7 @@ export function getBackofficeAccounts(): BackofficeAccountItem[] {
     followers_text: string | null;
     posts_count: number | null;
     status: "active" | "paused";
+    session_status: string | null;
     created_at: string;
     updated_at: string;
     user_id: number | null;
@@ -797,7 +848,7 @@ export function getBackofficeAccounts(): BackofficeAccountItem[] {
 
   const accounts = db.prepare(`
     SELECT 
-      a.id, a.username, a.display_name, a.avatar_url, a.bio, a.followers_text, a.posts_count, a.status, a.created_at, a.updated_at,
+      a.id, a.username, a.display_name, a.avatar_url, a.bio, a.followers_text, a.posts_count, a.status, a.session_status, a.created_at, a.updated_at,
       u.id as user_id, u.username as user_name, u.display_name as user_display_name,
       b.bot_profile_id, b.api_token, b.last_heartbeat_at, b.created_at as binding_created_at, b.updated_at as binding_updated_at
     FROM accounts a
@@ -839,6 +890,7 @@ export function getBackofficeAccounts(): BackofficeAccountItem[] {
       followers_text: r.followers_text || null,
       posts_count: r.posts_count || 0,
       status: r.status,
+      session_status: r.session_status || "unauthenticated",
       created_at: r.created_at,
       updated_at: r.updated_at,
       assigned_user: r.user_id
@@ -893,6 +945,8 @@ export function deleteAccount(accountUsername: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
     db.prepare("DELETE FROM accounts WHERE username = ?").run(accountUsername);
+    db.prepare("DELETE FROM dm_automations WHERE account_username = ?").run(accountUsername);
+    db.prepare("DELETE FROM dm_logs WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM account_bot_bindings WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM user_accounts WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM posts WHERE account_username = ?").run(accountUsername);
@@ -902,6 +956,77 @@ export function deleteAccount(accountUsername: string): void {
     db.prepare("DELETE FROM bot_activity_logs WHERE account_username = ?").run(accountUsername);
   });
   tx();
+}
+
+export interface SocialApiConfig {
+  apiKey: string;
+  hasKey: boolean;
+  baseUrl: string;
+  webhookSecret: string;
+  webhookId: string;
+}
+
+export function getSocialApiConfig(): SocialApiConfig {
+  const db = getDb();
+  let apiKey = process.env.SOCIAL_API_KEY || process.env.SOCAPI_KEY || "";
+  let baseUrl = process.env.SOCIAL_API_BASE_URL || "https://api.social-api.ai";
+  let webhookSecret = process.env.SOCIAL_WEBHOOK_SECRET || "";
+  let webhookId = process.env.SOCIAL_WEBHOOK_ID || "";
+
+  try {
+    const rows = db
+      .prepare(
+        "SELECT key, value FROM app_settings WHERE key IN ('social_api_key', 'social_api_base_url', 'social_webhook_secret', 'social_webhook_id')"
+      )
+      .all() as AppSettingRow[];
+
+    for (const r of rows) {
+      if (r.key === "social_api_key" && r.value) apiKey = r.value;
+      else if (r.key === "social_api_base_url" && r.value) baseUrl = r.value;
+      else if (r.key === "social_webhook_secret" && r.value) webhookSecret = r.value;
+      else if (r.key === "social_webhook_id" && r.value) webhookId = r.value;
+    }
+  } catch (err) {
+    console.error("[db] Error reading SocialAPI settings:", err);
+  }
+
+  return {
+    apiKey: apiKey.trim(),
+    hasKey: Boolean(apiKey && apiKey.trim().length > 5),
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    webhookSecret: webhookSecret.trim(),
+    webhookId: webhookId.trim(),
+  };
+}
+
+export function saveSocialApiConfig(params: {
+  apiKey?: string;
+  baseUrl?: string;
+  webhookSecret?: string;
+  webhookId?: string;
+}): void {
+  const db = getDb();
+  const now = nowTimestamp();
+  const upsert = db.prepare(`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+  `);
+
+  db.transaction(() => {
+    if (params.apiKey !== undefined && params.apiKey.trim().length > 0) {
+      upsert.run("social_api_key", params.apiKey.trim(), now);
+    }
+    if (params.baseUrl !== undefined && params.baseUrl.trim().length > 0) {
+      upsert.run("social_api_base_url", params.baseUrl.trim().replace(/\/+$/, ""), now);
+    }
+    if (params.webhookSecret !== undefined) {
+      upsert.run("social_webhook_secret", params.webhookSecret.trim(), now);
+    }
+    if (params.webhookId !== undefined) {
+      upsert.run("social_webhook_id", params.webhookId.trim(), now);
+    }
+  })();
 }
 
 export function validateAccountToken(token: string): { account_username: string; bot_profile_id: string } | null {

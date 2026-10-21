@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
-import type { PostRow } from "@/lib/db";
+import type { PostRow, AccountRow } from "@/lib/db";
 import { InflowDashboard } from "@/components/inflow-dashboard";
 
 interface CommentsPageProps {
@@ -27,8 +27,12 @@ export default async function CommentsPage({ params }: CommentsPageProps) {
     redirect("/");
   }
 
-  // Fetch posts for this account
+  // Fetch account profile & posts for this account
   const db = getDb();
+  const profile = db
+    .prepare("SELECT * FROM accounts WHERE username = ?")
+    .get(username) as AccountRow | undefined;
+
   const posts = db
     .prepare(`
       SELECT 
@@ -55,6 +59,7 @@ export default async function CommentsPage({ params }: CommentsPageProps) {
     >
       <InflowDashboard
         initialAccount={username}
+        initialProfile={profile || null}
         initialPosts={posts}
         embeddedInShell={true}
       />

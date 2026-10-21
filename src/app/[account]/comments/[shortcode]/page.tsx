@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
-import type { PostRow } from "@/lib/db";
+import type { PostRow, AccountRow } from "@/lib/db";
 import { InflowDashboard } from "@/components/inflow-dashboard";
 
 interface CommentDetailPageProps {
@@ -29,7 +29,11 @@ export default async function CommentDetailPage({ params }: CommentDetailPagePro
   }
 
   const db = getDb();
-  // Verify post exists
+  // Fetch account profile & target post
+  const profile = db
+    .prepare("SELECT * FROM accounts WHERE username = ?")
+    .get(username) as AccountRow | undefined;
+
   const targetPost = db
     .prepare("SELECT * FROM posts WHERE account_username = ? AND shortcode = ?")
     .get(username, shortcode) as PostRow | undefined;
@@ -65,6 +69,7 @@ export default async function CommentDetailPage({ params }: CommentDetailPagePro
     >
       <InflowDashboard
         initialAccount={username}
+        initialProfile={profile || null}
         initialPosts={posts}
         initialSelectedShortcode={shortcode}
         embeddedInShell={true}

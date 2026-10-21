@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import type { AccountRow, BotStatus } from "@/lib/db";
+import type { AccountRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 import { Lang, isRTL, t as translate } from "@/lib/i18n";
 
@@ -17,18 +17,6 @@ export interface WorkspaceContextType {
   dir: "rtl" | "ltr";
   setLang: (lang: Lang) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
-
-  // Global Bot Monitor & VNC State
-  botStatus: BotStatus;
-  setBotStatus: (status: BotStatus) => void;
-  botDrawerOpen: boolean;
-  setBotDrawerOpen: (open: boolean) => void;
-  vncModalOpen: boolean;
-  setVncModalOpen: (open: boolean) => void;
-  vncUrl: string;
-  vncExpiresInSec: number;
-  isVncLoading: boolean;
-  openVncSession: () => Promise<void>;
 
   // Form Dirty Tracking & Navigation Guard
   isDirty: boolean;
@@ -65,16 +53,6 @@ export function WorkspaceProvider({
   // Language & Direction states
   const [lang, setLangState] = useState<Lang>("fa");
   const dir: "rtl" | "ltr" = isRTL(lang) ? "rtl" : "ltr";
-
-  // Bot states
-  const [botStatus, setBotStatus] = useState<BotStatus>(
-    initialProfile.bot_status || "unprovisioned"
-  );
-  const [botDrawerOpen, setBotDrawerOpen] = useState(false);
-  const [vncModalOpen, setVncModalOpen] = useState(false);
-  const [vncUrl, setVncUrl] = useState("");
-  const [vncExpiresInSec, setVncExpiresInSec] = useState(600);
-  const [isVncLoading, setIsVncLoading] = useState(false);
 
   // Form dirty states
   const [isDirty, setIsDirty] = useState(false);
@@ -113,29 +91,6 @@ export function WorkspaceProvider({
     [lang]
   );
 
-  const openVncSession = useCallback(async () => {
-    setIsVncLoading(true);
-    try {
-      const res = await fetch("/api/bot/vnc-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setVncUrl(data.vnc_url);
-        setVncExpiresInSec(data.timeout_seconds || 600);
-        setVncModalOpen(true);
-      } else {
-        alert(t("vncLaunchError") + ": " + (data.error || ""));
-      }
-    } catch (err) {
-      console.error("VNC launch error:", err);
-    } finally {
-      setIsVncLoading(false);
-    }
-  }, [account, t]);
-
   const confirmDiscardAndNavigate = useCallback(() => {
     if (pendingNavigation) {
       setIsDirty(false);
@@ -156,16 +111,6 @@ export function WorkspaceProvider({
         dir,
         setLang,
         t,
-        botStatus,
-        setBotStatus,
-        botDrawerOpen,
-        setBotDrawerOpen,
-        vncModalOpen,
-        setVncModalOpen,
-        vncUrl,
-        vncExpiresInSec,
-        isVncLoading,
-        openVncSession,
         isDirty,
         setIsDirty,
         dirtyCount,

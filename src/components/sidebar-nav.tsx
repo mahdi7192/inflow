@@ -15,6 +15,7 @@ import {
   Trash2,
   MessageSquare,
   Send,
+  Sparkles,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -30,7 +31,6 @@ export interface SidebarNavProps {
   accounts: AccountRow[];
   onSelectAccount: (username: string) => void;
   onOpenAddAccount: () => void;
-  onOpenAgentApi: () => void;
   onSync: () => Promise<void>;
   syncing: boolean;
   currentUser?: SafeUser | null;
@@ -48,7 +48,6 @@ export function SidebarNav({
   accounts,
   onSelectAccount,
   onOpenAddAccount,
-  onOpenAgentApi,
   onSync,
   syncing,
   currentUser,
@@ -198,7 +197,7 @@ export function SidebarNav({
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-start"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف حساب و ربات از سامانه</span>
+                    <span>حذف حساب از سامانه</span>
                   </button>
                 </>
               )}
@@ -246,24 +245,6 @@ export function SidebarNav({
 
         <div className="h-px bg-border my-2" />
 
-        {/* Hermes Agent API Trigger (Superadmin Only) */}
-        {currentUser?.role === "superadmin" && (
-          <button
-            type="button"
-            onClick={() => {
-              onOpenAgentApi();
-              if (onCloseMobileDrawer) onCloseMobileDrawer();
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors cursor-pointer text-start"
-          >
-            <Terminal className="w-4 h-4 shrink-0 text-emerald-600" />
-            <span className="flex-1 truncate">{t("navAgentApi")}</span>
-            <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-emerald-700 bg-emerald-50 border-emerald-200">
-              Active
-            </Badge>
-          </button>
-        )}
-
         {/* Back-Office Link (Superadmin Only) */}
         {currentUser?.role === "superadmin" && (
           <Link
@@ -279,18 +260,32 @@ export function SidebarNav({
         )}
       </div>
 
-      {/* Sync Action Area */}
-      <div className="p-3 border-t border-border shrink-0">
+      {/* Sync & Account Action Area */}
+      <div className="p-3 border-t border-border shrink-0 space-y-2">
         <Button
           variant="secondary"
           size="default"
           disabled={syncing}
           onClick={onSync}
-          className="w-full justify-center gap-2 border-border hover:bg-secondary"
+          className="w-full justify-center gap-2 border-border hover:bg-secondary cursor-pointer"
         >
           <RotateCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
           <span>{syncing ? t("syncing") : t("navSync")}</span>
         </Button>
+
+        {currentAccount && onOpenDeleteAccount && (
+          <button
+            type="button"
+            onClick={() => {
+              onOpenDeleteAccount();
+              if (onCloseMobileDrawer) onCloseMobileDrawer();
+            }}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-destructive text-xs font-medium transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>حذف پیج جاری</span>
+          </button>
+        )}
       </div>
 
       {/* Bottom User Profile & Logout Footer */}

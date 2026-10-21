@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, AccountRow, PostRow } from "@/lib/db";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
+import { SocialApiClient } from "@/lib/social-api";
 
 export async function GET(req: NextRequest) {
   try {
@@ -114,7 +115,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let shortcode = String(body.shortcode || "").trim();
+    // Optional: Publish / Schedule via SocialAPI.ai `POST /v1/posts` if `publish_to_instagram` is true
+    let remotePostId = String(body.media_id || "");
+    if (body.publish_to_instagram && Array.isArray(body.media_urls) && body.media_urls.length > 0) {
+      const accountRow = db
+        .prepare("SELECT * FROM accounts WHERE username = ?")
+        .get(accountUsername) as AccountRow | undefined;
+      const client = new SocialApiClient();
+      const pubRes = await client.publishPost({
+        account_id: accountRow?.social_account_id || accountUsername,
+        targets: [{ platform: "instagram", account_id: accountRow?.social_account_id || undefined }],
+        caption: String(body.caption || ""),
+        media_urls: body.media_urls as string[],
+        post_type: body.post_type === "post" ? "post" : "reel",
+        scheduled_at: body.scheduled_at ? String(body.scheduled_at) : undefined,
+      });
+      if (pubRes.id) {
+        remotePostId = pubRes.id;
+      }
+    }
+
+    let shortcode = String(body.shortcode || remotePostId || "").trim();
 
     // Extract shortcode if full Instagram URL was provided
     if (body.url && !shortcode) {

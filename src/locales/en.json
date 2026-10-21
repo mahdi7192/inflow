@@ -305,5 +305,15 @@
   "vncModalSecurityNotice": "This session is protected by an ephemeral one-time token and auto-terminates after 10 minutes.",
   "vncModalTitle": "Live Browser Monitor (VNC Guard)",
   "vncSessionExpired": "VNC session expired. Click open again if you need to reconnect.",
-  "vncSessionExpiresIn": "Time remaining in secure session:"
+  "vncSessionExpiresIn": "Time remaining in secure session:",
+  "sessionActive": "Session Active",
+  "sessionReauthRequired": "Re-authentication Required",
+  "sessionReauthTitle": "Instagram Session Expired",
+  "sessionReauthDesc": "To continue automated replies and direct messages, please re-authenticate.",
+  "reLoginBtn": "Re-login",
+  "navAiSettings": "AI Settings",
+  "aiSettingsTitle": "AI API Key Settings",
+  "aiSettingsSubtitle": "Configure direct API key for semantic comment evaluation and response drafting without external agents",
+  "dmLiveInbox": "Live Direct Inbox",
+  "accountLoginTitle": "Direct Instagram Account Login"
 }

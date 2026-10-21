@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, PostRow, DMAutomationRow } from "@/lib/db";
 
 /**
- * Hermes Agent Control Plane Polling Endpoint
- * Called every ~2 minutes by the background agent on the Linux server.
- * GET /api/agent/poll?account=r9spoort1
+ * @deprecated Superseded by inFlow Native Instagram Engine (engine/worker.py).
+ * Maintained with backward compatibility for legacy pollers.
  */
 export async function GET(req: NextRequest) {
   try {

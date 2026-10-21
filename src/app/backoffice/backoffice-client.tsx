@@ -13,6 +13,7 @@ import {
   LogOut,
   Bot,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -25,6 +26,7 @@ import { UserTable, BackofficeUser } from "@/components/backoffice/user-table";
 import { CreateUserModal } from "@/components/backoffice/create-user-modal";
 import { AccountTable } from "@/components/backoffice/account-table";
 import { CreateAccountModal } from "@/components/backoffice/create-account-modal";
+import { AiSettingsPanel } from "@/components/backoffice/ai-settings-panel";
 
 interface BackofficeClientViewProps {
   currentUser: SafeUser;
@@ -32,7 +34,7 @@ interface BackofficeClientViewProps {
 
 export function BackofficeClientView({ currentUser }: BackofficeClientViewProps) {
   const [lang, setLang] = useState<Lang>("fa");
-  const [activeTab, setActiveTab] = useState<"pages" | "users">("pages");
+  const [activeTab, setActiveTab] = useState<"pages" | "users" | "ai">("pages");
 
   const [users, setUsers] = useState<BackofficeUser[]>([]);
   const [accounts, setAccounts] = useState<BackofficeAccountItem[]>([]);
@@ -143,7 +145,7 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
   const activeUsersCount = users.filter((u) => u.status === "active").length;
   const assignedPagesCount = accounts.filter((a) => a.assigned_user !== null).length;
   const unassignedPagesCount = accounts.filter((a) => a.assigned_user === null).length;
-  const activeBotsCount = accounts.filter((a) => a.bot_binding?.last_heartbeat_at !== null).length;
+  const activeSessionsCount = accounts.filter((a) => a.session_status === "active").length;
 
   return (
     <div
@@ -215,90 +217,92 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* KPI Strip (Dynamic based on Tab) */}
-        {activeTab === "pages" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("totalPages")}</span>
-                <InstagramIcon className="w-4 h-4 text-pink-500" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {accounts.length}
-              </div>
-            </Card>
+        {activeTab !== "ai" && (
+          activeTab === "pages" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("totalPages")}</span>
+                  <InstagramIcon className="w-4 h-4 text-pink-500" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {accounts.length}
+                </div>
+              </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("assignedPages")}</span>
-                <Users className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {assignedPagesCount}
-              </div>
-            </Card>
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("assignedPages")}</span>
+                  <Users className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {assignedPagesCount}
+                </div>
+              </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("unassignedPages")}</span>
-                <ShieldCheck className="w-4 h-4 text-amber-500" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {unassignedPagesCount}
-              </div>
-            </Card>
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("unassignedPages")}</span>
+                  <ShieldCheck className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {unassignedPagesCount}
+                </div>
+              </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("activeBots")}</span>
-                <Bot className="w-4 h-4 text-blue-500" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {activeBotsCount}
-              </div>
-            </Card>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("totalUsers")}</span>
-                <Users className="w-4 h-4 text-primary" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {users.length}
-              </div>
-            </Card>
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{lang === "fa" ? "نشست‌های فعال" : "Active Sessions"}</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {activeSessionsCount}
+                </div>
+              </Card>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("totalUsers")}</span>
+                  <Users className="w-4 h-4 text-primary" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {users.length}
+                </div>
+              </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("roleTenant")}</span>
-                <Users className="w-4 h-4 text-sky-400" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {totalTenants}
-              </div>
-            </Card>
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("roleTenant")}</span>
+                  <Users className="w-4 h-4 text-sky-400" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {totalTenants}
+                </div>
+              </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("userStatusActive")}</span>
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-bold text-emerald-500">
-                {activeUsersCount}
-              </div>
-            </Card>
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("userStatusActive")}</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-2xl font-bold text-emerald-500">
+                  {activeUsersCount}
+                </div>
+              </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
-                <span>{t("totalPages")}</span>
-                <InstagramIcon className="w-4 h-4 text-pink-400" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">
-                {accounts.length}
-              </div>
-            </Card>
-          </div>
+              <Card className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground text-xs mb-1.5">
+                  <span>{t("totalPages")}</span>
+                  <InstagramIcon className="w-4 h-4 text-pink-400" />
+                </div>
+                <div className="text-2xl font-bold text-foreground">
+                  {accounts.length}
+                </div>
+              </Card>
+            </div>
+          )
         )}
 
         {/* Tab Selector & Action Toolbar */}
@@ -318,7 +322,7 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
               }`}
             >
               <InstagramIcon className="w-3.5 h-3.5 text-zinc-800" />
-              <span>{t("tabPages")}</span>
+              <span>{lang === "fa" ? "پیج‌های اینستاگرام" : t("tabPages")}</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-100 text-zinc-600 font-mono">
                 {accounts.length}
               </span>
@@ -342,24 +346,42 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
                 {users.length}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("ai");
+                setSearchQuery("");
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === "ai"
+                  ? "bg-white text-zinc-900 shadow-xs"
+                  : "text-zinc-600 hover:text-zinc-900"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>{lang === "fa" ? "موتور هوش مصنوعی" : lang === "ar" ? "الذكاء الاصطناعي" : "AI Engine"}</span>
+            </button>
           </div>
 
           {/* Search & Actions */}
           <div className="flex items-center gap-2.5">
-            <div className="relative flex-1 sm:w-64">
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={
-                  activeTab === "pages"
-                    ? (lang === "fa" ? "جستجو در پیج‌ها، مالکان یا هرمس..." : "Search pages, owners...")
-                    : (lang === "fa" ? "جستجو در کاربران..." : "Search users...")
-                }
-                icon={<Search className="w-4 h-4" />}
-                className="h-9 text-xs"
-              />
-            </div>
+            {activeTab !== "ai" && (
+              <div className="relative flex-1 sm:w-64">
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    activeTab === "pages"
+                      ? (lang === "fa" ? "جستجو در پیج‌ها یا مالکان..." : "Search pages, owners...")
+                      : (lang === "fa" ? "جستجو در کاربران..." : "Search users...")
+                  }
+                  icon={<Search className="w-4 h-4" />}
+                  className="h-9 text-xs"
+                />
+              </div>
+            )}
 
             <Button
               type="button"
@@ -382,7 +404,7 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
                 <Plus className="w-4 h-4" />
                 <span>{t("addPageBtn")}</span>
               </Button>
-            ) : (
+            ) : activeTab === "users" ? (
               <Button
                 type="button"
                 variant="brand"
@@ -392,7 +414,7 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
                 <UserPlus className="w-4 h-4" />
                 <span>{t("createUserBtn")}</span>
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -409,7 +431,7 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
             lang={lang}
             onRefresh={refreshAll}
           />
-        ) : (
+        ) : activeTab === "users" ? (
           <UserTable
             users={filteredUsers}
             availableAccounts={availableAccounts}
@@ -417,6 +439,8 @@ export function BackofficeClientView({ currentUser }: BackofficeClientViewProps)
             lang={lang}
             onRefresh={refreshAll}
           />
+        ) : (
+          <AiSettingsPanel />
         )}
       </main>
 

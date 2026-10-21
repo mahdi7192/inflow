@@ -17,7 +17,11 @@ import {
   ExternalLink,
   Loader2,
   Trash2,
+  RotateCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
+import { SessionHealthBadge } from "@/components/layout/session-health-badge";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -27,15 +31,13 @@ import type { SafeUser } from "@/lib/auth";
 import { EmptyTenancyView } from "./empty-tenancy-view";
 import { PostDetailView } from "./post-detail-view";
 import { LogsModal } from "./modals/logs-modal";
-import { AgentApiModal } from "./modals/agent-api-modal";
-import { AddAccountModal } from "./modals/create-modals";
+import { AccountLoginDialog } from "@/components/auth/account-login-dialog";
 import { DeleteAccountModal } from "./modals/delete-account-modal";
-import { BotSetupWizard } from "./bot/bot-setup-wizard";
-import { BotToolbarButton } from "./bot/bot-toolbar-button";
-import { BotMonitorDrawer } from "./bot/bot-monitor-drawer";
-import { VncViewerModal } from "./bot/vnc-viewer-modal";
 import { useWorkspace } from "@/components/layout/workspace-context";
 import { cn } from "@/lib/utils";
+
+const EMPTY_ACCOUNTS: AccountRow[] = [];
+const EMPTY_POSTS: PostRow[] = [];
 
 export interface InflowDashboardProps {
   currentUser?: SafeUser | null;
@@ -49,10 +51,10 @@ export interface InflowDashboardProps {
 
 export function InflowDashboard({
   currentUser: propUser,
-  initialAccount,
+  initialAccount = "",
   initialProfile = null,
-  initialPosts = [],
-  initialAccounts = [],
+  initialPosts = EMPTY_POSTS,
+  initialAccounts = EMPTY_ACCOUNTS,
   initialSelectedShortcode = null,
   embeddedInShell = false,
 }: InflowDashboardProps) {
@@ -71,11 +73,15 @@ export function InflowDashboard({
       setInternalLang(l);
     }
   };
-  const [accounts, setAccounts] = useState<AccountRow[]>(initialAccounts);
-  const [currentAccount, setCurrentAccount] = useState<string>(
-    initialAccount || (initialAccounts.length > 0 ? initialAccounts[0].username : "")
+  const [accounts, setAccounts] = useState<AccountRow[]>(
+    workspace?.accounts && workspace.accounts.length > 0 ? workspace.accounts : initialAccounts
   );
-  const [profile, setProfile] = useState<AccountRow | null>(initialProfile);
+  const [currentAccount, setCurrentAccount] = useState<string>(
+    workspace?.account || initialAccount || (initialAccounts.length > 0 ? initialAccounts[0].username : "")
+  );
+  const [profile, setProfile] = useState<AccountRow | null>(
+    workspace?.profile || initialProfile
+  );
   const [posts, setPosts] = useState<PostRow[]>(initialPosts);
   const [loading, setLoading] = useState(
     !initialProfile && !initialPosts.length && !initialAccount
@@ -108,7 +114,7 @@ export function InflowDashboard({
   // Modals
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
   const [agentApiOpen, setAgentApiOpen] = useState(false);
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   const handleAccountDeleted = () => {
@@ -125,60 +131,7 @@ export function InflowDashboard({
     }
   };
 
-  // Dedicated Bot Lifecycle & VNC Guard States
-  const [botStatus, setBotStatus] = useState<BotStatus>(
-    initialProfile?.bot_status || "unprovisioned"
-  );
-  const [isSetupCompleted, setIsSetupCompleted] = useState<boolean>(false);
-  const [botDrawerOpen, setBotDrawerOpen] = useState(false);
-  const [vncModalOpen, setVncModalOpen] = useState(false);
-  const [vncUrl, setVncUrl] = useState("");
-  const [vncExpiresInSec, setVncExpiresInSec] = useState(600);
-  const [isVncLoading, setIsVncLoading] = useState(false);
-
-  const handleOpenVnc = async () => {
-    setIsVncLoading(true);
-    try {
-      const res = await fetch("/api/bot/vnc-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account: currentAccount }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setVncUrl(data.vnc_url);
-        setVncExpiresInSec(data.timeout_seconds || 600);
-        setVncModalOpen(true);
-      } else {
-        alert("خطا در باز کردن نشست مانیتور: " + data.error);
-      }
-    } catch (err: unknown) {
-      alert("خطا در ارتباط با سرور: " + (err as Error).message);
-    } finally {
-      setIsVncLoading(false);
-    }
-  };
-
   const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
-
-  const checkAgentStatus = useCallback(async (accountName: string) => {
-    if (!accountName) return;
-    try {
-      const res = await fetch(`/api/sync/status?account=${encodeURIComponent(accountName)}`);
-      const data = await res.json();
-      if (data.success && data.agent_status) {
-        setAgentStatus(data.agent_status);
-      }
-
-      const botRes = await fetch(`/api/bot/status?account=${encodeURIComponent(accountName)}`);
-      const botData = await botRes.json();
-      if (botData.success && botData.bot_status) {
-        setBotStatus(botData.bot_status);
-      }
-    } catch {
-      // Ignore network errors
-    }
-  }, []);
 
   // Sync saved language from localStorage if present
   useEffect(() => {
@@ -249,11 +202,6 @@ export function InflowDashboard({
       const data = await res.json();
       if (data.success) {
         setProfile(data.profile);
-        if (data.profile?.bot_status) {
-          setBotStatus(data.profile.bot_status);
-        } else {
-          setBotStatus("unprovisioned");
-        }
         setPosts(data.posts || []);
       }
     } catch (e) {
@@ -263,30 +211,50 @@ export function InflowDashboard({
     }
   }, []);
 
+  // Synchronize state with incoming props or workspace context changes
   useEffect(() => {
-    if (!initialAccounts || initialAccounts.length === 0) {
+    if (workspace?.account && workspace.account !== currentAccount) {
+      setCurrentAccount(workspace.account);
+    }
+  }, [workspace?.account, currentAccount]);
+
+  useEffect(() => {
+    if (workspace?.profile) {
+      setProfile(workspace.profile);
+    } else if (initialProfile) {
+      setProfile(initialProfile);
+    }
+  }, [workspace?.profile, initialProfile]);
+
+  useEffect(() => {
+    if (workspace?.accounts && workspace.accounts.length > 0) {
+      setAccounts(workspace.accounts);
+    }
+  }, [workspace?.accounts]);
+
+  useEffect(() => {
+    if (initialPosts) {
+      setPosts(initialPosts);
+    }
+  }, [initialPosts]);
+
+  // Fetch accounts list only when standalone (NOT embeddedInShell)
+  const fetchAccountsCalledRef = React.useRef(false);
+  useEffect(() => {
+    if (embeddedInShell) return;
+    if (initialAccounts.length === 0 && !fetchAccountsCalledRef.current) {
+      fetchAccountsCalledRef.current = true;
       fetchAccounts();
     }
-  }, [fetchAccounts, initialAccounts]);
+  }, [embeddedInShell, initialAccounts.length, fetchAccounts]);
 
+  // Fetch posts only when standalone (NOT embeddedInShell) and profile missing
   useEffect(() => {
-    setIsSetupCompleted(false);
-  }, [currentAccount]);
-
-  useEffect(() => {
-    if (currentAccount) {
-      // If we don't already have profile for currentAccount, fetch it with loading indicator
-      if (!profile || profile.username !== currentAccount) {
-        fetchPosts(currentAccount, true);
-      }
-      checkAgentStatus(currentAccount);
-
-      const interval = setInterval(() => {
-        checkAgentStatus(currentAccount);
-      }, 10000);
-      return () => clearInterval(interval);
+    if (embeddedInShell) return;
+    if (currentAccount && (!profile || profile.username !== currentAccount)) {
+      fetchPosts(currentAccount, false);
     }
-  }, [currentAccount, profile, fetchPosts, checkAgentStatus]);
+  }, [embeddedInShell, currentAccount, profile, fetchPosts]);
 
   // Synchronize route prop with selectedShortcode state
   useEffect(() => {
@@ -318,7 +286,7 @@ export function InflowDashboard({
     router.push(`/@${username}/comments`);
   };
 
-  // Sync action with real-time job polling
+  // Native Sync action
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -329,34 +297,17 @@ export function InflowDashboard({
       });
       const data = await res.json();
       if (data.success) {
-        if (data.job_id) {
-          // Poll job status until completed or max attempts (15 seconds)
-          let attempts = 0;
-          const maxAttempts = 10;
-          while (attempts < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            attempts++;
-            try {
-              const statusRes = await fetch(
-                `/api/sync/status?account=${currentAccount}&job_id=${data.job_id}`
-              );
-              const statusData = await statusRes.json();
-              if (
-                statusData.job &&
-                (statusData.job.status === "completed" ||
-                  statusData.job.status === "failed" ||
-                  statusData.job.status === "timed_out")
-              ) {
-                break;
-              }
-            } catch {
-              // Ignore polling network glitches
-            }
-          }
-        }
+        toast.success(data.message || t("syncSuccess") || "همگام‌سازی با موفقیت انجام شد");
         await fetchPosts(currentAccount);
         await fetchAccounts();
+      } else {
+        toast.error(data.error || "خطا در همگام‌سازی پست‌ها");
+        if (data.session_required) {
+          setLoginModalOpen(true);
+        }
       }
+    } catch {
+      toast.error("خطای شبکه هنگام ارتباط با سرور");
     } finally {
       setSyncing(false);
     }
@@ -447,20 +398,6 @@ export function InflowDashboard({
             }}
             onOpenLogs={(sc) => setLogsShortcode(sc)}
           />
-        ) : !loading && posts.length === 0 && (botStatus !== "live" || !isSetupCompleted) ? (
-          <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
-            <BotSetupWizard
-              account={currentAccount}
-              botStatus={botStatus}
-              lang={lang}
-              onOpenVnc={handleOpenVnc}
-              isVncLoading={isVncLoading}
-              onStatusChange={(status) => {
-                setBotStatus(status);
-                if (status === "live") fetchPosts(currentAccount);
-              }}
-            />
-          </div>
         ) : (
           <div className="space-y-6">
             {/* Account Meta & KPI Metrics Strip */}
@@ -492,6 +429,31 @@ export function InflowDashboard({
                       {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
                     </p>
                   </div>
+                </div>
+
+                {/* Account Actions: Sync & Delete */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={syncing}
+                    onClick={handleSync}
+                    className="text-xs gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <RotateCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
+                    <span>{syncing ? t("syncing") : t("navSync")}</span>
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteAccountOpen(true)}
+                    title="حذف حساب از سامانه"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-destructive text-xs font-medium transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>حذف پیج</span>
+                  </button>
                 </div>
               </div>
 
@@ -645,7 +607,30 @@ export function InflowDashboard({
             </div>
 
             {/* Post Feed */}
-            {filteredPosts.length === 0 ? (
+            {posts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center space-y-4 shadow-2xs">
+                <div className="w-12 h-12 rounded-xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
+                  <RotateCw className="w-6 h-6 text-zinc-500" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-foreground">
+                    کاتالوگ پست‌ها هنوز همگام‌سازی نشده است
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    پست‌ها و ریلزهای پیج هنوز دریافت نشده‌اند. با کلیک بر روی دکمه زیر، پست‌ها و ریلزها مستقیماً از اینستاگرام واکشی می‌شوند.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  size="sm"
+                  className="gap-2 cursor-pointer"
+                >
+                  <RotateCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+                  <span>{syncing ? "در حال دریافت پست‌ها..." : "همگام‌سازی پست‌ها با اینستاگرام"}</span>
+                </Button>
+              </div>
+            ) : filteredPosts.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center space-y-3">
                 <div className="w-12 h-12 rounded-xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
                   <FolderOpen className="w-6 h-6" />
@@ -799,8 +784,7 @@ export function InflowDashboard({
           currentAccount={currentAccount}
           accounts={accounts}
           onSelectAccount={handleSelectAccount}
-          onOpenAddAccount={() => setAddAccountOpen(true)}
-          onOpenAgentApi={() => setAgentApiOpen(true)}
+          onOpenAddAccount={() => setLoginModalOpen(true)}
           onSync={handleSync}
           syncing={syncing}
           currentUser={currentUser}
@@ -831,11 +815,7 @@ export function InflowDashboard({
               }}
               onOpenAddAccount={() => {
                 setMobileDrawerOpen(false);
-                setAddAccountOpen(true);
-              }}
-              onOpenAgentApi={() => {
-                setMobileDrawerOpen(false);
-                setAgentApiOpen(true);
+                setLoginModalOpen(true);
               }}
               onSync={handleSync}
               syncing={syncing}
@@ -902,14 +882,13 @@ export function InflowDashboard({
             </div>
           </div>
 
-          {/* Clean Right Actions: Unified Bot Indicator & Language Dropdown */}
+          {/* Clean Right Actions: Session Health Badge & Language Dropdown */}
           <div className="flex items-center gap-2">
             {currentAccount && (
-              <BotToolbarButton
+              <SessionHealthBadge
                 account={currentAccount}
-                botStatus={botStatus}
-                lang={lang}
-                onClick={() => setBotDrawerOpen(true)}
+                status={profile?.session_status || "unauthenticated"}
+                onReLogin={() => setLoginModalOpen(true)}
               />
             )}
 
@@ -964,70 +943,8 @@ export function InflowDashboard({
             }}
             onOpenLogs={(sc) => setLogsShortcode(sc)}
           />
-        ) : !loading && posts.length === 0 && (botStatus !== "live" || !isSetupCompleted) ? (
-          <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
-            <BotSetupWizard
-              account={currentAccount}
-              botStatus={botStatus}
-              lang={lang}
-              onOpenVnc={handleOpenVnc}
-              isVncLoading={isVncLoading}
-              onStatusChange={(newStatus) => {
-                setBotStatus(newStatus);
-              }}
-              onComplete={async () => {
-                setIsSetupCompleted(true);
-                await fetchPosts(currentAccount);
-                await fetchAccounts();
-              }}
-            />
-          </div>
         ) : (
           <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-            {botStatus === "login_required" && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs">{I18N[lang]?.botLoginAlertTitle || "نشست اینستاگرام نیازمند ورود مجدد است"}</h4>
-                    <p className="text-[11px] text-amber-800/90 mt-0.5">{I18N[lang]?.botLoginAlertDesc || "برای ادامه پاسخگویی خودکار، نیاز به ورود مجدد به حساب دارید. پست‌ها و اتوماسیون‌های شما حفظ شده‌اند."}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenVnc}
-                  disabled={isVncLoading}
-                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer flex items-center gap-1.5 transition-colors"
-                >
-                  {isVncLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-                  <span>{isVncLoading ? "در حال اتصال..." : (I18N[lang]?.botLoginVncBtn || "ورود مجدد با دسکتاپ مجازی")}</span>
-                </button>
-              </div>
-            )}
-            {botStatus === "checkpoint_required" && (
-              <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs">{I18N[lang]?.botCheckpointAlertTitle || "توجه: اینستاگرام نیازمند تایید هویت است"}</h4>
-                    <p className="text-[11px] text-red-800/90 mt-0.5">{I18N[lang]?.botCheckpointAlertDesc || "برای ادامه فعالیت ربات، لطفاً صفحه مرورگر را باز کرده و کد تایید ارسالی توسط اینستاگرام را وارد نمایید."}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenVnc}
-                  disabled={isVncLoading}
-                  className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg shrink-0 cursor-pointer flex items-center gap-1.5"
-                >
-                  {isVncLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  <span>{isVncLoading ? "در حال اتصال..." : (I18N[lang]?.botResolveCheckpointBtn || "حل چالش در مرورگر")}</span>
-                </button>
-              </div>
-            )}
             {/* Account Meta & KPI Metrics Strip */}
             <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1436,52 +1353,19 @@ export function InflowDashboard({
         />
       )}
 
-      {/* Agent API Modal */}
-      <AgentApiModal
-        open={agentApiOpen}
-        accountUsername={currentAccount}
-        onClose={() => setAgentApiOpen(false)}
-      />
-
-      {/* Add Account Modal */}
-      <AddAccountModal
-        open={addAccountOpen}
-        onClose={() => setAddAccountOpen(false)}
-        onCreated={(username) => {
-          fetchAccounts();
-          handleSelectAccount(username);
-        }}
-      />
-
-      {/* Bot Monitor Drawer */}
-      <BotMonitorDrawer
-        isOpen={botDrawerOpen}
-        onClose={() => setBotDrawerOpen(false)}
-        account={currentAccount}
-        botStatus={botStatus}
-        lang={lang}
-        agentStatus={agentStatus}
-        onOpenVnc={handleOpenVnc}
-        isVncLoading={isVncLoading}
-        onStatusChange={(status) => {
-          setBotStatus(status);
-          if (status === "live") fetchPosts(currentAccount);
-        }}
-        onOpenDeleteAccount={() => setDeleteAccountOpen(true)}
-      />
-
-      {/* VNC Viewer Modal */}
-      <VncViewerModal
-        isOpen={vncModalOpen}
-        onClose={() => setVncModalOpen(false)}
-        account={currentAccount}
-        vncUrl={vncUrl}
-        initialExpiresInSeconds={vncExpiresInSec}
-        lang={lang}
-        onSessionVerified={() => {
-          setBotStatus("live");
-        }}
-      />
+      {/* Direct In-App Login Modal */}
+      {loginModalOpen && (
+        <AccountLoginDialog
+          isOpen={loginModalOpen}
+          onClose={() => setLoginModalOpen(false)}
+          defaultUsername={currentAccount}
+          lockUsername={true}
+          onSuccess={async () => {
+            setLoginModalOpen(false);
+            await handleSync();
+          }}
+        />
+      )}
 
       {/* Delete Account & Wipe Bot Modal */}
       {currentAccount && (
