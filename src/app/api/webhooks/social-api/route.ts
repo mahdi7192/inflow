@@ -15,10 +15,14 @@ export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
     const signature =
+      req.headers.get("x-socialapi-signature-v2") ||
       req.headers.get("x-socialapi-signature") ||
       req.headers.get("X-SocialAPI-Signature");
+    const timestamp =
+      req.headers.get("x-socialapi-timestamp") ||
+      req.headers.get("X-SocialAPI-Timestamp");
 
-    if (!verifySocialApiWebhookSignature(rawBody, signature)) {
+    if (!verifySocialApiWebhookSignature(rawBody, signature, timestamp)) {
       return NextResponse.json(
         { success: false, error: "Invalid X-SocialAPI-Signature" },
         { status: 401 }
@@ -33,22 +37,57 @@ export async function POST(req: NextRequest) {
         ""
     );
     const data = (payload.data as Record<string, unknown>) || payload;
+    const rawPayload = (payload.raw_payload as Record<string, unknown>) || {};
+    const rawValue = (rawPayload.value as Record<string, unknown>) || {};
+    const rawFrom = (rawValue.from as Record<string, unknown>) || {};
+    const rawMedia = (rawValue.media as Record<string, unknown>) || {};
+    const author = (data.author as Record<string, unknown>) || {};
+    const content = (data.content as Record<string, unknown>) || {};
 
     // 1. Handle `comment.received`
     if (eventType === "comment.received") {
+      const commentId = String(data.id || rawValue.id || data.comment_id || "");
+      const postId = String(
+        data.platform_post_id ||
+          rawMedia.id ||
+          data.post_id ||
+          data.media_id ||
+          ""
+      );
+      const commenterUsername = String(
+        author.name ||
+          rawFrom.username ||
+          data.username ||
+          data.author_username ||
+          data.participant_name ||
+          "user"
+      );
+      const commenterUserId = String(
+        author.id ||
+          rawFrom.id ||
+          data.user_id ||
+          data.author_id ||
+          ""
+      );
+      const commentText = String(
+        content.text ||
+          rawValue.text ||
+          data.text ||
+          data.comment_text ||
+          ""
+      );
+
       const result = await processIncomingComment({
-        commentId: String(data.id || data.comment_id || ""),
-        postId: String(data.post_id || data.media_id || ""),
+        commentId,
+        postId,
         shortcode: data.shortcode ? String(data.shortcode) : undefined,
         socialAccountId: socialAccountId || undefined,
         accountUsername: data.account_username
           ? String(data.account_username)
           : undefined,
-        commenterUsername: String(
-          data.username || data.author_username || data.participant_name || "user"
-        ),
-        commenterUserId: String(data.user_id || data.author_id || ""),
-        commentText: String(data.text || data.comment_text || ""),
+        commenterUsername,
+        commenterUserId,
+        commentText,
         conversationId: data.conversation_id
           ? String(data.conversation_id)
           : undefined,
@@ -61,10 +100,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Handle `dm.received`
-    if (eventType === "dm.received") {
+    // 2. Handle `dm.received` and `dm.postback` (buttons / quick replies)
+    if (eventType === "dm.received" || eventType === "dm.postback") {
+      const sender = (data.sender as Record<string, unknown>) || {};
+      const payloadStr = String(
+        (content.metadata as Record<string, unknown>)?.payload ||
+        content.payload ||
+        data.payload ||
+        ""
+      );
+      const textStr = String(content.text || data.text || data.message || "");
+      const incomingText = payloadStr || textStr;
+
       const result = await processIncomingDm({
-        messageId: String(data.id || data.message_id || ""),
+        messageId: String(data.id || data.message_id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`),
         conversationId: String(
           data.conversation_id || data.thread_id || data.id || ""
         ),
@@ -73,10 +122,15 @@ export async function POST(req: NextRequest) {
           ? String(data.account_username)
           : undefined,
         senderUsername: String(
-          data.sender_username || data.participant_name || data.username || "user"
+          sender.name ||
+            data.sender_username ||
+            data.participant_name ||
+            data.username ||
+            "user"
         ),
-        senderId: String(data.sender_id || data.participant_id || ""),
-        incomingText: String(data.text || data.message || ""),
+        senderId: String(sender.id || data.sender_id || data.participant_id || ""),
+        incomingText,
+        payload: payloadStr || undefined,
         isStoryReply: Boolean(data.is_story_reply),
         storyId: data.story_id ? String(data.story_id) : null,
         storyContent: data.story_content ? String(data.story_content) : null,

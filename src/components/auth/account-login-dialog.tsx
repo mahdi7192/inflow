@@ -157,10 +157,47 @@ export function AccountLoginDialog({
     }
   };
 
+  const cleanTargetUser = (defaultUsername || username).trim().toLowerCase().replace(/^@/, "");
+  const matchedExisting = remoteAccounts.find(
+    (a) =>
+      a.username?.toLowerCase() === cleanTargetUser ||
+      a.handle?.toLowerCase().replace(/^@/, "") === cleanTargetUser
+  );
+
+  const doDirectSync = async (socialId: string) => {
+    const targetUsername = (username || defaultUsername).trim().replace(/^@/, "");
+    setSyncing(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/accounts/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "sync",
+          username: targetUsername,
+          social_account_id: socialId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const resolved = data.account?.username || targetUsername;
+        toast.success(data.message || `اکانت @${resolved} با موفقیت متصل و فعال شد.`);
+        onSuccess?.(resolved);
+        onClose();
+      } else {
+        setErrorMsg(data.error || "خطا در اتصال به SocialAPI.");
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "خطای شبکه");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
       <div
-        className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl shadow-xl overflow-hidden p-6 text-zinc-900 font-vazir"
+        className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl shadow-xl overflow-hidden p-6 text-zinc-900 font-vazir max-h-[90vh] overflow-y-auto"
         dir="rtl"
       >
         {/* Header */}
@@ -182,6 +219,34 @@ export function AccountLoginDialog({
           <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Instant 1-Click Sync Banner when account already connected in SocialAPI */}
+        {matchedExisting && (
+          <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 space-y-2.5">
+            <div className="flex items-center gap-2 font-bold text-xs text-emerald-800">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>این اکانت قبلاً در SocialAPI احراز هویت شده و فعال است!</span>
+            </div>
+            <p className="text-[11px] text-emerald-700 leading-relaxed">
+              اکانت <strong>@{matchedExisting.username || matchedExisting.handle || cleanTargetUser}</strong> با شناسه{" "}
+              <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono text-[10px]">{matchedExisting.id}</code>{" "}
+              در سرویس ابری موجود و آماده است. برای اتصال فوری نیازی به ورود مجدد به اینستاگرام نیست.
+            </p>
+            <Button
+              type="button"
+              onClick={() => doDirectSync(matchedExisting.id)}
+              disabled={syncing}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-2.5 gap-2 cursor-pointer shadow-sm"
+            >
+              {syncing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              <span>اتصال و فعال‌سازی فوری بدون ورود مجدد</span>
+            </Button>
           </div>
         )}
 

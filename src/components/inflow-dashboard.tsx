@@ -664,6 +664,7 @@ export function InflowDashboard({
                           <img
                             src={post.thumbnail_url}
                             alt=""
+                            referrerPolicy="no-referrer"
                             className="w-14 h-14 rounded-lg object-cover border border-border shrink-0 bg-secondary"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
@@ -732,6 +733,7 @@ export function InflowDashboard({
                           <img
                             src={post.thumbnail_url}
                             alt=""
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
@@ -1132,6 +1134,7 @@ export function InflowDashboard({
                             <img
                               src={p.thumbnail_url}
                               alt="Thumbnail"
+                              referrerPolicy="no-referrer"
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = "none";
@@ -1274,6 +1277,7 @@ export function InflowDashboard({
                           <img
                             src={p.thumbnail_url}
                             alt="Thumbnail"
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";

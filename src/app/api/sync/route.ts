@@ -200,21 +200,121 @@ export async function POST(req: NextRequest) {
         client.listCommentedPosts(socialAccountId),
       ]);
 
-      const combinedMap = new Map<string, SocialApiPost>();
-      if (publishedRes.status === "fulfilled") {
-        for (const p of publishedRes.value.data) {
-          const key = String(p.shortcode || p.code || p.post_id || p.id || "");
-          if (key) combinedMap.set(key, p);
+      interface NormalizedSyncPost {
+        shortcode: string;
+        media_id: string;
+        url: string;
+        post_type: "post" | "reel";
+        thumbnail_url: string;
+        caption: string;
+      }
+
+      function extractShortcodeFromUrl(url?: string): string | null {
+        if (!url) return null;
+        const match = url.match(/\/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/);
+        return match ? match[1] : null;
+      }
+
+      const combinedMap = new Map<string, NormalizedSyncPost>();
+
+      function mergePostData(p: SocialApiPost) {
+        const permalink = p.permalink || p.url || p.targets?.[0]?.permalink || "";
+        const extractedSc = extractShortcodeFromUrl(permalink);
+        const platformId = p.platform_id || p.targets?.[0]?.platform_post_id;
+        const nonUuidId = p.id && !p.id.includes("-") ? p.id : undefined;
+
+        const shortcode =
+          extractedSc ||
+          (p.shortcode && !p.shortcode.includes("-") ? p.shortcode : undefined) ||
+          (p.code && !p.code.includes("-") ? p.code : undefined) ||
+          platformId ||
+          nonUuidId ||
+          p.id;
+
+        if (!shortcode) return;
+
+        const mediaId = String(platformId || nonUuidId || p.post_id || shortcode);
+
+        const rawThumb =
+          p.thumbnail ||
+          p.thumbnail_url ||
+          p.media_url ||
+          p.targets?.[0]?.platform_media?.[0]?.url ||
+          "";
+
+        let thumbnailUrl = "";
+        if (rawThumb) {
+          if (rawThumb.startsWith("http://") || rawThumb.startsWith("https://")) {
+            thumbnailUrl = `/api/media/proxy?url=${encodeURIComponent(rawThumb)}`;
+          } else {
+            thumbnailUrl = rawThumb;
+          }
+        }
+
+        const rawCaption = String(p.caption || p.text || p.content || "").trim();
+        const rawType = String(p.media_type || p.type || "").toLowerCase();
+        const postType: "post" | "reel" =
+          permalink.includes("/p/") || rawType.includes("post") || rawType.includes("image")
+            ? "post"
+            : "reel";
+
+        const url =
+          permalink ||
+          `https://www.instagram.com/${targetAccount}/${postType === "reel" ? "reel" : "p"}/${shortcode}/`;
+
+        // Key by mediaId or shortcode to deduplicate across /v1/posts and /v1/inbox/comments
+        const dedupKey = mediaId || shortcode;
+        const existing = combinedMap.get(dedupKey);
+
+        if (!existing) {
+          combinedMap.set(dedupKey, {
+            shortcode,
+            media_id: mediaId,
+            url,
+            post_type: postType,
+            thumbnail_url: thumbnailUrl,
+            caption: rawCaption,
+          });
+        } else {
+          if (!existing.caption && rawCaption) existing.caption = rawCaption;
+          if (!existing.thumbnail_url && thumbnailUrl) existing.thumbnail_url = thumbnailUrl;
+          if (extractedSc && existing.shortcode !== extractedSc) {
+            existing.shortcode = extractedSc;
+          }
+          if (permalink && !existing.url.includes("instagram.com/p/")) {
+            existing.url = permalink;
+          }
         }
       }
-      if (commentedRes.status === "fulfilled") {
+
+      if (publishedRes.status === "fulfilled" && Array.isArray(publishedRes.value.data)) {
+        for (const p of publishedRes.value.data) {
+          mergePostData(p);
+        }
+      }
+      if (commentedRes.status === "fulfilled" && Array.isArray(commentedRes.value.data)) {
         for (const p of commentedRes.value.data) {
-          const key = String(p.shortcode || p.code || p.post_id || p.id || "");
-          if (key && !combinedMap.has(key)) combinedMap.set(key, p);
+          mergePostData(p);
         }
       }
 
       const remotePosts = Array.from(combinedMap.values());
+
+      // Clean up legacy malformed rows with UUID shortcodes
+      db.prepare(`
+        DELETE FROM posts
+        WHERE account_username = ? AND length(shortcode) = 36 AND shortcode LIKE '%-%'
+      `).run(targetAccount);
+
+      // Clean up legacy rows where shortcode was saved as numeric platform media_id
+      for (const p of remotePosts) {
+        if (p.media_id && p.shortcode !== p.media_id) {
+          db.prepare(`
+            DELETE FROM posts
+            WHERE account_username = ? AND shortcode = ?
+          `).run(targetAccount, p.media_id);
+        }
+      }
 
       const upsertPost = db.prepare(`
         INSERT INTO posts (
@@ -233,25 +333,16 @@ export async function POST(req: NextRequest) {
       `);
 
       let insertedCount = 0;
-      const tx = db.transaction((items: SocialApiPost[]) => {
+      const tx = db.transaction((items: NormalizedSyncPost[]) => {
         items.forEach((m, idx) => {
-          const sc = String(m.shortcode || m.code || m.post_id || m.id || "").trim();
-          if (!sc) return;
-          const mediaId = String(m.post_id || m.id || sc);
-          const rawType = String(m.media_type || m.type || "reel").toLowerCase();
-          const postType = rawType.includes("post") || rawType.includes("image") ? "post" : "reel";
-
           upsertPost.run({
             account_username: targetAccount,
-            shortcode: sc,
-            media_id: mediaId,
-            url:
-              m.url ||
-              m.permalink ||
-              `https://www.instagram.com/${targetAccount}/${postType === "reel" ? "reel" : "p"}/${sc}/`,
-            post_type: postType,
-            thumbnail_url: String(m.thumbnail_url || m.media_url || ""),
-            caption: String(m.caption || m.text || ""),
+            shortcode: m.shortcode,
+            media_id: m.media_id,
+            url: m.url,
+            post_type: m.post_type,
+            thumbnail_url: m.thumbnail_url,
+            caption: m.caption,
             synced_at: now,
             updated_at: now,
             sort_index: idx,

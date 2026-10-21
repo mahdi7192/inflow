@@ -73,10 +73,10 @@ export async function POST(req: NextRequest) {
 
     // Action 1: Initiate OAuth Flow via POST /v1/accounts/connect
     if (action === "initiate") {
-      const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "https://inflow.ketabdar.dev";
       const redirectUrl =
         body.redirect_url ||
-        (usernameInput ? `${origin}/@${usernameInput}/comments` : `${origin}/`);
+        `${origin}/auth/callback${usernameInput ? `?username=${encodeURIComponent(usernameInput)}` : ""}`;
 
       const connectRes = await client.connectAccount({
         platform: "instagram",

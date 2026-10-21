@@ -231,6 +231,15 @@ function migrateSchema(db: Database.Database) {
   if (!accountCols.includes("social_account_id")) {
     db.exec("ALTER TABLE accounts ADD COLUMN social_account_id TEXT DEFAULT NULL");
   }
+  if (!accountCols.includes("session_status")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN session_status TEXT NOT NULL DEFAULT 'unauthenticated'");
+  }
+  if (!accountCols.includes("proxy_url")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN proxy_url TEXT DEFAULT NULL");
+  }
+  if (!accountCols.includes("last_sync_at")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN last_sync_at TEXT DEFAULT NULL");
+  }
   if (!accountCols.includes("bot_profile_name")) {
     db.exec("ALTER TABLE accounts ADD COLUMN bot_profile_name TEXT DEFAULT NULL");
   }

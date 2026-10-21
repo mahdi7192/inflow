@@ -18,6 +18,7 @@ export interface SocialApiAccount {
 export interface SocialApiPost {
   id: string;
   post_id?: string;
+  platform_id?: string;
   shortcode?: string;
   code?: string;
   platform?: string;
@@ -27,9 +28,20 @@ export interface SocialApiPost {
   media_type?: string;
   type?: string;
   thumbnail_url?: string;
+  thumbnail?: string;
   media_url?: string;
   caption?: string;
   text?: string;
+  content?: string;
+  targets?: Array<{
+    platform?: string;
+    platform_post_id?: string;
+    permalink?: string;
+    platform_media?: Array<{
+      type?: string;
+      url?: string;
+    }>;
+  }>;
   created_at?: string;
 }
 
@@ -95,6 +107,18 @@ export class SocialApiError extends Error {
  * Documentation: https://docs.social-api.ai/api-reference/introduction
  * Base URL: https://api.social-api.ai/v1
  */
+export interface SocialApiMessageButton {
+  type: "postback" | "url";
+  title: string;
+  payload?: string;
+  url?: string;
+}
+
+export interface SocialApiQuickReply {
+  title: string;
+  payload?: string;
+}
+
 export class SocialApiClient {
   private apiKey: string;
   private baseUrl: string;
@@ -371,6 +395,35 @@ export class SocialApiClient {
   }
 
   /**
+   * Send a private reply (DM) to a person who commented on a post
+   * `POST /v1/inbox/comments/{postId}/{commentId}/private-reply`
+   */
+  async sendPrivateReply(params: {
+    postId: string;
+    commentId: string;
+    accountId: string;
+    text: string;
+    buttons?: SocialApiMessageButton[];
+  }): Promise<{ success: boolean }> {
+    const payload: Record<string, unknown> = {
+      account_id: params.accountId,
+      text: params.text,
+    };
+    if (params.buttons && params.buttons.length > 0) {
+      payload.buttons = params.buttons;
+    }
+    return this.request(
+      `/v1/inbox/comments/${encodeURIComponent(params.postId)}/${encodeURIComponent(
+        params.commentId
+      )}/private-reply`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  /**
    * Moderate a comment: delete, hide, unhide, like, unlike
    * - Delete: `DELETE /v1/inbox/comments/{postId}/{commentId}`
    * - Hide/Unhide: `POST|DELETE /v1/inbox/comments/{postId}/{commentId}/hide`
@@ -462,16 +515,25 @@ export class SocialApiClient {
     accountId: string;
     text: string;
     recipientId?: string;
+    buttons?: SocialApiMessageButton[];
+    quickReplies?: SocialApiQuickReply[];
   }): Promise<{ id?: string; message_id?: string; status?: string }> {
+    const payload: Record<string, unknown> = {
+      account_id: params.accountId,
+      text: params.text,
+      ...(params.recipientId ? { recipient_id: params.recipientId } : {}),
+    };
+    if (params.buttons && params.buttons.length > 0) {
+      payload.buttons = params.buttons;
+    }
+    if (params.quickReplies && params.quickReplies.length > 0) {
+      payload.quick_replies = params.quickReplies;
+    }
     return this.request(
       `/v1/inbox/conversations/${encodeURIComponent(params.conversationId)}/messages`,
       {
         method: "POST",
-        body: JSON.stringify({
-          account_id: params.accountId,
-          text: params.text,
-          ...(params.recipientId ? { recipient_id: params.recipientId } : {}),
-        }),
+        body: JSON.stringify(payload),
       }
     );
   }
@@ -527,6 +589,7 @@ export class SocialApiClient {
 export function verifySocialApiWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
+  timestamp?: string | null,
   webhookSecret?: string
 ): boolean {
   const secret = (webhookSecret ?? getSocialApiConfig().webhookSecret).trim();
@@ -539,14 +602,32 @@ export function verifySocialApiWebhookSignature(
   }
 
   const cleanSig = signatureHeader.replace(/^sha256=/i, "").trim();
-  const expected = crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
 
+  // Try V2 signature (<timestamp>.<raw body>) if timestamp is present
+  if (timestamp) {
+    const payloadV2 = `${timestamp}.${rawBody}`;
+    const expectedV2 = crypto.createHmac("sha256", secret).update(payloadV2, "utf8").digest("hex");
+    try {
+      const sigBuf = Buffer.from(cleanSig, "hex");
+      const expBuf = Buffer.from(expectedV2, "hex");
+      if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+        return true;
+      }
+    } catch {
+      if (cleanSig === expectedV2) return true;
+    }
+  }
+
+  // Fallback / V1 signature (raw body alone)
+  const expectedV1 = crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
   try {
     const sigBuf = Buffer.from(cleanSig, "hex");
-    const expBuf = Buffer.from(expected, "hex");
-    if (sigBuf.length !== expBuf.length) return false;
-    return crypto.timingSafeEqual(sigBuf, expBuf);
+    const expBuf = Buffer.from(expectedV1, "hex");
+    if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return true;
+    }
   } catch {
-    return cleanSig === expected;
+    return cleanSig === expectedV1;
   }
+  return false;
 }

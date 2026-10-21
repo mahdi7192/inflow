@@ -1,4 +1,12 @@
-import { getDb, type AccountRow, type PostRow, type DMAutomationRow } from "@/lib/db";
+import {
+  getDb,
+  logBotActivity,
+  type AccountRow,
+  type PostRow,
+  type DMAutomationRow,
+  type CommentLogRow,
+  type DMLogRow,
+} from "@/lib/db";
 import { SocialApiClient, SocialApiError } from "@/lib/social-api";
 import { evaluateTriggerWithAi, generateContextualReplyWithAi } from "@/lib/ai-client";
 
@@ -22,6 +30,7 @@ export interface IncomingDmEvent {
   senderUsername: string;
   senderId?: string;
   incomingText: string;
+  payload?: string;
   isStoryReply?: boolean;
   storyId?: string | null;
   storyContent?: string | null;
@@ -242,51 +251,152 @@ export async function processIncomingComment(event: IncomingCommentEvent): Promi
       try {
         let sent = false;
 
-        // 1. Try Instagram official Private Reply if triggered by a comment
-        if (event.postId && event.commentId) {
-          try {
-            await client.sendPrivateReply({
-              postId: event.postId,
-              commentId: event.commentId,
-              accountId: socialAccountId,
-              text: dmText.trim(),
-            });
-            dmStatus = "sent";
-            sent = true;
-          } catch (privateReplyErr) {
-            console.warn(
-              `[Instagram Automation] Private reply failed, falling back to conversation:`,
-              privateReplyErr
-            );
-          }
-        }
+        // Check if follow requirement is enabled for this post
+        if (post.dm_require_follow === 1) {
+          const accountUsername = account?.username || post.account_username;
+          const dmRule = db
+            .prepare("SELECT follow_prompt_text FROM dm_automations WHERE account_username = ?")
+            .get(accountUsername) as { follow_prompt_text?: string } | undefined;
 
-        // 2. Fallback to existing conversation thread if private reply didn't send
-        if (!sent) {
-          let conversationId = event.conversationId || "";
-          if (!conversationId) {
-            const convs = await client.listConversations(socialAccountId);
-            const matchedConv = (convs.data || []).find(
-              (c) =>
-                c.participant_name?.toLowerCase() === cleanCommenter ||
-                c.participant_username?.toLowerCase() === cleanCommenter ||
-                (event.commenterUserId && c.participant_id === event.commenterUserId)
-            );
-            if (matchedConv?.id) {
-              conversationId = matchedConv.id;
+          const followPrompt =
+            dmRule?.follow_prompt_text?.trim() ||
+            `سلام @${cleanCommenter} عزیز! برای دریافت پاسخ و فایل کامل، لطفاً ابتدا پیج را فالو کنید و روی دکمه «فالو کردم» بزنید 👇`;
+
+          // 1. Try sending Private Reply with "فالو کردم" button
+          if (event.postId && event.commentId) {
+            try {
+              await client.sendPrivateReply({
+                postId: event.postId,
+                commentId: event.commentId,
+                accountId: socialAccountId,
+                text: followPrompt,
+                buttons: [
+                  { type: "postback", title: "فالو کردم", payload: "FOLLOW_CONFIRMED" },
+                ],
+              });
+              dmStatus = "pending_follow";
+              sent = true;
+            } catch (privateReplyErr) {
+              console.warn(
+                `[Instagram Automation] Private reply with button failed, trying without buttons:`,
+                privateReplyErr
+              );
+              try {
+                await client.sendPrivateReply({
+                  postId: event.postId,
+                  commentId: event.commentId,
+                  accountId: socialAccountId,
+                  text: `${followPrompt}\n\n(پس از فالو کردن پیج، عبارت «فالو کردم» را در دایرکت بفرستید)`,
+                });
+                dmStatus = "pending_follow";
+                sent = true;
+              } catch (e2) {
+                console.warn(`[Instagram Automation] Plain private reply also failed:`, e2);
+              }
             }
           }
 
-          if (conversationId) {
-            await client.sendConversationMessage({
-              conversationId,
-              accountId: socialAccountId,
-              text: dmText.trim(),
-              recipientId: event.commenterUserId || cleanCommenter,
-            });
-            dmStatus = "sent";
-          } else {
-            dmStatus = "failed";
+          // 2. Fallback to conversation thread if private reply didn't send
+          if (!sent) {
+            let conversationId = event.conversationId || "";
+            if (!conversationId) {
+              const convs = await client.listConversations(socialAccountId);
+              const matchedConv = (convs.data || []).find(
+                (c) =>
+                  c.participant_name?.toLowerCase() === cleanCommenter ||
+                  c.participant_username?.toLowerCase() === cleanCommenter ||
+                  (event.commenterUserId && c.participant_id === event.commenterUserId)
+              );
+              if (matchedConv?.id) {
+                conversationId = matchedConv.id;
+              }
+            }
+
+            if (conversationId) {
+              try {
+                await client.sendConversationMessage({
+                  conversationId,
+                  accountId: socialAccountId,
+                  text: followPrompt,
+                  recipientId: event.commenterUserId || cleanCommenter,
+                  buttons: [
+                    { type: "postback", title: "فالو کردم", payload: "FOLLOW_CONFIRMED" },
+                  ],
+                  quickReplies: [
+                    { title: "فالو کردم", payload: "FOLLOW_CONFIRMED" },
+                  ],
+                });
+                dmStatus = "pending_follow";
+                sent = true;
+              } catch {
+                await client.sendConversationMessage({
+                  conversationId,
+                  accountId: socialAccountId,
+                  text: `${followPrompt}\n\n(پس از فالو کردن پیج، عبارت «فالو کردم» را در دایرکت بفرستید)`,
+                  recipientId: event.commenterUserId || cleanCommenter,
+                });
+                dmStatus = "pending_follow";
+                sent = true;
+              }
+            } else {
+              dmStatus = "failed";
+            }
+          }
+
+          if (dmStatus === "pending_follow") {
+            logBotActivity(
+              accountUsername,
+              "dm_sent",
+              `پیام درخواست فالو با دکمه «فالو کردم» برای @${cleanCommenter} ارسال شد (در انتظار فالو)`
+            );
+          }
+        } else {
+          // Regular direct message (no follow requirement)
+          if (event.postId && event.commentId) {
+            try {
+              await client.sendPrivateReply({
+                postId: event.postId,
+                commentId: event.commentId,
+                accountId: socialAccountId,
+                text: dmText.trim(),
+              });
+              dmStatus = "sent";
+              sent = true;
+            } catch (privateReplyErr) {
+              console.warn(
+                `[Instagram Automation] Private reply failed, falling back to conversation:`,
+                privateReplyErr
+              );
+            }
+          }
+
+          // 2. Fallback to existing conversation thread if private reply didn't send
+          if (!sent) {
+            let conversationId = event.conversationId || "";
+            if (!conversationId) {
+              const convs = await client.listConversations(socialAccountId);
+              const matchedConv = (convs.data || []).find(
+                (c) =>
+                  c.participant_name?.toLowerCase() === cleanCommenter ||
+                  c.participant_username?.toLowerCase() === cleanCommenter ||
+                  (event.commenterUserId && c.participant_id === event.commenterUserId)
+              );
+              if (matchedConv?.id) {
+                conversationId = matchedConv.id;
+              }
+            }
+
+            if (conversationId) {
+              await client.sendConversationMessage({
+                conversationId,
+                accountId: socialAccountId,
+                text: dmText.trim(),
+                recipientId: event.commenterUserId || cleanCommenter,
+              });
+              dmStatus = "sent";
+            } else {
+              dmStatus = "failed";
+            }
           }
         }
       } catch (err: unknown) {
@@ -377,14 +487,6 @@ export async function processIncomingDm(event: IncomingDmEvent): Promise<{
     return { processed: false };
   }
 
-  const dmRule = db
-    .prepare("SELECT * FROM dm_automations WHERE account_username = ?")
-    .get(account.username) as DMAutomationRow | undefined;
-
-  if (!dmRule || dmRule.enabled !== 1) {
-    return { processed: false };
-  }
-
   const now = nowTimestamp();
 
   // 3. Acquire Idempotency Lock
@@ -415,7 +517,162 @@ export async function processIncomingDm(event: IncomingDmEvent): Promise<{
     return { processed: true, already_processed: true };
   }
 
-  // 4. Evaluate Trigger
+  // 3.5 Check for Pending Follow Release (from Post Comment or prior DM)
+  const isFollowConfirmation =
+    event.payload === "FOLLOW_CONFIRMED" ||
+    matchesKeywords(
+      event.incomingText,
+      "فالو کردم,فالو شد,فالو,انجام شد,FOLLOW_CONFIRMED,done,followed,follow"
+    );
+
+  const pendingComments = db.prepare(`
+    SELECT * FROM comment_logs
+    WHERE account_username = ?
+      AND (LOWER(username) = ? OR (user_id != '' AND user_id = ?))
+      AND dm_status = 'pending_follow'
+    ORDER BY id ASC
+  `).all(account.username, cleanSender, event.senderId || "") as CommentLogRow[];
+
+  const pendingDms = db.prepare(`
+    SELECT * FROM dm_logs
+    WHERE account_username = ?
+      AND (LOWER(sender_username) = ? OR (sender_id != '' AND sender_id = ?))
+      AND reply_status = 'pending_follow'
+      AND message_id != ?
+    ORDER BY id ASC
+  `).all(account.username, cleanSender, event.senderId || "", messageId) as DMLogRow[];
+
+  if (pendingComments.length > 0 || pendingDms.length > 0) {
+    if (isFollowConfirmation || pendingComments.length > 0 || pendingDms.length > 0) {
+      const client = new SocialApiClient();
+      const socialAccountId =
+        account.social_account_id || event.socialAccountId || account.username;
+      let conversationId = event.conversationId;
+
+      if (!conversationId) {
+        try {
+          const convs = await client.listConversations(socialAccountId);
+          const matchedConv = (convs.data || []).find(
+            (c) =>
+              c.participant_name?.toLowerCase() === cleanSender ||
+              c.participant_username?.toLowerCase() === cleanSender ||
+              (event.senderId && c.participant_id === event.senderId)
+          );
+          if (matchedConv?.id) {
+            conversationId = matchedConv.id;
+          }
+        } catch (e) {
+          console.warn(`[Instagram Automation] Failed to list conversations:`, e);
+        }
+      }
+
+      let allSuccess = true;
+      let sentCount = 0;
+
+      // Release pending comment DMs
+      for (const pc of pendingComments) {
+        const textToSend = pc.dm_text?.trim();
+        if (textToSend && conversationId) {
+          try {
+            await client.sendConversationMessage({
+              conversationId,
+              accountId: socialAccountId,
+              text: textToSend,
+              recipientId: event.senderId || cleanSender,
+            });
+            db.prepare(`
+              UPDATE comment_logs
+              SET dm_status = 'sent', processed_at = ?
+              WHERE id = ?
+            `).run(nowTimestamp(), pc.id);
+
+            logBotActivity(
+              account.username,
+              "dm_sent",
+              `تایید فالو توسط @${cleanSender} دریافت شد و پاسخ دایرکت پست ارسال شد ✅`
+            );
+            sentCount++;
+          } catch (sendErr) {
+            allSuccess = false;
+            console.error(
+              `[Instagram Automation] Failed to release pending comment DM:`,
+              sendErr
+            );
+          }
+        }
+      }
+
+      // Release pending direct DMs
+      for (const pd of pendingDms) {
+        const textToSend = pd.reply_text?.trim();
+        if (textToSend && conversationId) {
+          try {
+            await client.sendConversationMessage({
+              conversationId,
+              accountId: socialAccountId,
+              text: textToSend,
+              recipientId: event.senderId || cleanSender,
+            });
+            db.prepare(`
+              UPDATE dm_logs
+              SET reply_status = 'sent', processed_at = ?
+              WHERE id = ?
+            `).run(nowTimestamp(), pd.id);
+
+            logBotActivity(
+              account.username,
+              "dm_sent",
+              `تایید فالو توسط @${cleanSender} دریافت شد و پاسخ معلق دایرکت ارسال شد ✅`
+            );
+            sentCount++;
+          } catch (sendErr) {
+            allSuccess = false;
+            console.error(
+              `[Instagram Automation] Failed to release pending DM:`,
+              sendErr
+            );
+          }
+        }
+      }
+
+      if (sentCount > 0) {
+        db.prepare(`
+          UPDATE dm_logs
+          SET trigger_matched = 1,
+              reply_status = @reply_status,
+              reply_text = @reply_text,
+              processed_at = @processed_at
+        WHERE message_id = @message_id
+      `).run({
+        message_id: messageId,
+        reply_status: allSuccess ? "sent" : "failed",
+        reply_text: "تایید فالو دریافت شد و پاسخ معلق با موفقیت ارسال گردید.",
+        processed_at: nowTimestamp(),
+      });
+
+        return {
+          processed: true,
+          reply_status: allSuccess ? "sent" : "failed",
+        };
+      }
+    }
+  }
+
+  // 4. Check if standard DM automation is active
+  const dmRule = db
+    .prepare("SELECT * FROM dm_automations WHERE account_username = ?")
+    .get(account.username) as DMAutomationRow | undefined;
+
+  if (!dmRule || dmRule.enabled !== 1) {
+    db.prepare(`
+      UPDATE dm_logs
+      SET trigger_matched = 0, reply_status = 'skipped', processed_at = ?
+      WHERE message_id = ?
+    `).run(nowTimestamp(), messageId);
+    return { processed: true, reply_status: "skipped" };
+  }
+
+  // 5. Evaluate Trigger
   let matched = false;
   if (dmRule.trigger_type === "all") {
     matched = true;
@@ -438,7 +695,7 @@ export async function processIncomingDm(event: IncomingDmEvent): Promise<{
     return { processed: true, reply_status: "skipped" };
   }
 
-  // 5. Generate Reply Text
+  // 6. Generate Reply Text
   let replyText = "";
   if (dmRule.reply_mode === "direct") {
     replyText = dmRule.direct_reply_text || "";
@@ -453,7 +710,7 @@ export async function processIncomingDm(event: IncomingDmEvent): Promise<{
     });
   }
 
-  let replyStatus: "sent" | "failed" | "skipped" = "skipped";
+  let replyStatus: "sent" | "failed" | "skipped" | "pending_follow" = "skipped";
   let errorDetails: string | null = null;
 
   if (replyText.trim()) {
@@ -461,21 +718,61 @@ export async function processIncomingDm(event: IncomingDmEvent): Promise<{
     const socialAccountId =
       account.social_account_id || event.socialAccountId || account.username;
 
-    try {
-      await client.sendConversationMessage({
-        conversationId: event.conversationId,
-        accountId: socialAccountId,
-        text: replyText.trim(),
-        recipientId: event.senderId || cleanSender,
-      });
-      replyStatus = "sent";
-    } catch (err: unknown) {
-      replyStatus = "failed";
-      errorDetails = (err as Error).message || "SocialAPI DM send failed";
-      if (err instanceof SocialApiError && err.status === 401) {
-        db.prepare(
-          "UPDATE accounts SET session_status = 'reauth_required', updated_at = ? WHERE username = ?"
-        ).run(nowTimestamp(), account.username);
+    if (dmRule.require_follow === 1) {
+      const followPrompt =
+        dmRule.follow_prompt_text?.trim() ||
+        "سلام! برای دریافت پاسخ و مشاوره کامل، لطفاً ابتدا پیج را فالو کنید و روی دکمه «فالو کردم» بزنید 👇";
+
+      try {
+        await client.sendConversationMessage({
+          conversationId: event.conversationId,
+          accountId: socialAccountId,
+          text: followPrompt,
+          recipientId: event.senderId || cleanSender,
+          buttons: [
+            { type: "postback", title: "فالو کردم", payload: "FOLLOW_CONFIRMED" },
+          ],
+          quickReplies: [
+            { title: "فالو کردم", payload: "FOLLOW_CONFIRMED" },
+          ],
+        });
+        replyStatus = "pending_follow";
+        logBotActivity(
+          account.username,
+          "dm_sent",
+          `پیام درخواست فالو با دکمه «فالو کردم» برای @${cleanSender} ارسال شد (در انتظار فالو)`
+        );
+      } catch (err: unknown) {
+        try {
+          await client.sendConversationMessage({
+            conversationId: event.conversationId,
+            accountId: socialAccountId,
+            text: `${followPrompt}\n\n(پس از فالو کردن پیج، عبارت «فالو کردم» را در همین دایرکت ارسال کنید)`,
+            recipientId: event.senderId || cleanSender,
+          });
+          replyStatus = "pending_follow";
+        } catch (convErr) {
+          replyStatus = "failed";
+          errorDetails = (convErr as Error).message || "DM send failed";
+        }
+      }
+    } else {
+      try {
+        await client.sendConversationMessage({
+          conversationId: event.conversationId,
+          accountId: socialAccountId,
+          text: replyText.trim(),
+          recipientId: event.senderId || cleanSender,
+        });
+        replyStatus = "sent";
+      } catch (err: unknown) {
+        replyStatus = "failed";
+        errorDetails = (err as Error).message || "SocialAPI DM send failed";
+        if (err instanceof SocialApiError && err.status === 401) {
+          db.prepare(
+            "UPDATE accounts SET session_status = 'reauth_required', updated_at = ? WHERE username = ?"
+          ).run(nowTimestamp(), account.username);
+        }
       }
     }
   }
