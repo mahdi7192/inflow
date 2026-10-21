@@ -194,7 +194,8 @@ export async function processIncomingComment(event: IncomingCommentEvent): Promi
         incomingText: event.commentText,
         instructions:
           post.comment_action_text || "پاسخ کوتاه و محترمانه زیر کامنت بده",
-        fallbackText: "پاسخ کامل در دایرکت خدمتتان ارسال شد 📩",
+        fallbackText: "پاسخ خدمتتان ارسال شد 🙏",
+        mode: "comment",
       });
     }
 
@@ -233,33 +234,64 @@ export async function processIncomingComment(event: IncomingCommentEvent): Promi
         instructions:
           post.dm_action_text || "پاسخ کامل و محترمانه در دایرکت ارسال کن",
         fallbackText: post.dm_action_text || "سلام! در خدمت شما هستیم 🙏",
+        mode: "dm",
       });
     }
 
     if (dmText.trim()) {
       try {
-        // Resolve conversation ID if not provided directly
-        let conversationId = event.conversationId || "";
-        if (!conversationId) {
-          const convs = await client.listConversations(socialAccountId);
-          const matchedConv = convs.data.find(
-            (c) =>
-              c.participant_name?.toLowerCase() === cleanCommenter ||
-              c.participant_username?.toLowerCase() === cleanCommenter ||
-              (event.commenterUserId && c.participant_id === event.commenterUserId)
-          );
-          conversationId = matchedConv?.id || event.commenterUserId || cleanCommenter;
+        let sent = false;
+
+        // 1. Try Instagram official Private Reply if triggered by a comment
+        if (event.postId && event.commentId) {
+          try {
+            await client.sendPrivateReply({
+              postId: event.postId,
+              commentId: event.commentId,
+              accountId: socialAccountId,
+              text: dmText.trim(),
+            });
+            dmStatus = "sent";
+            sent = true;
+          } catch (privateReplyErr) {
+            console.warn(
+              `[Instagram Automation] Private reply failed, falling back to conversation:`,
+              privateReplyErr
+            );
+          }
         }
 
-        await client.sendConversationMessage({
-          conversationId,
-          accountId: socialAccountId,
-          text: dmText.trim(),
-          recipientId: event.commenterUserId || cleanCommenter,
-        });
-        dmStatus = "sent";
+        // 2. Fallback to existing conversation thread if private reply didn't send
+        if (!sent) {
+          let conversationId = event.conversationId || "";
+          if (!conversationId) {
+            const convs = await client.listConversations(socialAccountId);
+            const matchedConv = (convs.data || []).find(
+              (c) =>
+                c.participant_name?.toLowerCase() === cleanCommenter ||
+                c.participant_username?.toLowerCase() === cleanCommenter ||
+                (event.commenterUserId && c.participant_id === event.commenterUserId)
+            );
+            if (matchedConv?.id) {
+              conversationId = matchedConv.id;
+            }
+          }
+
+          if (conversationId) {
+            await client.sendConversationMessage({
+              conversationId,
+              accountId: socialAccountId,
+              text: dmText.trim(),
+              recipientId: event.commenterUserId || cleanCommenter,
+            });
+            dmStatus = "sent";
+          } else {
+            dmStatus = "failed";
+          }
+        }
       } catch (err: unknown) {
         dmStatus = "failed";
+        console.error(`[Instagram Automation] DM send error:`, err);
         if (err instanceof SocialApiError && err.status === 401 && account) {
           db.prepare(
             "UPDATE accounts SET session_status = 'reauth_required', updated_at = ? WHERE username = ?"
@@ -417,6 +449,7 @@ export async function processIncomingDm(event: IncomingDmEvent): Promise<{
       incomingText: event.incomingText,
       instructions: dmRule.ai_prompt_instructions || "پاسخ مودبانه و دقیق به پیام مشتری بده",
       fallbackText: dmRule.direct_reply_text || "سلام! پیام شما دریافت شد، در خدمتتان هستیم 🙏",
+      mode: "dm",
     });
   }
 

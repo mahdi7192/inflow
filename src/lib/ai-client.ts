@@ -5,22 +5,24 @@ export interface AiConfig {
   apiKey: string;
   hasKey: boolean;
   model: string;
+  baseUrl?: string;
 }
 
 export function getAiConfig(): AiConfig {
   const db = getDb();
-  let provider = (process.env.AI_PROVIDER || "gemini").toLowerCase() as "gemini" | "openai";
+  let provider = (process.env.AI_PROVIDER || "openai").toLowerCase() as "gemini" | "openai";
   let apiKey =
     process.env.AI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
     process.env.OPENAI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
     "";
   let model = process.env.AI_MODEL || "";
+  let baseUrl = process.env.AI_BASE_URL || "";
 
   try {
     const rows = db
       .prepare(
-        "SELECT key, value FROM app_settings WHERE key IN ('ai_provider', 'ai_api_key', 'ai_model')"
+        "SELECT key, value FROM app_settings WHERE key IN ('ai_provider', 'ai_api_key', 'ai_model', 'ai_base_url')"
       )
       .all() as AppSettingRow[];
 
@@ -31,14 +33,21 @@ export function getAiConfig(): AiConfig {
         apiKey = r.value;
       } else if (r.key === "ai_model" && r.value) {
         model = r.value;
+      } else if (r.key === "ai_base_url" && r.value) {
+        baseUrl = r.value;
       }
     }
   } catch (err) {
     console.error("[AiClient] Error reading app_settings:", err);
   }
 
+  // Default to local 9Router gateway if using openai provider without explicit url
+  if (!baseUrl && provider === "openai") {
+    baseUrl = "http://127.0.0.1:20128/v1";
+  }
+
   if (!model) {
-    model = provider === "gemini" ? "gemini-1.5-flash" : "gpt-4o-mini";
+    model = provider === "gemini" ? "gemini-1.5-flash" : "ag/gemini-3.8-flash";
   }
 
   return {
@@ -46,6 +55,7 @@ export function getAiConfig(): AiConfig {
     apiKey,
     hasKey: Boolean(apiKey && apiKey.length > 5),
     model,
+    baseUrl,
   };
 }
 
@@ -53,6 +63,7 @@ export function saveAiConfig(params: {
   provider: "gemini" | "openai";
   apiKey?: string;
   model?: string;
+  baseUrl?: string;
 }): void {
   const db = getDb();
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -71,6 +82,9 @@ export function saveAiConfig(params: {
     if (params.model !== undefined && params.model.trim().length > 0) {
       upsert.run("ai_model", params.model.trim(), now);
     }
+    if (params.baseUrl !== undefined && params.baseUrl.trim().length > 0) {
+      upsert.run("ai_base_url", params.baseUrl.trim(), now);
+    }
   })();
 }
 
@@ -78,16 +92,17 @@ export async function testAiConnection(params: {
   provider: "gemini" | "openai";
   apiKey: string;
   model?: string;
+  baseUrl?: string;
 }): Promise<{ success: boolean; message: string }> {
-  const { provider, apiKey, model } = params;
-  const timeoutMs = 4500;
+  const { provider, apiKey, model, baseUrl } = params;
+  const timeoutMs = 6000;
 
   if (!apiKey || apiKey.trim().length < 8) {
     return { success: false, message: "کلید API نامعتبر است (طول کلید بسیار کوتاه است)." };
   }
 
   const selectedModel =
-    model || (provider === "gemini" ? "gemini-1.5-flash" : "gpt-4o-mini");
+    model || (provider === "gemini" ? "gemini-1.5-flash" : "ag/gemini-3.8-flash");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -113,7 +128,8 @@ export async function testAiConnection(params: {
       }
       return { success: true, message: "اتصال به Gemini با موفقیت برقرار شد." };
     } else {
-      const url = "https://api.openai.com/v1/chat/completions";
+      const base = (baseUrl || process.env.AI_BASE_URL || "http://127.0.0.1:20128/v1").replace(/\/+$/, "");
+      const url = `${base}/chat/completions`;
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -124,6 +140,7 @@ export async function testAiConnection(params: {
           model: selectedModel,
           messages: [{ role: "user", content: "Ping test. Respond with OK." }],
           max_tokens: 5,
+          stream: false,
         }),
         signal: controller.signal,
       });
@@ -135,11 +152,11 @@ export async function testAiConnection(params: {
           message: errData.error?.message || `خطای OpenAI API (کد ${res.status})`,
         };
       }
-      return { success: true, message: "اتصال به OpenAI با موفقیت برقرار شد." };
+      return { success: true, message: "اتصال به مدل هوش مصنوعی با موفقیت برقرار شد." };
     }
   } catch (err: unknown) {
     if ((err as Error).name === "AbortError") {
-      return { success: false, message: "مهلت زمانی اتصال به هوش مصنوعی (۴.۵ ثانیه) پایان یافت." };
+      return { success: false, message: "مهلت زمانی اتصال به هوش مصنوعی (۶ ثانیه) پایان یافت." };
     }
     return { success: false, message: (err as Error).message || "خطا در اتصال به API" };
   } finally {
@@ -148,14 +165,17 @@ export async function testAiConnection(params: {
 }
 
 /**
- * Direct LLM Completion Helper (4.5s hard timeout)
+ * Direct LLM Completion Helper (8s hard timeout)
  */
 async function callLlmCompletion(systemPrompt: string, userPrompt: string): Promise<string | null> {
   const config = getAiConfig();
-  if (!config.hasKey) return null;
+  if (!config.hasKey) {
+    console.warn("[AiClient] No AI API key configured.");
+    return null;
+  }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4500);
+  const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
     if (config.provider === "gemini") {
@@ -170,19 +190,23 @@ async function callLlmCompletion(systemPrompt: string, userPrompt: string): Prom
             },
           ],
           generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 250,
+            temperature: 0.4,
+            maxOutputTokens: 350,
           },
         }),
         signal: controller.signal,
       });
 
-      if (!res.ok) return null;
+      if (!res.ok) {
+        console.error(`[AiClient] Gemini returned HTTP ${res.status}`);
+        return null;
+      }
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       return typeof text === "string" ? text.trim() : null;
     } else {
-      const url = "https://api.openai.com/v1/chat/completions";
+      const base = (config.baseUrl || "http://127.0.0.1:20128/v1").replace(/\/+$/, "");
+      const url = `${base}/chat/completions`;
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -190,23 +214,29 @@ async function callLlmCompletion(systemPrompt: string, userPrompt: string): Prom
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify({
-          model: config.model,
+          model: config.model || "ag/gemini-3.8-flash",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.3,
-          max_tokens: 250,
+          temperature: 0.4,
+          max_tokens: 350,
+          stream: false,
         }),
         signal: controller.signal,
       });
 
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        console.error(`[AiClient] LLM API returned HTTP ${res.status}: ${errBody.slice(0, 150)}`);
+        return null;
+      }
       const data = await res.json();
       const text = data?.choices?.[0]?.message?.content;
       return typeof text === "string" ? text.trim() : null;
     }
-  } catch {
+  } catch (err: unknown) {
+    console.error("[AiClient] LLM call error:", (err as Error).message);
     return null;
   } finally {
     clearTimeout(timeout);
@@ -233,21 +263,74 @@ export async function evaluateTriggerWithAi(params: {
   return result.toUpperCase().includes("YES");
 }
 
-/**
- * Generate a contextual Persian/multilingual reply for a comment or DM using AI instructions
- */
-export async function generateContextualReplyWithAi(params: {
+export interface GenerateReplyParams {
   caption: string;
   username: string;
   incomingText: string;
   instructions: string;
   fallbackText: string;
-}): Promise<string> {
-  const sys =
-    "You are a polite, helpful Instagram page assistant. Write a concise, natural, and direct response following the operator instructions. Output ONLY the final reply message without quotes.";
-  const usr = `Post Context: ${params.caption || "N/A"}\nCustomer (@${params.username}) wrote: "${params.incomingText}"\nOperator Instructions: ${params.instructions}\n\nReply:`;
+  mode?: "comment" | "dm";
+}
+
+/**
+ * Generate a contextual Persian/multilingual reply for a comment or DM using AI instructions.
+ * Carefully injects commenter username, incoming comment text, post caption, and admin instructions.
+ */
+export async function generateContextualReplyWithAi(params: GenerateReplyParams): Promise<string> {
+  const isDm = params.mode === "dm";
+  const userHandle = params.username ? `@${params.username.replace(/^@/, "")}` : "کاربر";
+
+  let sys: string;
+  let usr: string;
+
+  if (isDm) {
+    sys = `شما دستیار هوشمند و رسمی پیج اینستاگرام هستید.
+وظیفه شما این است که یک پیام خصوصی در دایرکت به کاربری که زیر پست اینستاگرام کامنت گذاشته، ارسال کنید.
+قوانین الزامی:
+۱. نام کاربری مخاطب در اینستاگرام ${userHandle} است؛ در شروع پیام با سلام محترمانه و لحن دوستانه و طبیعی به زبان فارسی خطابش قرار دهید.
+۲. با توجه به متنی که کاربر در کامنت گذاشته و موضوع پست، دقیقاً به سوال یا نیاز او پاسخ بدهید یا راهنمایی لازم را ارائه کنید.
+۳. دستورالعمل ادمین پیج را کاملاً در پیام لحاظ کنید.
+۴. پیام باید روان، خوانا، بدون زیاده‌گویی و کاملاً آماده ارسال باشد.
+۵. خروجی فقط و فقط متن نهایی پیام دایرکت باشد؛ بدون هیچ توضیح اضافی، بدون پیشوند و بدون گیومه.`;
+
+    usr = `[مشخصات پست اینستاگرام]
+کپشن و موضوع پست: ${params.caption || "ندارد"}
+
+[مشخصات کاربر و کامنت دریافتی]
+نام کاربری مخاطب: ${userHandle}
+متن کامنتی که کاربر در پست گذاشته بود: "${params.incomingText}"
+
+[دستورالعمل ادمین برای متن دایرکت]
+${params.instructions || "سلام کن و بر اساس کامنت کاربر، راهنمایی کامل و صمیمی در دایرکت ارائه بده."}
+
+متن پیام دایرکت:`;
+  } else {
+    sys = `شما ادمین حرفه‌ای و صمیمی یک پیج اینستاگرام هستید.
+وظیفه شما ثبت یک پاسخ عمومی کوتاه، جذاب و محترمانه زیر کامنت کاربر در پست اینستاگرام است.
+قوانین الزامی:
+۱. نام کاربری مخاطب ${userHandle} است. می‌توانید او را منشن کنید یا با لحنی صمیمی پاسخش را بدهید.
+۲. پاسخ شما باید ۱ تا ۲ جمله کوتاه، فارسی، پرانرژی و متناسب با متن کامنت کاربر باشد.
+۳. دستورالعمل ادمین پیج را دقیقاً رعایت کنید.
+۴. خروجی فقط و فقط متن نهایی پاسخ کامنت باشد؛ بدون هیچ توضیح اضافی، بدون پیشوند و بدون گیومه.`;
+
+    usr = `[مشخصات پست اینستاگرام]
+کپشن و موضوع پست: ${params.caption || "ندارد"}
+
+[مشخصات کاربر و کامنت دریافتی]
+نام کاربری مخاطب: ${userHandle}
+متن کامنت کاربر: "${params.incomingText}"
+
+[دستورالعمل ادمین برای پاسخ کامنت]
+${params.instructions || "یک پاسخ کوتاه، محترمانه و پرانرژی بنویس و از همراهی او تشکر کن."}
+
+متن پاسخ کامنت:`;
+  }
 
   const generated = await callLlmCompletion(sys, usr);
-  return generated || params.fallbackText || "پاسخ خدمتتان ارسال شد 🙏";
+  if (generated && generated.length > 0) {
+    return generated.replace(/^["'«]+|["'»]+$/g, "").trim();
+  }
+
+  return params.fallbackText || (isDm ? "سلام! در خدمت شما هستیم 🙏" : "پاسخ خدمتتان ارسال شد 🙏");
 }
 

@@ -18,6 +18,7 @@ export async function GET() {
     success: true,
     provider: config.provider,
     model: config.model,
+    baseUrl: config.baseUrl,
     hasKey: config.hasKey,
     maskedKey,
   });
@@ -31,15 +32,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { action, provider, apiKey, model } = body;
+    const { action, provider, apiKey, model, baseUrl } = body;
 
     if (action === "test") {
       const activeKey =
         apiKey && apiKey.trim().length > 0 ? apiKey : getAiConfig().apiKey;
       const result = await testAiConnection({
-        provider: provider || "gemini",
+        provider: provider || "openai",
         apiKey: activeKey,
         model,
+        baseUrl,
       });
       return NextResponse.json(result);
     }
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
         provider,
         apiKey: apiKey?.trim() || undefined,
         model: model?.trim() || undefined,
+        baseUrl: baseUrl?.trim() || undefined,
       });
 
       return NextResponse.json({
