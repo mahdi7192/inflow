@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, saveAppLanguage, PostRow } from "@/lib/db";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
+import { getPlaybookById } from "@/lib/playbooks";
 
 export async function GET(
   _req: NextRequest,
@@ -94,20 +95,55 @@ async function handleUpdate(
           : 0
         : existing.auto_reply;
 
-    const triggerType = body.trigger_type ?? existing.trigger_type;
-    const triggerContext = body.trigger_context ?? existing.trigger_context;
+    const playbookId =
+      typeof body.playbook_id === "string"
+        ? body.playbook_id.trim() || "custom"
+        : existing.playbook_id || "custom";
+    const preset = getPlaybookById(playbookId);
+
+    const cheatSheet =
+      typeof body.cheat_sheet === "string"
+        ? body.cheat_sheet
+        : existing.cheat_sheet || "";
+    const targetUrl =
+      typeof body.target_url === "string"
+        ? body.target_url.trim()
+        : existing.target_url || "";
+    const smartModeration =
+      body.smart_moderation !== undefined
+        ? body.smart_moderation
+          ? 1
+          : 0
+        : existing.smart_moderation || 0;
+
+    const triggerType =
+      body.trigger_type ?? preset?.defaults.trigger_type ?? existing.trigger_type;
+    const triggerContext =
+      body.trigger_context ?? preset?.defaults.trigger_context ?? existing.trigger_context;
     const triggerKeywords = body.trigger_keywords ?? existing.trigger_keywords;
     const commentActionType =
-      body.comment_action_type ?? existing.comment_action_type;
+      body.comment_action_type ??
+      preset?.defaults.comment_action_type ??
+      existing.comment_action_type;
     const commentActionText =
-      body.comment_action_text ?? existing.comment_action_text;
-    const dmActionType = body.dm_action_type ?? existing.dm_action_type;
-    const dmActionText = body.dm_action_text ?? existing.dm_action_text;
+      body.comment_action_text ??
+      preset?.defaults.comment_action_text ??
+      existing.comment_action_text;
+    const dmActionType =
+      body.dm_action_type ??
+      preset?.defaults.dm_action_type ??
+      existing.dm_action_type;
+    const dmActionText =
+      body.dm_action_text ??
+      preset?.defaults.dm_action_text ??
+      existing.dm_action_text;
     const dmRequireFollow =
       body.dm_require_follow !== undefined
         ? body.dm_require_follow
           ? 1
           : 0
+        : preset !== undefined && body.apply_playbook_defaults
+        ? preset.defaults.dm_require_follow
         : existing.dm_require_follow;
 
     const appLanguage =
@@ -118,6 +154,11 @@ async function handleUpdate(
     if (body.app_language) {
       saveAppLanguage(appLanguage, existing.account_username);
     }
+
+    const automationEnabledAt =
+      autoReply === 1 && existing.auto_reply === 0
+        ? now
+        : existing.automation_enabled_at || (autoReply === 1 ? now : null);
 
     db.prepare(`
       UPDATE posts SET
@@ -130,6 +171,11 @@ async function handleUpdate(
         dm_action_type = @dm_action_type,
         dm_action_text = @dm_action_text,
         dm_require_follow = @dm_require_follow,
+        playbook_id = @playbook_id,
+        cheat_sheet = @cheat_sheet,
+        target_url = @target_url,
+        smart_moderation = @smart_moderation,
+        automation_enabled_at = @automation_enabled_at,
         app_language = @app_language,
         updated_at = @updated_at
       WHERE shortcode = @shortcode
@@ -144,6 +190,11 @@ async function handleUpdate(
       dm_action_type: dmActionType,
       dm_action_text: dmActionText,
       dm_require_follow: dmRequireFollow,
+      playbook_id: playbookId,
+      cheat_sheet: cheatSheet,
+      target_url: targetUrl,
+      smart_moderation: smartModeration,
+      automation_enabled_at: automationEnabledAt,
       app_language: appLanguage,
       updated_at: now,
     });

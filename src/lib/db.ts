@@ -59,6 +59,10 @@ export interface AccountRow {
   bot_vnc_token?: string | null;
   bot_vnc_expires_at?: string | null;
   bot_last_error?: string | null;
+  account_persona?: "business" | "creator";
+  brand_cheat_sheet?: string;
+  website_url?: string;
+  insights_json?: string | null;
   updated_at: string;
   created_at: string;
 }
@@ -128,6 +132,11 @@ export interface PostRow {
   dm_action_type: "none" | "direct" | "ai";
   dm_action_text: string;
   dm_require_follow: number; // 0 or 1
+  playbook_id?: string;
+  cheat_sheet?: string;
+  target_url?: string;
+  smart_moderation?: number; // 0 or 1
+  metrics_json?: string | null;
   app_language?: "fa" | "en" | "ar";
   automation_enabled_at?: string | null;
   synced_at: string;
@@ -192,6 +201,7 @@ export interface DMLogRow {
   reply_text: string;
   tools_invoked: string | null; // JSON array string
   error_details: string | null;
+  read_at?: string | null;
   processed_at: string;
   created_at: string;
 }
@@ -418,6 +428,35 @@ function migrateSchema(db: Database.Database) {
   if (!postCols.includes("app_language")) {
     db.exec("ALTER TABLE posts ADD COLUMN app_language TEXT NOT NULL DEFAULT 'fa'");
   }
+  if (!postCols.includes("playbook_id")) {
+    db.exec("ALTER TABLE posts ADD COLUMN playbook_id TEXT NOT NULL DEFAULT 'custom'");
+  }
+  if (!postCols.includes("cheat_sheet")) {
+    db.exec("ALTER TABLE posts ADD COLUMN cheat_sheet TEXT NOT NULL DEFAULT ''");
+  }
+  if (!postCols.includes("target_url")) {
+    db.exec("ALTER TABLE posts ADD COLUMN target_url TEXT NOT NULL DEFAULT ''");
+  }
+  if (!postCols.includes("smart_moderation")) {
+    db.exec("ALTER TABLE posts ADD COLUMN smart_moderation INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!postCols.includes("metrics_json")) {
+    db.exec("ALTER TABLE posts ADD COLUMN metrics_json TEXT DEFAULT NULL");
+  }
+
+  const accountSpec018Cols = (db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[]).map(c => c.name);
+  if (!accountSpec018Cols.includes("account_persona")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN account_persona TEXT NOT NULL DEFAULT 'business'");
+  }
+  if (!accountSpec018Cols.includes("brand_cheat_sheet")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN brand_cheat_sheet TEXT NOT NULL DEFAULT ''");
+  }
+  if (!accountSpec018Cols.includes("website_url")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN website_url TEXT NOT NULL DEFAULT ''");
+  }
+  if (!accountSpec018Cols.includes("insights_json")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN insights_json TEXT DEFAULT NULL");
+  }
 
   const commentLogCols = (db.prepare("PRAGMA table_info(comment_logs)").all() as { name: string }[]).map(c => c.name);
   if (!commentLogCols.includes("author_full_name")) {
@@ -427,6 +466,9 @@ function migrateSchema(db: Database.Database) {
   const dmLogCols = (db.prepare("PRAGMA table_info(dm_logs)").all() as { name: string }[]).map(c => c.name);
   if (!dmLogCols.includes("sender_full_name")) {
     db.exec("ALTER TABLE dm_logs ADD COLUMN sender_full_name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!dmLogCols.includes("read_at")) {
+    db.exec("ALTER TABLE dm_logs ADD COLUMN read_at TEXT DEFAULT NULL");
   }
 
   // Ensure incoming_events & action_queue tables and columns exist

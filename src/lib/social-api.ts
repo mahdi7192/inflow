@@ -718,6 +718,62 @@ export class SocialApiClient {
     }>("/v1/webhooks");
     return { data: Array.isArray(res.data) ? res.data : [] };
   }
+
+  // ============================================================================
+  // 7. Zero-Credit Instagram Insights, Deep Post Metrics & Active Stories (Spec 018)
+  // ============================================================================
+
+  /**
+   * Get Instagram account summary insights (`GET /v1/platforms/instagram/accounts/{id}/summary`)
+   * Cost: 0 credits
+   */
+  async getInstagramAccountSummary(accountId: string): Promise<Record<string, unknown> | null> {
+    if (!accountId) return null;
+    try {
+      const res = await this.request<{ data?: Record<string, unknown> } & Record<string, unknown>>(
+        `/v1/platforms/instagram/accounts/${encodeURIComponent(accountId)}/summary`
+      );
+      return (res && typeof res.data === "object" && res.data ? res.data : res) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get deep post/reel metrics (`GET /v1/posts/{id}/metrics`)
+   * Returns `views`, `reach`, `likes`, `comments`, `shares`, `saves`, `follows`, `skip_rate`, `avg_watch_time_ms`
+   * Cost: 0 credits
+   */
+  async getPostDeepMetrics(postId: string): Promise<Record<string, unknown> | null> {
+    if (!postId) return null;
+    try {
+      const res = await this.request<{ data?: Record<string, unknown> } & Record<string, unknown>>(
+        `/v1/posts/${encodeURIComponent(postId)}/metrics`
+      );
+      return (res && typeof res.data === "object" && res.data ? res.data : res) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * List active 24-hour Instagram stories (`GET /v1/platforms/instagram/accounts/{id}/stories`)
+   * Cost: 0 credits
+   */
+  async listActiveInstagramStories(accountId: string): Promise<Array<Record<string, unknown>>> {
+    if (!accountId) return [];
+    try {
+      const res = await this.request<{
+        data?: Array<Record<string, unknown>>;
+        stories?: Array<Record<string, unknown>>;
+      }>(`/v1/platforms/instagram/accounts/${encodeURIComponent(accountId)}/stories`);
+      if (Array.isArray(res.data)) return res.data;
+      if (Array.isArray(res.stories)) return res.stories;
+      return [];
+    } catch {
+      return [];
+    }
+  }
 }
 
 /**

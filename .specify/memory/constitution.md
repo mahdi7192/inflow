@@ -78,9 +78,10 @@ No direct, unplanned code modifications are permitted for new features or struct
   2. Provision Instagram pages, link/sync SocialAPI `account_id`s, and assign pages to users.
   3. Centrally manage SocialAPI.ai credentials (`social_api_key`, `social_webhook_secret`) and AI provider credentials (`ai_api_key`).
 
-### X. Unified Design System, shadcn/ui Light Mode & Persistent App Shell (NON-NEGOTIABLE)
-* All UI components across inFlow MUST strictly use or extend standardized `shadcn/ui` primitives located in `src/components/ui/`.
-* **Canonical Light Mode Standard**: inFlow strictly uses **shadcn/ui Light Mode** (`#ffffff` surfaces, `#fafafa` canvas, `#e4e4e7` zinc borders, `#18181b` primary elements).
+### X. Unified Studio Design System (`DESIGN.md`), Dual-Persona Architecture & Persistent App Shell (NON-NEGOTIABLE)
+* All UI components across inFlow MUST strictly follow `/DESIGN.md` and `/docs/design-system.md` and extend standardized `shadcn/ui` primitives located in `src/components/ui/`.
+* **Canonical Studio Light Theme**: inFlow strictly uses the **inFlow Studio** light palette (`#F8FAFC` Alabaster canvas, `#FFFFFF` pure white surfaces, `#E2E8F0` hairline borders, `#09090B` primary ink, `--persona-business: #4F46E5` for Business/Stores, `--persona-creator: #E11D48` for Creators/Influencers, `--status-active: #059669` for live Autopilot).
+* **Zero-Config Playbooks & Supplemental Cheat Sheet Law**: Post and DM automations MUST prioritize 1-Click Playbooks (`src/lib/playbooks.ts`), Slide-Over Context Drawers (`src/components/post-playbook-drawer.tsx`), and the Supplemental Cheat Sheet (`cheat_sheet` — اطلاعات مکمل خارج از کپشن) bridged across both public comments and DM conversations.
 * **Persistent Workspace App Shell (`WorkspaceShell`)**: All account workspace routes (`/@[account]/*`) render within `src/app/[account]/layout.tsx` without remounting on sub-page navigation.
 
 ### XI. OAuth Account Connection Lifecycle (NON-NEGOTIABLE)

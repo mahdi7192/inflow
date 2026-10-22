@@ -288,6 +288,33 @@ export async function ingestWebhookPayload(
 
   const normalized = provider.parseWebhookEvent(rawBody);
   if (!normalized) {
+    // Handle `dm.status.read` read-receipt webhook events (Spec 018)
+    try {
+      const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+      if (parsed && parsed.event === "dm.status.read") {
+        const data = (parsed.data || {}) as Record<string, unknown>;
+        const convId = String(data.conversation_id || "");
+        const senderId = String(data.sender_id || data.recipient_id || "");
+        const db = getDb();
+        if (convId) {
+          db.prepare(
+            "UPDATE dm_logs SET read_at = ? WHERE thread_id = ? AND read_at IS NULL"
+          ).run(nowTimestamp(), convId);
+        } else if (senderId) {
+          db.prepare(
+            "UPDATE dm_logs SET read_at = ? WHERE sender_id = ? AND read_at IS NULL"
+          ).run(nowTimestamp(), senderId);
+        }
+        return {
+          authorized: true,
+          received: true,
+          event: "dm.status.read",
+          processed: true,
+        };
+      }
+    } catch {
+      // ignore non-JSON
+    }
     return {
       authorized: true,
       received: true,

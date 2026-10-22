@@ -18,6 +18,13 @@ import {
   Loader2,
   Trash2,
   RotateCw,
+  Eye,
+  FileText,
+  ShieldCheck,
+  Zap,
+  Flame,
+  CheckCircle2,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
@@ -30,6 +37,8 @@ import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 import { EmptyTenancyView } from "./empty-tenancy-view";
 import { PostDetailView } from "./post-detail-view";
+import { PostPlaybookDrawer, type DrawerPostData } from "./post-playbook-drawer";
+import { getPlaybookById, type AccountPersona } from "@/lib/playbooks";
 import { LogsModal } from "./modals/logs-modal";
 import { AccountLoginDialog } from "@/components/auth/account-login-dialog";
 import { DeleteAccountModal } from "./modals/delete-account-modal";
@@ -111,11 +120,43 @@ export function InflowDashboard({
     initialSelectedShortcode || null
   );
 
-  // Modals
+  // Modals & Slide-Over Playbook Drawer (Spec 018)
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
+  const [drawerShortcode, setDrawerShortcode] = useState<string | null>(null);
   const [agentApiOpen, setAgentApiOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+
+  // Spec 018: Persona, Brand Cheat Sheet & Live SocialAPI Insights
+  const [accountPersona, setAccountPersona] = useState<AccountPersona>(
+    (initialProfile?.account_persona as AccountPersona) || "business"
+  );
+  const [brandCheatSheet, setBrandCheatSheet] = useState<string>(
+    initialProfile?.brand_cheat_sheet || ""
+  );
+  const [websiteUrl, setWebsiteUrl] = useState<string>(
+    initialProfile?.website_url || ""
+  );
+  const [brandSheetOpen, setBrandSheetOpen] = useState(false);
+  const [savingBrandSheet, setSavingBrandSheet] = useState(false);
+  const [liveInsights, setLiveInsights] = useState<{
+    funnel?: {
+      views: number;
+      reach: number;
+      saves: number;
+      shares: number;
+      avg_skip_rate: number | null;
+      total_comments: number;
+      comment_replies_sent: number;
+      total_dms_sent: number;
+      dms_read: number;
+      story_replies: number;
+      follows_gained: number;
+      pending_follow: number;
+    };
+    stories?: Array<Record<string, unknown>>;
+    post_metrics?: Record<string, Record<string, unknown>>;
+  } | null>(null);
 
   const handleAccountDeleted = () => {
     setDeleteAccountOpen(false);
@@ -375,6 +416,99 @@ export function InflowDashboard({
     return posts.find((p) => p.shortcode === logsShortcode) || null;
   }, [posts, logsShortcode]);
 
+  // Selected post for Slide-Over Playbook Drawer (Spec 018)
+  const activeDrawerPost = useMemo(() => {
+    return (posts.find((p) => p.shortcode === drawerShortcode) as unknown as DrawerPostData) || null;
+  }, [posts, drawerShortcode]);
+
+  // Sync Persona & Brand Cheat Sheet when profile changes
+  useEffect(() => {
+    if (profile) {
+      if (profile.account_persona === "creator" || profile.account_persona === "business") {
+        setAccountPersona(profile.account_persona);
+      }
+      if (typeof profile.brand_cheat_sheet === "string") {
+        setBrandCheatSheet(profile.brand_cheat_sheet);
+      }
+      if (typeof profile.website_url === "string") {
+        setWebsiteUrl(profile.website_url);
+      }
+    }
+  }, [profile]);
+
+  // Fetch Zero-Credit SocialAPI Insights & ROI Funnel (Spec 018)
+  const fetchLiveInsights = useCallback(async (account: string, force = false) => {
+    if (!account) return;
+    try {
+      const res = await fetch(
+        `/api/accounts/${encodeURIComponent(account)}/insights${force ? "?refresh=1" : ""}`
+      );
+      const data = await res.json();
+      if (data.success) {
+        setLiveInsights({
+          funnel: data.funnel,
+          stories: data.stories || [],
+          post_metrics: data.post_metrics || {},
+        });
+        if (data.account) {
+          setAccountPersona(data.account.account_persona || "business");
+          setBrandCheatSheet(data.account.brand_cheat_sheet || "");
+          setWebsiteUrl(data.account.website_url || "");
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentAccount) {
+      fetchLiveInsights(currentAccount, false);
+    }
+  }, [currentAccount, fetchLiveInsights]);
+
+  const handleSwitchPersona = async (nextPersona: AccountPersona) => {
+    setAccountPersona(nextPersona);
+    if (!currentAccount) return;
+    try {
+      await fetch(`/api/accounts/${encodeURIComponent(currentAccount)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_persona: nextPersona }),
+      });
+      toast.success(
+        nextPersona === "creator"
+          ? "حالت استودیو روی «کریتور و بلاگر» تنظیم شد 🎥"
+          : "حالت استودیو روی «فروشگاه و بیزینس» تنظیم شد 🛍️"
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveBrandCheatSheet = async () => {
+    if (!currentAccount) return;
+    setSavingBrandSheet(true);
+    try {
+      const res = await fetch(`/api/accounts/${encodeURIComponent(currentAccount)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_persona: accountPersona,
+          brand_cheat_sheet: brandCheatSheet,
+          website_url: websiteUrl,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("تقلب‌نامه کلی پیج و لینک سایت ذخیره شد ✓");
+        setBrandSheetOpen(false);
+      }
+    } finally {
+      setSavingBrandSheet(false);
+    }
+  };
+
   // Metrics
   const activeCount = posts.filter((p) => p.auto_reply === 1).length;
   const configuredCount = posts.filter(
@@ -382,6 +516,8 @@ export function InflowDashboard({
       p.auto_reply === 1 &&
       (p.comment_action_type !== "none" || p.dm_action_type !== "none")
   ).length;
+  const cheatSheetCount = posts.filter((p) => (p.cheat_sheet || "").trim().length > 0).length;
+  const isCreatorPersona = accountPersona === "creator";
 
   if (embeddedInShell) {
     return (
@@ -400,46 +536,107 @@ export function InflowDashboard({
           />
         ) : (
           <div className="space-y-6">
-            {/* Account Meta & KPI Metrics Strip */}
-            <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+            {/* Studio Account Command Bar, Adaptive Persona Switcher & True ROI Funnel (Spec 018) */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-5 space-y-5 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
                   {profile?.avatar_url ? (
                     <img
                       src={profile.avatar_url}
                       alt={profile.display_name || currentAccount}
-                      className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
+                      className="w-13 h-13 rounded-2xl object-cover border border-slate-200 bg-slate-100"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = "none";
                       }}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-bold font-mono text-muted-foreground shrink-0">
+                    <div className="w-13 h-13 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-sm font-bold font-mono text-slate-600 shrink-0">
                       {(currentAccount || "IN").slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div>
-                    <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <span>{profile?.display_name || currentAccount}</span>
-                      <span className="text-xs font-mono text-muted-foreground font-normal">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-base font-bold text-slate-900">
+                        {profile?.display_name || currentAccount}
+                      </h1>
+                      <span className="text-xs font-mono text-slate-500">
                         <bdi>@{currentAccount}</bdi>
                       </span>
-                    </h1>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                      {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
+                      <span
+                        className={cn(
+                          "text-[11px] font-bold px-2.5 py-0.5 rounded-full",
+                          isCreatorPersona
+                            ? "bg-rose-50 text-rose-700 border border-rose-200"
+                            : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                        )}
+                      >
+                        {isCreatorPersona ? "🎥 استودیو کریتور" : "🛍️ استودیو فروشگاه"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-1">
+                      {profile?.bio || "سیستم‌عامل هوشمند تبدیل کامنت و دایرکت به فروش و فالوور"}
                     </p>
                   </div>
                 </div>
 
-                {/* Account Actions: Sync & Delete */}
-                <div className="flex items-center gap-2">
+                {/* Adaptive Persona Switcher + Brand Cheat Sheet + Sync */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Dual-Persona Switcher */}
+                  <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchPersona("business")}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                        !isCreatorPersona
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      🛍️ فروشگاه و بیزینس
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchPersona("creator")}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                        isCreatorPersona
+                          ? "bg-rose-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      🎥 کریتور و بلاگر
+                    </button>
+                  </div>
+
+                  {/* Brand Cheat Sheet Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setBrandSheetOpen(!brandSheetOpen)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                      brandCheatSheet.trim()
+                        ? "border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100/70"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>تقلب‌نامه کلی پیج</span>
+                    {brandCheatSheet.trim() && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={syncing}
-                    onClick={handleSync}
-                    className="text-xs gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={() => {
+                      handleSync();
+                      fetchLiveInsights(currentAccount, true);
+                    }}
+                    className="text-xs gap-1.5 rounded-xl cursor-pointer shadow-2xs"
                   >
                     <RotateCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
                     <span>{syncing ? t("syncing") : t("navSync")}</span>
@@ -449,51 +646,181 @@ export function InflowDashboard({
                     type="button"
                     onClick={() => setDeleteAccountOpen(true)}
                     title="حذف حساب از سامانه"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-destructive text-xs font-medium transition-colors cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-100/60 text-red-600 text-xs font-medium transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف پیج</span>
                   </button>
                 </div>
               </div>
 
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("totalPosts")}</div>
-                  <div className="text-xl font-bold font-mono text-foreground mt-1">
-                    {posts.length}
+              {/* Collapsible Account-Level Brand Cheat Sheet Drawer */}
+              {brandSheetOpen && (
+                <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/30 p-4 space-y-3 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span>
+                          تقلب‌نامه و حافظه کلی پیج (مشترک برای تمام پست‌ها و چت‌های دایرکت)
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        اطلاعات ثابتی که در کپشن‌ها نمی‌نویسید (مثل هزینه و زمان ارسال، شرایط تعویض، آدرس، لینک سایت یا معرفی خودتان) را یک بار اینجا بنویسید تا دستیار هوش مصنوعی همیشه بداند.
+                      </p>
+                    </div>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={brandCheatSheet}
+                    onChange={(e) => setBrandCheatSheet(e.target.value)}
+                    placeholder={
+                      isCreatorPersona
+                        ? "مثال: من مهدی هستم، تولیدکننده محتوای تکنولوژی و هوش مصنوعی. لحن پاسخگویی باید صمیمی و پرانرژی باشد. لینک کانال تلگرام و یوتیوب در بایو هست..."
+                        : "مثال: ارسال به سراسر ایران با پست پیشتاز (۶۵ هزار تومان، بالای ۲ میلیون رایگان) | تحویل تهران با پیک | امکان تعویض سایز تا ۴۸ ساعت..."
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 flex-1">
+                      <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={websiteUrl}
+                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                        placeholder="https://your-site.ir (وب‌سایت یا لینک اصلی پیج)"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-mono text-slate-800"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setBrandSheetOpen(false)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200/50"
+                      >
+                        بستن
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingBrandSheet}
+                        onClick={handleSaveBrandCheatSheet}
+                        className="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                      >
+                        {savingBrandSheet ? "در حال ذخیره..." : "ذخیره حافظه کلی پیج"}
+                      </button>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("activeAutomations")}</div>
-                  <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
-                    {activeCount}
+              {/* 4-Stage True Revenue & Engagement Funnel Strip */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-medium">۱. ویو و ریچ محتوا</span>
+                    <Eye className="w-4 h-4 text-slate-400" />
                   </div>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("configuredRules")}</div>
-                  <div className="text-xl font-bold font-mono text-amber-700 mt-1">
-                    {configuredCount}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("totalActions")}</div>
-                  <div className="text-xl font-bold font-mono text-sky-700 mt-1">
-                    {posts.reduce(
-                      (acc, p) =>
-                        acc +
-                        Number(
-                          (p as unknown as { logs_count: number }).logs_count || 0
-                        ),
-                      0
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-xl font-bold font-mono tabular-nums text-slate-900">
+                      {(liveInsights?.funnel?.views || 0).toLocaleString("fa-IR")}
+                    </span>
+                    {liveInsights?.funnel?.avg_skip_rate ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        پرش ریلز: %{liveInsights.funnel.avg_skip_rate}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-500">
+                        ریچ: {(liveInsights?.funnel?.reach || 0).toLocaleString("fa-IR")}
+                      </span>
                     )}
                   </div>
                 </div>
+
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-medium">۲. کامنت و پاسخ عمومی</span>
+                    <MessageSquare className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-xl font-bold font-mono tabular-nums text-slate-900">
+                      {(
+                        liveInsights?.funnel?.total_comments ??
+                        posts.reduce(
+                          (acc, p) =>
+                            acc + Number((p as unknown as { logs_count: number }).logs_count || 0),
+                          0
+                        )
+                      ).toLocaleString("fa-IR")}
+                    </span>
+                    <span className="text-[11px] text-emerald-700 font-medium">
+                      {(liveInsights?.funnel?.comment_replies_sent || 0).toLocaleString("fa-IR")} پاسخ ارسالی
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-medium">۳. دایرکت و نرخ سین (Read)</span>
+                    <Send className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-xl font-bold font-mono tabular-nums text-emerald-700">
+                      {(liveInsights?.funnel?.total_dms_sent || 0).toLocaleString("fa-IR")}
+                    </span>
+                    <span className="text-[11px] text-slate-600 font-medium">
+                      {(liveInsights?.funnel?.dms_read || 0).toLocaleString("fa-IR")} خوانده‌شده ✓✓
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-medium">۴. فالوور جذب‌شده و خلبان</span>
+                    <UserCheck className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-xl font-bold font-mono tabular-nums text-rose-600">
+                      +{(liveInsights?.funnel?.follows_gained || 0).toLocaleString("fa-IR")}
+                    </span>
+                    <span className="text-[11px] text-slate-600 font-medium">
+                      {activeCount} پست فعال ({cheatSheetCount} تقلب‌نامه)
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* Active 24h Stories Strip (if account has live stories) */}
+              {liveInsights?.stories && liveInsights.stories.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-3 overflow-x-auto">
+                  <span className="text-[11px] font-bold text-rose-600 shrink-0 flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5" />
+                    استوری‌های زنده ۲۴ ساعت اخیر ({liveInsights.stories.length}):
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {liveInsights.stories.slice(0, 8).map((st, idx) => {
+                      const thumb = String(st.thumbnail_url || st.media_url || "");
+                      return (
+                        <div
+                          key={String(st.id || idx)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50/70 border border-rose-200 text-[11px] text-rose-900 shrink-0"
+                        >
+                          {thumb && (
+                            <img
+                              src={thumb}
+                              alt=""
+                              className="w-4 h-4 rounded-full object-cover"
+                            />
+                          )}
+                          <span>استوری #{idx + 1}</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold">
+                            پاسخگوی خودکار فعال
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Search, Filter Tabs & View Mode Toolbar */}
@@ -648,64 +975,158 @@ export function InflowDashboard({
               <div className="space-y-3">
                 {filteredPosts.map((post) => {
                   const isActive = post.auto_reply === 1;
+                  const pbPreset = getPlaybookById(post.playbook_id);
+                  const hasCheatSheet = Boolean((post.cheat_sheet || "").trim());
+                  const hasTargetUrl = Boolean((post.target_url || "").trim());
+                  const pMetrics =
+                    liveInsights?.post_metrics?.[post.shortcode] ||
+                    (() => {
+                      if (!post.metrics_json) return {};
+                      try {
+                        return JSON.parse(post.metrics_json);
+                      } catch {
+                        return {};
+                      }
+                    })();
+                  const pViews = Number(pMetrics.views || pMetrics.plays || 0);
+                  const pFollows = Number(pMetrics.follows || 0);
+                  const pLogsCount = Number(
+                    (post as unknown as { logs_count?: number }).logs_count || 0
+                  );
+                  const pDmsCount = Number(
+                    (post as unknown as { dms_count?: number }).dms_count || 0
+                  );
+
                   return (
                     <div
                       key={post.id}
-                      onClick={() => handleSelectPost(post.shortcode)}
+                      onClick={() => setDrawerShortcode(post.shortcode)}
                       className={cn(
-                        "group rounded-xl border p-4 transition-all duration-150 cursor-pointer flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center",
+                        "group rounded-2xl border p-4 transition-all duration-150 cursor-pointer flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center",
                         isActive
-                          ? "border-emerald-200/60 bg-card hover:border-emerald-300 hover:shadow-xs"
-                          : "border-border bg-card hover:border-zinc-300 hover:shadow-2xs"
+                          ? "border-emerald-300/80 bg-white hover:border-emerald-400 shadow-2xs"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-2xs"
                       )}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                         {post.thumbnail_url ? (
                           <img
                             src={post.thumbnail_url}
                             alt=""
                             referrerPolicy="no-referrer"
-                            className="w-14 h-14 rounded-lg object-cover border border-border shrink-0 bg-secondary"
+                            className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
                             }}
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-lg bg-secondary border border-border flex items-center justify-center text-xs font-mono text-muted-foreground shrink-0">
+                          <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-mono text-slate-500 shrink-0">
                             {post.post_type}
                           </div>
                         )}
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-semibold text-foreground">
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-mono font-bold text-slate-900">
                               {post.shortcode}
                             </span>
                             <Badge variant="outline" className="text-[10px] uppercase font-mono">
-                              {post.post_type}
+                              {post.post_type === "reel" ? "🎬 REEL" : "🖼️ POST"}
                             </Badge>
+                            {pbPreset && (
+                              <span
+                                className={cn(
+                                  "text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1",
+                                  pbPreset.persona === "creator"
+                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                    : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                )}
+                              >
+                                <span>{pbPreset.emoji}</span>
+                                <span>{pbPreset.title}</span>
+                              </span>
+                            )}
+                            {hasCheatSheet && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                <FileText className="w-3 h-3" />
+                                <span>دارای تقلب‌نامه</span>
+                              </span>
+                            )}
+                            {hasTargetUrl && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 inline-flex items-center gap-1">
+                                <Link2 className="w-3 h-3" />
+                                <span>لینک مقصد</span>
+                              </span>
+                            )}
+                            {post.smart_moderation === 1 && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 inline-flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" />
+                                <span>سپر ضد-اسپم</span>
+                              </span>
+                            )}
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
+
+                          <p className="text-xs text-slate-600 line-clamp-1">
                             {post.caption || t("noCaption")}
                           </p>
+
+                          {/* Mini Funnel Metrics Row on Card */}
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 pt-0.5">
+                            {pViews > 0 && (
+                              <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                                <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                {pViews.toLocaleString("fa-IR")} ویو
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                              <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
+                              {pLogsCount.toLocaleString("fa-IR")} کامنت
+                            </span>
+                            <span className="inline-flex items-center gap-1 font-mono tabular-nums text-emerald-700 font-medium">
+                              <Send className="w-3.5 h-3.5 text-emerald-600" />
+                              {pDmsCount.toLocaleString("fa-IR")} دایرکت
+                            </span>
+                            {pFollows > 0 && (
+                              <span className="inline-flex items-center gap-1 font-mono tabular-nums text-rose-600 font-bold">
+                                +{pFollows.toLocaleString("fa-IR")} فالوور
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                      <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLogsShortcode(post.shortcode);
+                            setDrawerShortcode(post.shortcode);
                           }}
-                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2.5 py-1 rounded-md border border-border hover:bg-secondary transition-colors cursor-pointer"
+                          className={cn(
+                            "text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer",
+                            isCreatorPersona
+                              ? "border-rose-200 bg-rose-50/80 text-rose-700 hover:bg-rose-100"
+                              : "border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100"
+                          )}
                         >
-                          <Clock className="w-3.5 h-3.5 text-sky-600" />
-                          <span>لاگ‌ها</span>
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>تنظیم ۱-کلیکی و تقلب‌نامه</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectPost(post.shortcode);
+                          }}
+                          className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          <span>لاگ کامل</span>
                         </button>
 
                         <div
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 ps-1"
                         >
                           <Switch
                             checked={isActive}
@@ -722,13 +1143,20 @@ export function InflowDashboard({
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredPosts.map((post) => {
                   const isActive = post.auto_reply === 1;
+                  const pbPreset = getPlaybookById(post.playbook_id);
+                  const hasCheatSheet = Boolean((post.cheat_sheet || "").trim());
                   return (
                     <div
                       key={post.id}
-                      onClick={() => handleSelectPost(post.shortcode)}
-                      className="group rounded-xl border border-border bg-card overflow-hidden hover:border-zinc-300 hover:shadow-xs transition-all cursor-pointer flex flex-col"
+                      onClick={() => setDrawerShortcode(post.shortcode)}
+                      className={cn(
+                        "group rounded-2xl border bg-white overflow-hidden transition-all cursor-pointer flex flex-col",
+                        isActive
+                          ? "border-emerald-300 shadow-xs"
+                          : "border-slate-200 hover:border-slate-300 hover:shadow-xs"
+                      )}
                     >
-                      <div className="aspect-square bg-secondary relative overflow-hidden">
+                      <div className="aspect-square bg-slate-100 relative overflow-hidden">
                         {post.thumbnail_url ? (
                           <img
                             src={post.thumbnail_url}
@@ -740,14 +1168,26 @@ export function InflowDashboard({
                             }}
                           />
                         ) : null}
-                        <div className="absolute top-2 start-2">
+                        <div className="absolute top-2 start-2 flex flex-wrap gap-1">
                           <Badge variant="secondary" className="text-[10px] uppercase font-mono backdrop-blur-md">
                             {post.post_type}
                           </Badge>
+                          {hasCheatSheet && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600/90 text-white backdrop-blur-md">
+                              📝 تقلب‌نامه
+                            </span>
+                          )}
                         </div>
+                        {pbPreset && (
+                          <div className="absolute bottom-2 inset-x-2">
+                            <div className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-900/80 text-white backdrop-blur-md truncate">
+                              {pbPreset.emoji} {pbPreset.title}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="p-3 flex items-center justify-between gap-2 border-t border-border">
-                        <span className="text-xs font-mono font-medium truncate">
+                      <div className="p-3 flex items-center justify-between gap-2 border-t border-slate-100">
+                        <span className="text-xs font-mono font-bold text-slate-800 truncate">
                           {post.shortcode}
                         </span>
                         <div onClick={(e) => e.stopPropagation()}>
@@ -765,6 +1205,26 @@ export function InflowDashboard({
           </div>
         )}
 
+        {/* 1-Click Slide-Over Playbook & Cheat Sheet Drawer (Spec 018) */}
+        <PostPlaybookDrawer
+          post={activeDrawerPost}
+          persona={accountPersona}
+          accountUsername={currentAccount}
+          postMetrics={
+            drawerShortcode ? liveInsights?.post_metrics?.[drawerShortcode] : undefined
+          }
+          onClose={() => setDrawerShortcode(null)}
+          onSaved={(updatedPost) => {
+            setPosts((prev) =>
+              prev.map((p) =>
+                p.shortcode === updatedPost.shortcode
+                  ? ({ ...p, ...updatedPost } as unknown as PostRow)
+                  : p
+              )
+            );
+          }}
+        />
+
         {/* Logs Modal */}
         {logsShortcode && activeLogPost && (
           <LogsModal
@@ -772,6 +1232,16 @@ export function InflowDashboard({
             lang={lang}
             onClose={() => setLogsShortcode(null)}
             onLogsUpdated={() => fetchPosts(currentAccount)}
+          />
+        )}
+
+        {/* Delete Account Modal */}
+        {currentAccount && (
+          <DeleteAccountModal
+            open={deleteAccountOpen}
+            account={currentAccount}
+            onClose={() => setDeleteAccountOpen(false)}
+            onDeleted={handleAccountDeleted}
           />
         )}
       </div>

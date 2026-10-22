@@ -14,11 +14,13 @@
 4. **Spec-Driven Development (GitHub Spec-Kit)**: Development is spec-first. Use `.specify/` templates (`constitution.md`, `spec.md`, `plan.md`, `tasks.md`) and slash commands (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`, `/speckit-converge`).
 5. **BiDi / RTL**: The dashboard defaults to Persian (`dir="rtl"`) with Vazirmatn font. When editing UI or typography, maintain clean bidirectional layout support.
 
-## Key Files
+## Key Files & Canonical Design System
+* `DESIGN.md`: Canonical Design System Token Specification (`inFlow Studio` — Alabaster Light Theme, Dual-Persona Accents, Typography & Component Laws).
+* `docs/design-system.md`: Bilingual (Persian/English) Component Architecture & UX Pattern Guide (Slide-Over Context Drawers, 1-Click Playbooks, Supplemental Cheat Sheet).
 * `src/lib/db.ts`: SQLite database schema, initialization, and connection pooling.
-* `src/lib/i18n.ts`: Multilingual translation dictionary (`fa`, `en`, `ar`).
-* `src/app/api/agent/poll/route.ts`: Dedicated 2-minute polling endpoint for the Hermes Agent.
-* `src/app/api/posts/[shortcode]/logs/route.ts`: Comment log and idempotency locking endpoint.
-* `src/components/inflow-dashboard.tsx`: Main dashboard and multi-account platform switcher.
-* `src/components/post-detail-view.tsx`: 1-to-1 post automation rule configuration.
-* `scripts/hermes_worker.py`: Ready-to-run Python worker for the execution plane.
+* `src/lib/playbooks.ts`: Dual-Persona (`business` & `creator`) 1-Click Playbook presets, Supplemental Cheat Sheet (`cheat_sheet`) & attributed URL builders.
+* `src/lib/social-api.ts`: Official SocialAPI.ai client (including zero-credit account summary, deep post metrics, active 24h stories, and comment moderation).
+* `src/lib/instagram/automation-engine.ts`: Autonomous comment & DM automation engine with Cross-Channel Comment-to-DM Context Bridge.
+* `src/components/inflow-dashboard.tsx`: Main Studio workspace, Adaptive Persona Switcher, True ROI Funnel Strip, and Post Catalog.
+* `src/components/post-playbook-drawer.tsx`: 1-Click Slide-Over Playbook & Cheat Sheet Drawer.
+* `src/components/post-detail-view.tsx`: Full-page post automation rule & cheat sheet configuration.

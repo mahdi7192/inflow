@@ -23,6 +23,12 @@ import {
   enqueueInstagramAction,
   processActionQueue,
 } from "@/lib/instagram/action-executor";
+import {
+  buildAugmentedPostContext,
+  buildAttributedUrl,
+  getPlaybookById,
+} from "@/lib/playbooks";
+import { SocialApiClient } from "@/lib/social-api";
 
 export interface IncomingCommentEvent {
   commentId: string;
@@ -469,6 +475,59 @@ export async function processIncomingComment(
   `).run(identity.userId, identity.username, identity.fullName, commentLogId);
 
   const appLanguage = post.app_language || getAppLanguage(account.username);
+  const playbook = getPlaybookById(post.playbook_id);
+  const augmentedPostContext = buildAugmentedPostContext({
+    caption: post.caption,
+    cheatSheet: post.cheat_sheet,
+    targetUrl: post.target_url,
+    brandCheatSheet: account.brand_cheat_sheet,
+    websiteUrl: account.website_url,
+    accountPersona: account.account_persona,
+    recipientUsername: identity.username,
+    shortcode: post.shortcode,
+  });
+
+  // 4.5. Smart Competitor & Spam Comment Shield (Spec 018 — 0 credit hide via SocialAPI)
+  if (post.smart_moderation === 1 && socialAccountId) {
+    const lowerComment = (event.commentText || "").toLowerCase();
+    const isSpamOrCompetitorPoach =
+      /(پیج ما|پیجمون|ارزون‌تر|ارزان تر|ارزونتر|فروش ویژه در پیج|تلگرام\s*@|http:\/\/|https:\/\/|www\.)/i.test(
+        lowerComment
+      );
+    if (isSpamOrCompetitorPoach) {
+      try {
+        const client = new SocialApiClient();
+        await client.moderateComment({
+          postId: post.media_id || event.postId || post.shortcode,
+          commentId,
+          accountId: socialAccountId,
+          action: "hide",
+        });
+        logBotActivity(
+          account.username,
+          "reply_sent",
+          `🛡️ سپر هوشمند: کامنت تبلیغاتی/اسپم @${identity.username} روی پست ${post.shortcode} مخفی شد`,
+          event.commentText
+        );
+      } catch {
+        // non-blocking
+      }
+      db.prepare(`
+        UPDATE comment_logs
+        SET trigger_matched = 0,
+            comment_reply_status = 'skipped',
+            dm_status = 'skipped',
+            processed_at = ?
+        WHERE id = ?
+      `).run(nowTimestamp(), commentLogId);
+      return {
+        processed: true,
+        trigger_matched: false,
+        comment_reply_status: "skipped",
+        dm_status: "skipped",
+      };
+    }
+  }
 
   // 5. Evaluate Trigger (`all` | `keywords` | `ai_context`)
   let matched = false;
@@ -478,9 +537,9 @@ export async function processIncomingComment(
     matched = matchesKeywords(event.commentText, post.trigger_keywords);
   } else if (post.trigger_type === "ai_context") {
     matched = await evaluateTriggerWithAi({
-      postCaption: post.caption,
+      postCaption: augmentedPostContext,
       commentText: event.commentText,
-      triggerCondition: post.trigger_context,
+      triggerCondition: post.trigger_context || playbook?.defaults.trigger_context || "",
       username: identity.username,
       userFullName: identity.fullName,
       appLanguage,
@@ -529,14 +588,15 @@ export async function processIncomingComment(
       commentReplyText = await generateContextualReplyWithAi({
         mode: "comment",
         accountUsername: account.username,
-        postCaption: post.caption,
+        postCaption: augmentedPostContext,
         username: identity.username,
         userFullName: identity.fullName,
         followerCount: identity.followerCount,
         isFollowing: identity.isFollowing,
         appLanguage,
         incomingText: event.commentText,
-        instructions: post.comment_action_text,
+        instructions:
+          post.comment_action_text || playbook?.defaults.comment_action_text || "",
         fallbackText: "ممنون از همراهی شما 🙏",
       });
     }
@@ -569,25 +629,38 @@ export async function processIncomingComment(
 
   // 7. Enqueue Private Reply / DM Action (`direct` | `ai`) + Follow Gate
   if (post.dm_action_type !== "none") {
+    const attributedTargetUrl = buildAttributedUrl(post.target_url, {
+      username: identity.username,
+      shortcode: post.shortcode,
+      playbookId: post.playbook_id,
+    });
+
     if (post.dm_action_type === "direct") {
       dmText = interpolateStaticText(post.dm_action_text, {
         username: identity.username,
         fullName: identity.fullName,
       });
+      if (attributedTargetUrl && !dmText.includes("http")) {
+        dmText = `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim();
+      }
     } else if (post.dm_action_type === "ai") {
       dmText = await generateContextualReplyWithAi({
         mode: "comment_dm",
         accountUsername: account.username,
-        postCaption: post.caption,
+        postCaption: augmentedPostContext,
         username: identity.username,
         userFullName: identity.fullName,
         followerCount: identity.followerCount,
         isFollowing: identity.isFollowing,
         appLanguage,
         incomingText: event.commentText,
-        instructions: post.dm_action_text,
+        instructions:
+          post.dm_action_text || playbook?.defaults.dm_action_text || "",
         fallbackText: "سلام! اطلاعات درخواستی خدمت شما ارسال شد 🙏",
       });
+      if (attributedTargetUrl && !dmText.includes("http")) {
+        dmText = `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim();
+      }
     }
 
     if (dmText) {
@@ -1145,9 +1218,104 @@ export async function processIncomingDm(
         fullName: identity.fullName,
       }) || "سلام! پیام شما دریافت شد 🙏";
   } else {
-    const contextCaption = event.isStoryReply
-      ? `ریپلای استوری: ${event.storyContent || "استوری اینستاگرام"}`
-      : account.bio || "گفتگوی مستقیم دایرکت اینستاگرام";
+    // Spec 018: Cross-Channel Comment-to-DM Context Bridge + Supplemental Cheat Sheets
+    const recentCommentOrigin = db
+      .prepare(`
+        SELECT c.shortcode, c.comment_text, c.dm_text, p.caption, p.cheat_sheet, p.target_url
+        FROM comment_logs c
+        LEFT JOIN posts p ON p.shortcode = c.shortcode
+        WHERE c.account_username = ?
+          AND (c.user_id = ? OR LOWER(c.username) = ?)
+        ORDER BY c.id DESC
+        LIMIT 1
+      `)
+      .get(
+        account.username,
+        identity.userId || "__none__",
+        identity.username.toLowerCase()
+      ) as
+      | {
+          shortcode: string;
+          comment_text: string;
+          dm_text: string;
+          caption?: string;
+          cheat_sheet?: string;
+          target_url?: string;
+        }
+      | undefined;
+
+    const catalogCheatSheets = db
+      .prepare(`
+        SELECT shortcode, caption, cheat_sheet, target_url
+        FROM posts
+        WHERE account_username = ?
+          AND (cheat_sheet != '' OR target_url != '' OR auto_reply = 1)
+        ORDER BY sort_index ASC, id ASC
+        LIMIT 8
+      `)
+      .all(account.username) as Array<{
+      shortcode: string;
+      caption: string;
+      cheat_sheet?: string;
+      target_url?: string;
+    }>;
+
+    const dmContextParts: string[] = [];
+    if (event.isStoryReply) {
+      dmContextParts.push(`ریپلای استوری: ${event.storyContent || "استوری اینستاگرام"}`);
+    }
+    if (account.bio) {
+      dmContextParts.push(`[بیوگرافی پیج]: ${account.bio}`);
+    }
+    if (account.brand_cheat_sheet?.trim()) {
+      dmContextParts.push(
+        `[تقلب‌نامه و اطلاعات کلی پیج/برند]:\n${account.brand_cheat_sheet.trim()}`
+      );
+    }
+    if (account.website_url?.trim()) {
+      dmContextParts.push(`[سایت/لینک اصلی پیج]: ${account.website_url.trim()}`);
+    }
+
+    if (recentCommentOrigin) {
+      const originLink = buildAttributedUrl(recentCommentOrigin.target_url, {
+        username: identity.username,
+        shortcode: recentCommentOrigin.shortcode,
+      });
+      dmContextParts.push(
+        `[پستی که این کاربر اخیراً زیر آن کامنت گذاشته (${recentCommentOrigin.shortcode})]:\n` +
+          `- کامنت قبلی کاربر: "${recentCommentOrigin.comment_text}"\n` +
+          (recentCommentOrigin.dm_text
+            ? `- پیام دایرکتی که روی آن پست برایش فرستادیم: "${recentCommentOrigin.dm_text}"\n`
+            : "") +
+          (recentCommentOrigin.caption
+            ? `- کپشن پست: ${recentCommentOrigin.caption.slice(0, 400)}\n`
+            : "") +
+          (recentCommentOrigin.cheat_sheet
+            ? `- 🔥 تقلب‌نامه و اطلاعات تکمیلی این پست (قیمت/سایز/جزئیات): ${recentCommentOrigin.cheat_sheet}\n`
+            : "") +
+          (originLink ? `- 🔗 لینک مستقیم این پست: ${originLink}` : "")
+      );
+    }
+
+    if (catalogCheatSheets.length > 0) {
+      const catalogLines = catalogCheatSheets
+        .map((item, idx) => {
+          const link = buildAttributedUrl(item.target_url, {
+            username: identity.username,
+            shortcode: item.shortcode,
+          });
+          return (
+            `${idx + 1}. پست ${item.shortcode}: ${(item.caption || "").slice(0, 140)}` +
+            (item.cheat_sheet ? ` | اطلاعات تکمیلی/قیمت: ${item.cheat_sheet}` : "") +
+            (link ? ` | لینک: ${link}` : "")
+          );
+        })
+        .join("\n");
+      dmContextParts.push(`[فهرست پست‌ها و تقلب‌نامه‌های فعال پیج]:\n${catalogLines}`);
+    }
+
+    const contextCaption =
+      dmContextParts.join("\n\n") || "گفتگوی مستقیم دایرکت اینستاگرام";
 
     replyText = await generateContextualReplyWithAi({
       mode: "dm_chat",

@@ -11,6 +11,9 @@ import {
   UserCheck,
   Info,
   Hash,
+  FileText,
+  Link2,
+  ShieldCheck,
 } from "lucide-react";
 import { Button, Badge, Switch, Input, Textarea } from "@/components/ui/primitives";
 import { ActivationCard, ProgressiveDisclosureContainer } from "@/components/ui/activation-card";
@@ -59,6 +62,11 @@ export function PostDetailView({
   const [dmActionText, setDmActionText] = useState(post.dm_action_text || "");
   const [dmRequireFollow, setDmRequireFollow] = useState(post.dm_require_follow === 1);
 
+  // Spec 018: Supplemental Cheat Sheet, Target URL & Smart Moderation
+  const [cheatSheet, setCheatSheet] = useState(post.cheat_sheet || "");
+  const [targetUrl, setTargetUrl] = useState(post.target_url || "");
+  const [smartModeration, setSmartModeration] = useState(post.smart_moderation === 1);
+
   const [saving, setSaving] = useState(false);
 
   // Sync state if prop changes
@@ -72,6 +80,9 @@ export function PostDetailView({
     setDmActionType(post.dm_action_type || "none");
     setDmActionText(post.dm_action_text || "");
     setDmRequireFollow(post.dm_require_follow === 1);
+    setCheatSheet(post.cheat_sheet || "");
+    setTargetUrl(post.target_url || "");
+    setSmartModeration(post.smart_moderation === 1);
   }, [post]);
 
   // Dirty state tracking
@@ -84,7 +95,10 @@ export function PostDetailView({
       commentActionText !== (post.comment_action_text || "") ||
       dmActionType !== (post.dm_action_type || "none") ||
       dmActionText !== (post.dm_action_text || "") ||
-      dmRequireFollow !== (post.dm_require_follow === 1)
+      dmRequireFollow !== (post.dm_require_follow === 1) ||
+      cheatSheet !== (post.cheat_sheet || "") ||
+      targetUrl !== (post.target_url || "") ||
+      smartModeration !== (post.smart_moderation === 1)
     );
   }, [
     post,
@@ -96,6 +110,9 @@ export function PostDetailView({
     dmActionType,
     dmActionText,
     dmRequireFollow,
+    cheatSheet,
+    targetUrl,
+    smartModeration,
   ]);
 
   // Sync with workspace navigation guard
@@ -140,6 +157,9 @@ export function PostDetailView({
     setDmActionType(post.dm_action_type || "none");
     setDmActionText(post.dm_action_text || "");
     setDmRequireFollow(post.dm_require_follow === 1);
+    setCheatSheet(post.cheat_sheet || "");
+    setTargetUrl(post.target_url || "");
+    setSmartModeration(post.smart_moderation === 1);
     toast.info("تغییرات لغو و به مقادیر اولیه بازگردانده شدند.");
   };
 
@@ -155,6 +175,9 @@ export function PostDetailView({
         dm_action_type: dmActionType,
         dm_action_text: dmActionText,
         dm_require_follow: dmRequireFollow ? 1 : 0,
+        cheat_sheet: cheatSheet,
+        target_url: targetUrl,
+        smart_moderation: smartModeration ? 1 : 0,
         app_language: workspace?.lang || lang,
       };
 
@@ -304,6 +327,57 @@ export function PostDetailView({
 
           {/* Progressive Disclosure Container */}
           <ProgressiveDisclosureContainer enabled={autoReply} className="space-y-5">
+            {/* SECTION 0: SUPPLEMENTAL CHEAT SHEET & TARGET LINK (Spec 018) */}
+            <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/30 p-4 space-y-3 shadow-2xs">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <span>📝 تقلب‌نامه دستیار (اطلاعاتی که در کپشن پست نیست)</span>
+                </h3>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                  قیمت، سایزبندی، موجودی، کد تخفیف یا نکاتی که در کپشن ننوشته‌اید را اینجا وارد کنید تا هوش مصنوعی هم در کامنت و هم در ادامه گفتگوی دایرکت از آن استفاده کند.
+                </p>
+              </div>
+
+              <Textarea
+                rows={3}
+                value={cheatSheet}
+                onChange={(e) => setCheatSheet(e.target.value)}
+                placeholder="مثال: قیمت ۹۸۰ هزار تومن | سایز ۳۸ تا ۴۴ موجوده | ارسال با تیپاکس رایگان..."
+                className="bg-white text-xs"
+              />
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                  <Link2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span>لینک مستقیم محصول / فایل / لندینگ این پست (ارسال خودکار با رهگیری مشتری):</span>
+                </label>
+                <Input
+                  type="text"
+                  dir="ltr"
+                  value={targetUrl}
+                  onChange={(e) => setTargetUrl(e.target.value)}
+                  placeholder="https://shop.ir/product/..."
+                  className="bg-white text-xs font-mono"
+                />
+              </div>
+
+              <label className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer">
+                <div className="text-xs">
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>سپر ضد-اسپم و مخفی‌سازی خودکار کامنت‌های تبلیغاتی رقبا (رایگان)</span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={smartModeration}
+                  onChange={(e) => setSmartModeration(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-600 rounded"
+                />
+              </label>
+            </div>
+
             {/* SECTION 1: TRIGGER */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-2xs">
               <div>
