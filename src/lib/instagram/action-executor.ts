@@ -245,6 +245,38 @@ function updateLinkedLogsOnSuccess(
         SET dm_status = ?, processed_at = ?
         WHERE id = ?
       `).run(status, now, meta.commentLogId);
+
+      try {
+        const cLog = db.prepare("SELECT * FROM comment_logs WHERE id = ?").get(meta.commentLogId) as any;
+        const msgId = `cmt_dm_${meta.commentLogId}`;
+        const incomingText = cLog?.shortcode
+          ? `[کامنت روی پست ${cLog.shortcode}: ${cLog.comment_text || ''}]`
+          : `[کامنت روی پست: ${cLog?.comment_text || ''}]`;
+        db.prepare(`
+          INSERT INTO dm_logs (
+            message_id, thread_id, account_username, sender_username, sender_full_name, sender_id,
+            incoming_text, trigger_matched, reply_status, reply_text, processed_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+          ON CONFLICT(message_id) DO UPDATE SET
+            reply_status = excluded.reply_status,
+            reply_text = excluded.reply_text,
+            processed_at = excluded.processed_at
+        `).run(
+          msgId,
+          row.target_conversation_id || "",
+          row.account_username,
+          row.target_username,
+          cLog?.author_full_name || "",
+          row.target_user_id || "",
+          incomingText,
+          status,
+          row.payload_text,
+          now,
+          now
+        );
+      } catch (logErr) {
+        console.error("[action-executor] Error recording comment DM to dm_logs:", logErr);
+      }
     } else if (row.target_comment_id) {
       db.prepare(`
         UPDATE comment_logs
@@ -259,6 +291,37 @@ function updateLinkedLogsOnSuccess(
         SET dm_status = 'pending_follow', processed_at = ?
         WHERE id = ?
       `).run(now, meta.commentLogId);
+
+      try {
+        const cLog = db.prepare("SELECT * FROM comment_logs WHERE id = ?").get(meta.commentLogId) as any;
+        const msgId = `cmt_gate_${meta.commentLogId}`;
+        const incomingText = cLog?.shortcode
+          ? `[کامنت روی پست ${cLog.shortcode}: ${cLog.comment_text || ''}]`
+          : `[کامنت روی پست: ${cLog?.comment_text || ''}]`;
+        db.prepare(`
+          INSERT INTO dm_logs (
+            message_id, thread_id, account_username, sender_username, sender_full_name, sender_id,
+            incoming_text, trigger_matched, reply_status, reply_text, processed_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'sent', ?, ?, ?)
+          ON CONFLICT(message_id) DO UPDATE SET
+            reply_status = excluded.reply_status,
+            reply_text = excluded.reply_text,
+            processed_at = excluded.processed_at
+        `).run(
+          msgId,
+          row.target_conversation_id || "",
+          row.account_username,
+          row.target_username,
+          cLog?.author_full_name || "",
+          row.target_user_id || "",
+          incomingText,
+          row.payload_text,
+          now,
+          now
+        );
+      } catch (logErr) {
+        console.error("[action-executor] Error recording comment gate to dm_logs:", logErr);
+      }
     }
     if (meta.dmLogId) {
       db.prepare(`
@@ -274,6 +337,37 @@ function updateLinkedLogsOnSuccess(
         SET dm_status = 'sent', processed_at = ?
         WHERE id = ?
       `).run(now, meta.commentLogId);
+
+      try {
+        const cLog = db.prepare("SELECT * FROM comment_logs WHERE id = ?").get(meta.commentLogId) as any;
+        const msgId = `cmt_dm_${meta.commentLogId}`;
+        const incomingText = cLog?.shortcode
+          ? `[کامنت روی پست ${cLog.shortcode}: ${cLog.comment_text || ''}]`
+          : `[کامنت روی پست: ${cLog?.comment_text || ''}]`;
+        db.prepare(`
+          INSERT INTO dm_logs (
+            message_id, thread_id, account_username, sender_username, sender_full_name, sender_id,
+            incoming_text, trigger_matched, reply_status, reply_text, processed_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'sent', ?, ?, ?)
+          ON CONFLICT(message_id) DO UPDATE SET
+            reply_status = excluded.reply_status,
+            reply_text = excluded.reply_text,
+            processed_at = excluded.processed_at
+        `).run(
+          msgId,
+          row.target_conversation_id || "",
+          row.account_username,
+          row.target_username,
+          cLog?.author_full_name || "",
+          row.target_user_id || "",
+          incomingText,
+          row.payload_text,
+          now,
+          now
+        );
+      } catch (logErr) {
+        console.error("[action-executor] Error recording released DM to dm_logs:", logErr);
+      }
     }
     if (meta.dmLogId) {
       db.prepare(`

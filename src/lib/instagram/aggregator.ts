@@ -498,6 +498,7 @@ export async function pollActiveAccountsAndPosts(options?: {
       .prepare(`
         SELECT * FROM dm_logs
         WHERE account_username = ? AND reply_status = 'pending_follow'
+          AND message_id NOT LIKE 'cmt_gate_%'
       `)
       .all(acc.username) as DMLogRow[];
 
@@ -672,6 +673,7 @@ export async function pollActiveAccountsAndPosts(options?: {
               SELECT * FROM dm_logs
               WHERE account_username = ?
                 AND reply_status = 'pending_follow'
+                AND message_id NOT LIKE 'cmt_gate_%'
                 AND (thread_id = ? OR sender_id = ? OR LOWER(sender_username) = ?)
             `)
             .all(

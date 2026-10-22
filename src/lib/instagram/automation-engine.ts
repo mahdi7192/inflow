@@ -928,6 +928,7 @@ export async function processIncomingDm(
       WHERE account_username = @account_username
         AND reply_status = 'pending_follow'
         AND message_id != @message_id
+        AND message_id NOT LIKE 'cmt_gate_%'
         AND (
           (@thread_id != '' AND thread_id = @thread_id)
           OR (@user_id != '' AND sender_id = @user_id)
@@ -944,6 +945,33 @@ export async function processIncomingDm(
     }) as DMLogRow[];
 
   const hasPendingItems = pendingComments.length > 0 || pendingDms.length > 0;
+
+  if ((hasPendingItems || isFollowClaim) && !identity.isFollowing && isFollowClaim) {
+    // Meta Graph API replication lag: `is_user_follow_business` can take 1-2.5 seconds to propagate after user follows in app.
+    // Retry once after 1800ms before concluding the user did not follow.
+    try {
+      await new Promise((r) => setTimeout(r, 1800));
+      const targetAccountId = socialAccountId || account.social_account_id || account.username;
+      const targetUserId = identity.userId || identity.username;
+      const recheck = await provider.checkFollowStatus(targetAccountId, targetUserId);
+      if (recheck?.verified === true) {
+        identity.isFollowing = true;
+        if (recheck.profile?.followerCount !== undefined) {
+          identity.followerCount = recheck.profile.followerCount;
+        }
+      } else if (socialAccountId && identity.userId) {
+        const recheckProfile = await provider.getParticipantProfile(socialAccountId, identity.userId);
+        if (recheckProfile?.isUserFollowBusiness) {
+          identity.isFollowing = true;
+          if (recheckProfile.followerCount !== undefined) {
+            identity.followerCount = recheckProfile.followerCount;
+          }
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+  }
 
   if (hasPendingItems || isFollowClaim) {
     if (identity.isFollowing && hasPendingItems) {
@@ -1170,9 +1198,17 @@ export async function processIncomingDm(
           phone_number, source_shortcode, intent_summary, last_message,
           status, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)
-        ON CONFLICT(account_username, sender_username, phone_number) DO UPDATE SET
+        ON CONFLICT(account_username, sender_username) DO UPDATE SET
+          phone_number = CASE
+            WHEN excluded.phone_number != '' AND excluded.phone_number NOT LIKE '%بدون شماره%'
+              THEN excluded.phone_number
+            WHEN captured_leads.phone_number != '' AND captured_leads.phone_number NOT LIKE '%بدون شماره%'
+              THEN captured_leads.phone_number
+            ELSE excluded.phone_number
+          END,
           sender_full_name = CASE WHEN excluded.sender_full_name != '' THEN excluded.sender_full_name ELSE captured_leads.sender_full_name END,
           source_shortcode = CASE WHEN excluded.source_shortcode != '' THEN excluded.source_shortcode ELSE captured_leads.source_shortcode END,
+          intent_summary = excluded.intent_summary,
           last_message = excluded.last_message,
           updated_at = excluded.updated_at
       `).run(
