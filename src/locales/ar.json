@@ -316,5 +316,11 @@
   "aiSettingsSubtitle": "تكوين مفتاح API مباشر لتقييم التعليقات وصياغة الردود دون الحاجة إلى وكلاء خارجيين",
   "dmLiveInbox": "صندوق الرسائل المباشرة",
   "accountLoginTitle": "ربط حساب إنستغرام مباشرة",
-  "allAccounts": "جميع الحسابات"
+  "allAccounts": "جميع الحسابات",
+  "personaEcommerce": "المتجر والمنتجات",
+  "personaServiceB2b": "الخدمات والاستشارات",
+  "personaCreator": "صانع المحتوى والإعلام",
+  "studioEcommerce": "استوديو المتجر",
+  "studioServiceB2b": "استوديو الخدمات",
+  "studioCreator": "استوديو صانع المحتوى"
 }

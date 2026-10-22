@@ -316,5 +316,11 @@
   "aiSettingsSubtitle": "پیکربندی کلید API برای ارزیابی معنایی کامنت‌ها و تولید پاسخ‌های هوشمند بدون نیاز به هیچ ایجنت خارجی",
   "dmLiveInbox": "صندوق پیام‌های زنده",
   "accountLoginTitle": "اتصال مستقیم حساب اینستاگرام",
-  "allAccounts": "همه پیج‌ها"
+  "allAccounts": "همه پیج‌ها",
+  "personaEcommerce": "فروشگاه و کالا",
+  "personaServiceB2b": "خدمات و مشاوره",
+  "personaCreator": "کریتور و مدیا",
+  "studioEcommerce": "استودیو فروشگاه",
+  "studioServiceB2b": "استودیو خدمات",
+  "studioCreator": "استودیو کریتور"
 }

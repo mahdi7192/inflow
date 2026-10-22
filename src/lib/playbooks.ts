@@ -1,9 +1,10 @@
 /**
- * Spec 018 — Dual-Persona 1-Click Playbooks & Supplemental Cheat Sheet Helpers
- * Supports both E-Commerce/Business (`business`) and Creator/Influencer (`creator`) personas.
+ * Spec 018/019 — Triple-Persona 1-Click Playbooks & Supplemental Cheat Sheet Helpers
+ * Supports E-Commerce (`ecommerce`), B2B Services & Consulting (`service_b2b`) and
+ * Creator/Influencer (`creator`) personas. Legacy `business` values map to `ecommerce`.
  */
 
-export type AccountPersona = "business" | "creator";
+export type AccountPersona = "ecommerce" | "service_b2b" | "creator";
 
 export type PlaybookId =
   | "custom"
@@ -12,7 +13,60 @@ export type PlaybookId =
   | "lead_closer"
   | "creator_magnet"
   | "creator_twin"
-  | "sponsor_campaign";
+  | "sponsor_campaign"
+  | "brief_qualifier"
+  | "consultation_booking"
+  | "portfolio_showcase";
+
+/** Normalizes any stored/legacy persona value (incl. `business`) to a valid AccountPersona. */
+export function normalizePersona(value?: string | null): AccountPersona {
+  if (value === "creator" || value === "service_b2b") return value;
+  return "ecommerce";
+}
+
+export const PERSONA_META: Record<
+  AccountPersona,
+  {
+    emoji: string;
+    tabLabel: string;
+    studioLabel: string;
+    defaultPlaybook: PlaybookId;
+    aiLabel: string;
+    targetUrlLabel: string;
+    brandSheetPlaceholder: string;
+  }
+> = {
+  ecommerce: {
+    emoji: "🛍️",
+    tabLabel: "فروشگاه و کالا",
+    studioLabel: "استودیو فروشگاه",
+    defaultPlaybook: "auto_seller",
+    aiLabel: "پیج فروشگاهی / کسب‌وکار فروش کالا",
+    targetUrlLabel: "لینک مستقیم خرید محصول در سایت یا کاتالوگ (اختیاری — همراه رهگیری خودکار مشتری):",
+    brandSheetPlaceholder:
+      "مثال: ارسال به سراسر ایران با پست پیشتاز (۶۵ هزار تومان، بالای ۲ میلیون رایگان) | تحویل تهران با پیک | امکان تعویض سایز تا ۴۸ ساعت...",
+  },
+  service_b2b: {
+    emoji: "💼",
+    tabLabel: "خدمات و مشاوره",
+    studioLabel: "استودیو خدمات",
+    defaultPlaybook: "brief_qualifier",
+    aiLabel: "پیج خدماتی / مشاوره / آژانس / B2B (پروژه‌محور، بدون سبد خرید)",
+    targetUrlLabel: "لینک فرم بریف، رزرو جلسه یا پورتفولیو (اختیاری — همراه رهگیری خودکار مشتری):",
+    brandSheetPlaceholder:
+      "مثال: آژانس تولید محتوا و دیجیتال مارکتینگ | لحن مشاوره‌ای و محترمانه | جلسه مشاوره اولیه رایگان ۳۰ دقیقه‌ای | ساعات پاسخگویی شنبه تا چهارشنبه ۹ تا ۱۷...",
+  },
+  creator: {
+    emoji: "🌟",
+    tabLabel: "کریتور و مدیا",
+    studioLabel: "استودیو کریتور",
+    defaultPlaybook: "creator_magnet",
+    aiLabel: "پیج کریتور / اینفلوئنسر / تولیدکننده محتوا",
+    targetUrlLabel: "لینک فایل / ویدیو / لندینگ اسپانسر (ارسال خودکار در دایرکت با رهگیری کلیک):",
+    brandSheetPlaceholder:
+      "مثال: من مهدی هستم، تولیدکننده محتوای تکنولوژی و هوش مصنوعی. لحن پاسخگویی باید صمیمی و پرانرژی باشد. لینک کانال تلگرام و یوتیوب در بایو هست...",
+  },
+};
 
 export interface PlaybookPreset {
   id: PlaybookId;
@@ -37,11 +91,11 @@ export interface PlaybookPreset {
 
 export const PLAYBOOK_PRESETS: PlaybookPreset[] = [
   // ==========================================
-  // 🛍️ BUSINESS & STORE PLAYBOOKS (`business`)
+  // 🛍️ E-COMMERCE & STORE PLAYBOOKS (`ecommerce`)
   // ==========================================
   {
     id: "auto_seller",
-    persona: "business",
+    persona: "ecommerce",
     title: "فروشنده خودکار و پاسخگوی قیمت",
     subtitle: "پاسخ هوشمند به کامنت + ارسال قیمت، موجودی و لینک خرید در دایرکت",
     badge: "پرفروش‌ترین",
@@ -69,7 +123,7 @@ export const PLAYBOOK_PRESETS: PlaybookPreset[] = [
   },
   {
     id: "viral_gate",
-    persona: "business",
+    persona: "ecommerce",
     title: "قفل فالوورگیر و ارسال کاتالوگ/لینک",
     subtitle: "تبدیل ویوی اکسپلور به فالوور واقعی؛ ارسال لینک یا قیمت پس از تایید فالو",
     badge: "رشد فالوور",
@@ -96,7 +150,7 @@ export const PLAYBOOK_PRESETS: PlaybookPreset[] = [
   },
   {
     id: "lead_closer",
-    persona: "business",
+    persona: "ecommerce",
     title: "شکارچی شماره تماس و ثبت سفارش دایرکت",
     subtitle: "مناسب پیج‌های بدون سایت یا خدمات؛ هدایت مشتری به ارسال شماره موبایل و سایز",
     badge: "بدون نیاز به سایت",
@@ -120,6 +174,92 @@ export const PLAYBOOK_PRESETS: PlaybookPreset[] = [
       { label: "+ آدرس حضوری", snippet: "آدرس مراجعه حضوری: ...\n" },
     ],
     targetUrlPlaceholder: "لینک پرداخت یا واتساپ/تلگرام پشتیبانی (اختیاری)",
+  },
+
+  // ==========================================
+  // 💼 B2B SERVICES & CONSULTING PLAYBOOKS (`service_b2b`)
+  // ==========================================
+  {
+    id: "brief_qualifier",
+    persona: "service_b2b",
+    title: "نیازسنجی و دریافت بریف",
+    subtitle: "هدایت کامنت به دایرکت + پرسش‌های کشف نیاز و ثبت محدوده پروژه در لیدها",
+    badge: "کیفیت‌سنجی لید",
+    emoji: "📝",
+    defaults: {
+      trigger_type: "all",
+      trigger_context: "هر کامنتی که درباره خدمات، همکاری، هزینه پروژه یا نحوه شروع کار می‌پرسد",
+      comment_action_type: "ai",
+      comment_action_text:
+        "با لحن مشاورانه و محترمانه بگو برای بررسی دقیق نیاز شما، در دایرکت پیام دادم و چند سوال کوتاه پرسیدم 🙏",
+      dm_action_type: "ai",
+      dm_action_text:
+        "به عنوان مدیر حساب ارشد، با لحن مشاوره‌ای و محترمانه چند سوال کشف نیاز بپرس (نوع کسب‌وکار، هدف پروژه، بازه زمانی و بودجه تقریبی)، پاسخ‌ها را جمع‌بندی کن و در پایان شماره تماس یا راه ارتباطی مشتری را برای ثبت بریف بگیر.",
+      dm_require_follow: 0,
+    },
+    cheatSheetPlaceholder:
+      "مثال: خدمات: تولید محتوا و مدیریت شبکه اجتماعی | حداقل بازه پروژه ۳ ماه | سوالات بریف: نوع کسب‌وکار، هدف، بودجه...",
+    cheatSheetChips: [
+      { label: "+ فرآیند شروع همکاری", snippet: "فرآیند شروع همکاری: ۱) جلسه کشف نیاز ۲) ارسال پیشنهاد ۳) تایید و عقد قرارداد ۴) شروع پروژه\n" },
+      { label: "+ شرایط و تعرفه پایه", snippet: "تعرفه پایه: شروع از ... تومان (قیمت نهایی پس از بررسی بریف و ارسال پیشنهاد اختصاصی اعلام می‌شود)\n" },
+      { label: "+ لینک پورتفولیو و رزومه", snippet: "پورتفولیو و نمونه‌کارها: ...\n" },
+      { label: "+ اطلاعات مورد نیاز بریف", snippet: "اطلاعات مورد نیاز بریف: نوع کسب‌وکار، هدف پروژه، مخاطب هدف، بازه زمانی، بودجه تقریبی، نمونه‌های مورد علاقه\n" },
+    ],
+    targetUrlPlaceholder: "https://agency.ir/brief (لینک فرم بریف — اختیاری)",
+  },
+  {
+    id: "consultation_booking",
+    persona: "service_b2b",
+    title: "رزرو جلسه مشاوره و تماس",
+    subtitle: "دریافت شماره تماس یا ارسال لینک رزرو جلسه (Calendly / جلسه) بدون دست‌انداز",
+    badge: "رزرو جلسه",
+    emoji: "📅",
+    defaults: {
+      trigger_type: "all",
+      trigger_context: "هر کامنتی که درخواست مشاوره، تماس، جلسه یا زمان‌بندی دارد",
+      comment_action_type: "ai",
+      comment_action_text:
+        "کوتاه و محترمانه بگو برای هماهنگی جلسه مشاوره، جزئیات و لینک رزرو را در دایرکت فرستادم 📅",
+      dm_action_type: "ai",
+      dm_action_text:
+        "با لحن حرفه‌ای و صمیمی، لینک رزرو جلسه موجود در تقلب‌نامه را بفرست؛ اگر لینکی نیست از مشتری نام، شماره تماس و بهترین زمان تماس را بگیر. بدون فشار و ربات‌وار رفتار کن.",
+      dm_require_follow: 0,
+    },
+    cheatSheetPlaceholder:
+      "مثال: جلسه مشاوره اولیه ۳۰ دقیقه‌ای رایگان | ساعات پاسخگویی شنبه تا چهارشنبه ۹ تا ۱۷ | لینک رزرو: ...",
+    cheatSheetChips: [
+      { label: "+ لینک رزرو جلسه", snippet: "لینک رزرو جلسه مشاوره: ...\n" },
+      { label: "+ ساعات پاسخگویی", snippet: "ساعات پاسخگویی و جلسات: ...\n" },
+      { label: "+ فرآیند شروع همکاری", snippet: "فرآیند شروع همکاری: ۱) جلسه کشف نیاز ۲) ارسال پیشنهاد ۳) تایید و عقد قرارداد ۴) شروع پروژه\n" },
+    ],
+    targetUrlPlaceholder: "https://calendly.com/... (لینک رزرو جلسه)",
+  },
+  {
+    id: "portfolio_showcase",
+    persona: "service_b2b",
+    title: "ارسال نمونه‌کار و کاتالوگ خدمات",
+    subtitle: "ارسال لینک پورتفولیو و معرفی کوتاه سطوح همکاری و فرآیند کار",
+    badge: "اعتمادسازی",
+    emoji: "🗂️",
+    defaults: {
+      trigger_type: "all",
+      trigger_context: "هر کامنتی که نمونه‌کار، رزومه، سوابق یا کاتالوگ خدمات می‌خواهد",
+      comment_action_type: "ai",
+      comment_action_text:
+        "با احترام بگو نمونه‌کارها و معرفی خدمات را در دایرکت برایتان ارسال کردم 🗂️",
+      dm_action_type: "ai",
+      dm_action_text:
+        "لینک پورتفولیو/کاتالوگ موجود در تقلب‌نامه را بفرست، سطوح همکاری و فرآیند کار را در چند جمله کوتاه توضیح بده و در پایان بپرس برای چه پروژه‌ای به دنبال همکاری هستند.",
+      dm_require_follow: 0,
+    },
+    cheatSheetPlaceholder:
+      "مثال: پورتفولیو: ... | سه سطح همکاری: پایه، حرفه‌ای، سازمانی | مدت متوسط پروژه ۴ هفته...",
+    cheatSheetChips: [
+      { label: "+ لینک پورتفولیو و رزومه", snippet: "پورتفولیو و نمونه‌کارها: ...\n" },
+      { label: "+ شرایط و تعرفه پایه", snippet: "تعرفه پایه: شروع از ... تومان (قیمت نهایی پس از بررسی بریف اعلام می‌شود)\n" },
+      { label: "+ فرآیند شروع همکاری", snippet: "فرآیند شروع همکاری: ۱) جلسه کشف نیاز ۲) ارسال پیشنهاد ۳) تایید و عقد قرارداد ۴) شروع پروژه\n" },
+    ],
+    targetUrlPlaceholder: "https://agency.ir/portfolio.pdf (لینک پورتفولیو یا کاتالوگ خدمات)",
   },
 
   // ==========================================
@@ -208,8 +348,9 @@ export const PLAYBOOK_PRESETS: PlaybookPreset[] = [
   },
 ];
 
-export function getPlaybooksForPersona(persona: AccountPersona = "business"): PlaybookPreset[] {
-  return PLAYBOOK_PRESETS.filter((p) => p.persona === persona);
+export function getPlaybooksForPersona(persona?: AccountPersona | string | null): PlaybookPreset[] {
+  const normalized = normalizePersona(persona);
+  return PLAYBOOK_PRESETS.filter((p) => p.persona === normalized);
 }
 
 export function getPlaybookById(id?: string | null): PlaybookPreset | undefined {
@@ -260,10 +401,7 @@ export function buildAugmentedPostContext(params: {
 }): string {
   const sections: string[] = [];
 
-  const personaLabel =
-    params.accountPersona === "creator"
-      ? "پیج کریتور / اینفلوئنسر / تولیدکننده محتوا"
-      : "پیج فروشگاهی / کسب‌وکار";
+  const personaLabel = PERSONA_META[normalizePersona(params.accountPersona)].aiLabel;
   sections.push(`[نوع و هویت پیج]: ${personaLabel}`);
 
   if (params.caption?.trim()) {

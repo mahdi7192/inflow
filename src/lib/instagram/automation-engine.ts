@@ -588,6 +588,7 @@ export async function processIncomingComment(
       commentReplyText = await generateContextualReplyWithAi({
         mode: "comment",
         accountUsername: account.username,
+        accountPersona: account.account_persona,
         postCaption: augmentedPostContext,
         username: identity.username,
         userFullName: identity.fullName,
@@ -647,6 +648,7 @@ export async function processIncomingComment(
       dmText = await generateContextualReplyWithAi({
         mode: "comment_dm",
         accountUsername: account.username,
+        accountPersona: account.account_persona,
         postCaption: augmentedPostContext,
         username: identity.username,
         userFullName: identity.fullName,
@@ -1407,6 +1409,7 @@ export async function processIncomingDm(
     replyText = await generateContextualReplyWithAi({
       mode: "dm_chat",
       accountUsername: account.username,
+      accountPersona: account.account_persona,
       postCaption: contextCaption,
       username: identity.username,
       userFullName: identity.fullName,

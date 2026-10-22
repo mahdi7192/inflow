@@ -59,7 +59,7 @@ export interface AccountRow {
   bot_vnc_token?: string | null;
   bot_vnc_expires_at?: string | null;
   bot_last_error?: string | null;
-  account_persona?: "business" | "creator";
+  account_persona?: "business" | "ecommerce" | "service_b2b" | "creator";
   brand_cheat_sheet?: string;
   website_url?: string;
   insights_json?: string | null;

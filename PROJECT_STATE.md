@@ -13,13 +13,13 @@
 - **هوش مصنوعی:** متصل به درگاه محلی `9Router` (`http://127.0.0.1:20128/v1`)
 
 ## ۲. وضعیت فعلی Spec-Kit
-- **وضعیت:** فعال و کامل در `/opt/inflow/.specify/` (شامل `constitution.md` و ۱۷ اسپک از `001-inflow-core` تا `018-autonomous-social-revenue-os`).
-- **آخرین Spec مستقرشده:** `018-autonomous-social-revenue-os` (Step 1 & Step 2 تکمیل‌شده: ناوبری یکپارچه ۴ تب، قفل تایپوگرافی Vazirmatn، جدول سرنخ‌های فروش `captured_leads`، و قابلیت Human Takeover در دایرکت).
+- **وضعیت:** فعال و کامل در `/opt/inflow/.specify/` (شامل `constitution.md` و ۱۹ اسپک از `001-inflow-core` تا `019-b2b-services-persona-playbooks`).
+- **آخرین Spec مستقرشده:** `019-b2b-services-persona-playbooks` (فاز میانی ۲.۵: تفکیک سه‌گانه پرسونا به `ecommerce`، `service_b2b` و `creator`، سناریوهای اختصاصی خدمات و مشاوره B2B، چیپ‌های تخصصی تقلب‌نامه و پرامپت مهندسی‌شده مشاوره‌ای).
 
 ## ۳. ساختار دیتابیس (`SQLite WAL` — `/opt/inflow/data/inflow.db`)
 - **جداول اصلی (۱۸ جدول):**
   - `users`, `user_sessions`, `user_accounts`: احراز هویت، نقش‌ها (`admin`/`user`) و تخصیص چندحسابی.
-  - `accounts`: حساب‌های اینستاگرام، توکن‌های SocialAPI، پرسونا (`business`/`creator`)، لحن برند و بایو.
+  - `accounts`: حساب‌های اینستاگرام، توکن‌های SocialAPI، پرسونا (`ecommerce`/`service_b2b`/`creator`)، لحن برند و بایو.
   - `posts`: کاتالوگ پست‌ها و ریلزها، `shortcode`، کپشن، قوانین اختصاصی پاسخ کامنت/دایرکت و متادیتای محصول (`structured_metadata`).
   - `comment_logs`, `dm_logs`: لاگ‌های پاسخ‌دهی با قفل یکتای `comment_id` و `message_id` (Idempotency).
   - `dm_automations`: قوانین اتوماسیون دایرکت.
@@ -29,5 +29,5 @@
   - `app_settings`: تنظیمات سراسری سیستم.
 
 ## ۴. آخرین وضعیت و گام بعدی
-- بیلد پروداکشن روی کامیت `226a1d0` پایدار و در حال سرویس‌دهی است.
-- نقشه راه ۵ مرحله‌ای در `ROADMAP.md` مستند شده و آماده ورود به مراحل بعدی (Steps 3-5) پس از دستور کاربر است.
+- بیلد پروداکشن با فاز میانی Spec 019 پایدار و در حال سرویس‌دهی است.
+- نقشه راه در `ROADMAP.md` به‌روزرسانی شده و آماده ورود به گام ۳ (کارت‌های تعاملی و استوری‌های زنده) است.

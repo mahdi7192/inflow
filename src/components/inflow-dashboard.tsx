@@ -35,7 +35,44 @@ import { I18N, Lang } from "@/lib/i18n";
 import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 import { PostPlaybookDrawer, type DrawerPostData } from "./post-playbook-drawer";
-import { getPlaybookById, type AccountPersona } from "@/lib/playbooks";
+import {
+  getPlaybookById,
+  normalizePersona,
+  PERSONA_META,
+  type AccountPersona,
+} from "@/lib/playbooks";
+
+const PERSONA_ORDER: AccountPersona[] = ["ecommerce", "service_b2b", "creator"];
+const PERSONA_TAB_KEY: Record<AccountPersona, string> = {
+  ecommerce: "personaEcommerce",
+  service_b2b: "personaServiceB2b",
+  creator: "personaCreator",
+};
+const PERSONA_STUDIO_KEY: Record<AccountPersona, string> = {
+  ecommerce: "studioEcommerce",
+  service_b2b: "studioServiceB2b",
+  creator: "studioCreator",
+};
+const PERSONA_STYLE: Record<
+  AccountPersona,
+  { badge: string; active: string; action: string }
+> = {
+  ecommerce: {
+    badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+    active: "bg-indigo-600 text-white shadow-xs",
+    action: "border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100",
+  },
+  service_b2b: {
+    badge: "bg-teal-50 text-teal-700 border border-teal-200",
+    active: "bg-teal-600 text-white shadow-xs",
+    action: "border-teal-200 bg-teal-50/80 text-teal-700 hover:bg-teal-100",
+  },
+  creator: {
+    badge: "bg-rose-50 text-rose-700 border border-rose-200",
+    active: "bg-rose-600 text-white shadow-xs",
+    action: "border-rose-200 bg-rose-50/80 text-rose-700 hover:bg-rose-100",
+  },
+};
 import { LogsModal } from "./modals/logs-modal";
 import { DeleteAccountModal } from "./modals/delete-account-modal";
 import { useWorkspace } from "@/components/layout/workspace-context";
@@ -125,7 +162,7 @@ export function InflowDashboard({
 
   // Spec 018: Persona, Brand Cheat Sheet & Live SocialAPI Insights
   const [accountPersona, setAccountPersona] = useState<AccountPersona>(
-    (initialProfile?.account_persona as AccountPersona) || "business"
+    normalizePersona(initialProfile?.account_persona)
   );
   const [brandCheatSheet, setBrandCheatSheet] = useState<string>(
     initialProfile?.brand_cheat_sheet || ""
@@ -417,8 +454,8 @@ export function InflowDashboard({
   // Sync Persona & Brand Cheat Sheet when profile changes
   useEffect(() => {
     if (profile) {
-      if (profile.account_persona === "creator" || profile.account_persona === "business") {
-        setAccountPersona(profile.account_persona);
+      if (profile.account_persona) {
+        setAccountPersona(normalizePersona(profile.account_persona));
       }
       if (typeof profile.brand_cheat_sheet === "string") {
         setBrandCheatSheet(profile.brand_cheat_sheet);
@@ -444,7 +481,7 @@ export function InflowDashboard({
           post_metrics: data.post_metrics || {},
         });
         if (data.account) {
-          setAccountPersona(data.account.account_persona || "business");
+          setAccountPersona(normalizePersona(data.account.account_persona));
           setBrandCheatSheet(data.account.brand_cheat_sheet || "");
           setWebsiteUrl(data.account.website_url || "");
         }
@@ -510,7 +547,6 @@ export function InflowDashboard({
       (p.comment_action_type !== "none" || p.dm_action_type !== "none")
   ).length;
   const cheatSheetCount = posts.filter((p) => (p.cheat_sheet || "").trim().length > 0).length;
-  const isCreatorPersona = accountPersona === "creator";
 
   return (
     <div className="w-full space-y-6 pb-10">
@@ -544,12 +580,10 @@ export function InflowDashboard({
                       <span
                         className={cn(
                           "text-[11px] font-bold px-2.5 py-0.5 rounded-full",
-                          isCreatorPersona
-                            ? "bg-rose-50 text-rose-700 border border-rose-200"
-                            : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          PERSONA_STYLE[accountPersona].badge
                         )}
                       >
-                        {isCreatorPersona ? "🎥 استودیو کریتور" : "🛍️ استودیو فروشگاه"}
+                        {PERSONA_META[accountPersona].emoji} {t(PERSONA_STUDIO_KEY[accountPersona])}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1 line-clamp-1">
@@ -560,32 +594,23 @@ export function InflowDashboard({
 
                 {/* Adaptive Persona Switcher + Brand Cheat Sheet + Sync */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Dual-Persona Switcher */}
+                  {/* Triple-Persona Switcher (Spec 019) */}
                   <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchPersona("business")}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                        !isCreatorPersona
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      )}
-                    >
-                      🛍️ فروشگاه و بیزینس
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSwitchPersona("creator")}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                        isCreatorPersona
-                          ? "bg-rose-600 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      )}
-                    >
-                      🎥 کریتور و بلاگر
-                    </button>
+                    {PERSONA_ORDER.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => handleSwitchPersona(p)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                          accountPersona === p
+                            ? PERSONA_STYLE[p].active
+                            : "text-slate-600 hover:text-slate-900"
+                        )}
+                      >
+                        {PERSONA_META[p].emoji} {t(PERSONA_TAB_KEY[p])}
+                      </button>
+                    ))}
                   </div>
 
                   {/* Brand Cheat Sheet Toggle */}
@@ -628,11 +653,7 @@ export function InflowDashboard({
                     rows={3}
                     value={brandCheatSheet}
                     onChange={(e) => setBrandCheatSheet(e.target.value)}
-                    placeholder={
-                      isCreatorPersona
-                        ? "مثال: من مهدی هستم، تولیدکننده محتوای تکنولوژی و هوش مصنوعی. لحن پاسخگویی باید صمیمی و پرانرژی باشد. لینک کانال تلگرام و یوتیوب در بایو هست..."
-                        : "مثال: ارسال به سراسر ایران با پست پیشتاز (۶۵ هزار تومان، بالای ۲ میلیون رایگان) | تحویل تهران با پیک | امکان تعویض سایز تا ۴۸ ساعت..."
-                    }
+                    placeholder={PERSONA_META[accountPersona].brandSheetPlaceholder}
                     className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
@@ -985,9 +1006,7 @@ export function InflowDashboard({
                               <span
                                 className={cn(
                                   "text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1",
-                                  pbPreset.persona === "creator"
-                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                    : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                  PERSONA_STYLE[pbPreset.persona].badge
                                 )}
                               >
                                 <span>{pbPreset.emoji}</span>
@@ -1052,9 +1071,7 @@ export function InflowDashboard({
                           }}
                           className={cn(
                             "text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer",
-                            isCreatorPersona
-                              ? "border-rose-200 bg-rose-50/80 text-rose-700 hover:bg-rose-100"
-                              : "border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100"
+                            PERSONA_STYLE[accountPersona].action
                           )}
                         >
                           <Zap className="w-3.5 h-3.5" />

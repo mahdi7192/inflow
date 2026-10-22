@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { deleteAccount, getDb, type AccountRow } from "@/lib/db";
+import { normalizePersona } from "@/lib/playbooks";
 
 interface RouteParams {
   params: Promise<{
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         username: account.username,
         display_name: account.display_name,
         bio: account.bio,
-        account_persona: account.account_persona || "business",
+        account_persona: normalizePersona(account.account_persona),
         brand_cheat_sheet: account.brand_cheat_sheet || "",
         website_url: account.website_url || "",
       },
@@ -79,9 +80,12 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     const nextPersona =
-      body.account_persona === "creator" || body.account_persona === "business"
-        ? body.account_persona
-        : existing.account_persona || "business";
+      body.account_persona === "creator" ||
+      body.account_persona === "service_b2b" ||
+      body.account_persona === "ecommerce" ||
+      body.account_persona === "business"
+        ? normalizePersona(body.account_persona)
+        : normalizePersona(existing.account_persona);
     const nextBrandCheatSheet =
       typeof body.brand_cheat_sheet === "string"
         ? body.brand_cheat_sheet.trim()
@@ -108,7 +112,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       success: true,
       account: {
         username: updated.username,
-        account_persona: updated.account_persona || "business",
+        account_persona: normalizePersona(updated.account_persona),
         brand_cheat_sheet: updated.brand_cheat_sheet || "",
         website_url: updated.website_url || "",
       },

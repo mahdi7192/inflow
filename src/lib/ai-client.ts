@@ -333,6 +333,7 @@ export interface GenerateReplyParams {
   followerCount?: number;
   isFollowing?: boolean;
   appLanguage?: "fa" | "en" | "ar";
+  accountPersona?: string | null;
   incomingText: string;
   instructions: string;
   fallbackText?: string;
@@ -401,6 +402,21 @@ function getLanguageDirective(lang: "fa" | "en" | "ar"): string {
     return "زبان پنل برنامه: عربی (العربية). مگر اینکه در دستورالعمل ادمین یا پیام کاربر صراحتاً زبان دیگری خواسته شده باشد، به زبان عربی طبیعی پاسخ دهید.";
   }
   return "زبان پنل برنامه: فارسی (fa). پاسخ را به زبان فارسی روان، طبیعی و محترمانه بنویسید (مگر اینکه در دستورالعمل ادمین زبان دیگری خواسته شده باشد).";
+}
+
+/**
+ * Persona-specific tone & goal directive (Spec 019). Legacy `business` behaves as `ecommerce`.
+ */
+function getPersonaDirective(persona?: string | null): string {
+  if (persona === "service_b2b") {
+    return `\nنوع پیج: خدمات و مشاوره (B2B). لحن شما مشاوره‌ای، حرفه‌ای و محترمانه است (مثل مدیر حساب ارشد).
+این پیج سبد خرید، موجودی یا ارسال پستی ندارد؛ هرگز قیمت قطعی یا لینک خرید نسازید. قیمت دقیق را فقط از تقلب‌نامه بگویید، وگرنه بگویید پس از بررسی نیاز، پیشنهاد اختصاصی ارسال می‌شود.
+هدف: کشف نیاز با یک یا دو سوال کوتاه در هر پیام (نوع کسب‌وکار، هدف پروژه، بازه زمانی، بودجه)، سپس گرفتن شماره تماس یا ارسال لینک رزرو جلسه/پورتفولیو، بدون فشار و ربات‌وار.`;
+  }
+  if (persona === "creator") {
+    return `\nنوع پیج: کریتور / تولیدکننده محتوا. لحن شما صمیمی، پرانرژی و شبیه صاحب پیج است.`;
+  }
+  return "";
 }
 
 /**
@@ -569,6 +585,8 @@ ${
     : "پاسخ شما به کاربر:"
 }`;
   }
+
+  sys += getPersonaDirective(params.accountPersona);
 
   const generated = await callLlmCompletion(sys, usr, chatHistoryMessages);
   if (generated && generated.length > 0) {

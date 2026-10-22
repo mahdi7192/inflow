@@ -28,7 +28,40 @@ import {
   type PlaybookId,
   getPlaybooksForPersona,
   getPlaybookById,
+  normalizePersona,
+  PERSONA_META,
 } from "@/lib/playbooks";
+
+const PERSONA_ORDER: AccountPersona[] = ["ecommerce", "service_b2b", "creator"];
+const PERSONA_ACCENT: Record<
+  AccountPersona,
+  { icon: string; tab: string; border: string; badge: string; radio: string; button: string }
+> = {
+  ecommerce: {
+    icon: "text-indigo-600",
+    tab: "bg-indigo-600 text-white shadow-xs",
+    border: "border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600/20",
+    badge: "bg-indigo-100 text-indigo-700",
+    radio: "border-indigo-600 bg-indigo-600 text-white",
+    button: "bg-indigo-600 hover:bg-indigo-700",
+  },
+  service_b2b: {
+    icon: "text-teal-600",
+    tab: "bg-teal-600 text-white shadow-xs",
+    border: "border-teal-600 bg-teal-50/50 ring-1 ring-teal-600/20",
+    badge: "bg-teal-100 text-teal-700",
+    radio: "border-teal-600 bg-teal-600 text-white",
+    button: "bg-teal-600 hover:bg-teal-700",
+  },
+  creator: {
+    icon: "text-rose-600",
+    tab: "bg-rose-600 text-white shadow-xs",
+    border: "border-rose-500 bg-rose-50/50 ring-1 ring-rose-500/20",
+    badge: "bg-rose-100 text-rose-700",
+    radio: "border-rose-600 bg-rose-600 text-white",
+    button: "bg-rose-600 hover:bg-rose-700",
+  },
+};
 
 export interface DrawerPostData {
   id: number;
@@ -83,9 +116,11 @@ export function PostPlaybookDrawer({
   onClose,
   onSaved,
 }: PostPlaybookDrawerProps) {
-  const playbooks = getPlaybooksForPersona(persona);
-  const defaultPlaybookId: PlaybookId =
-    persona === "creator" ? "creator_magnet" : "auto_seller";
+  const accountPersona = normalizePersona(persona);
+  // Persona tab currently shown in the drawer (starts at the account persona)
+  const [viewPersona, setViewPersona] = useState<AccountPersona>(accountPersona);
+  const playbooks = getPlaybooksForPersona(viewPersona);
+  const defaultPlaybookId: PlaybookId = PERSONA_META[viewPersona].defaultPlaybook;
 
   const [autoReply, setAutoReply] = useState(true);
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookId>(defaultPlaybookId);
@@ -111,15 +146,20 @@ export function PostPlaybookDrawer({
     if (!post) return;
     setAutoReply(post.auto_reply === 1);
     const existingPb = (post.playbook_id as PlaybookId) || "custom";
+    const existingPreset = getPlaybookById(existingPb);
+    const basePersona = existingPreset ? existingPreset.persona : accountPersona;
     const resolvedPb =
       existingPb !== "custom"
         ? existingPb
         : post.dm_require_follow === 1
-        ? persona === "creator"
+        ? accountPersona === "creator"
           ? "creator_magnet"
+          : accountPersona === "service_b2b"
+          ? "brief_qualifier"
           : "viral_gate"
-        : defaultPlaybookId;
+        : PERSONA_META[accountPersona].defaultPlaybook;
 
+    setViewPersona(basePersona);
     setSelectedPlaybook(resolvedPb);
     setCheatSheet(post.cheat_sheet || "");
     setTargetUrl(post.target_url || "");
@@ -134,7 +174,7 @@ export function PostPlaybookDrawer({
     setDmActionText(post.dm_action_text || "");
     setDmRequireFollow(post.dm_require_follow === 1);
     setSaveSuccess(false);
-  }, [post, persona, defaultPlaybookId]);
+  }, [post, accountPersona]);
 
   if (!post) return null;
 
@@ -155,7 +195,12 @@ export function PostPlaybookDrawer({
     }
   };
 
-  const handleAppendChip = (snippet: string) => {
+  const handleSwitchViewPersona = (next: AccountPersona) => {
+    setViewPersona(next);
+    handleSelectPlaybook(PERSONA_META[next].defaultPlaybook);
+  };
+
+  const handleAppendChip =(snippet: string) => {
     setCheatSheet((prev) => {
       if (!prev.trim()) return snippet.trim();
       return `${prev.trim()}\n${snippet.trim()}`;
@@ -211,7 +256,7 @@ export function PostPlaybookDrawer({
   const saves = Number(metrics.saves || metrics.saved || 0);
   const skipRate = typeof metrics.skip_rate === "number" ? metrics.skip_rate : null;
 
-  const isCreator = persona === "creator";
+  const accent = PERSONA_ACCENT[viewPersona];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] animate-in fade-in duration-150">
@@ -400,27 +445,35 @@ export function PostPlaybookDrawer({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <Sparkles
-                  className={`w-4 h-4 ${
-                    isCreator ? "text-rose-600" : "text-indigo-600"
-                  }`}
-                />
+                <Sparkles className={`w-4 h-4 ${accent.icon}`} />
                 <span>
-                  ۱. هدف این پست چیست؟ (انتخاب ۱-کلیکی سناریو —{" "}
-                  {isCreator ? "حالت کریتور و بلاگر" : "حالت فروشگاه و بیزینس"})
+                  ۱. هدف این پست چیست؟ (انتخاب ۱-کلیکی سناریو — {PERSONA_META[viewPersona].tabLabel})
                 </span>
               </label>
+            </div>
+
+            <div className="inline-flex w-full items-center p-1 rounded-xl bg-slate-100 border border-slate-200">
+              {PERSONA_ORDER.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handleSwitchViewPersona(p)}
+                  className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    viewPersona === p
+                      ? PERSONA_ACCENT[p].tab
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {PERSONA_META[p].emoji} {PERSONA_META[p].tabLabel}
+                </button>
+              ))}
             </div>
 
             <div className="grid grid-cols-1 gap-2.5">
               {playbooks.map((pb) => {
                 const isSelected = selectedPlaybook === pb.id;
-                const activeBorderClass = isCreator
-                  ? "border-rose-500 bg-rose-50/50 ring-1 ring-rose-500/20"
-                  : "border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600/20";
-                const badgeClass = isCreator
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-indigo-100 text-indigo-700";
+                const activeBorderClass = accent.border;
+                const badgeClass = accent.badge;
 
                 return (
                   <button
@@ -455,9 +508,7 @@ export function PostPlaybookDrawer({
                       <div
                         className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                           isSelected
-                            ? isCreator
-                              ? "border-rose-600 bg-rose-600 text-white"
-                              : "border-indigo-600 bg-indigo-600 text-white"
+                            ? accent.radio
                             : "border-slate-300"
                         }`}
                       >
@@ -510,11 +561,7 @@ export function PostPlaybookDrawer({
             <div className="pt-1">
               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 mb-1.5">
                 <Link2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>
-                  {isCreator
-                    ? "لینک فایل / ویدیو / لندینگ اسپانسر (ارسال خودکار در دایرکت با رهگیری کلیک):"
-                    : "لینک مستقیم خرید محصول در سایت یا کاتالوگ (اختیاری — همراه رهگیری خودکار مشتری):"}
-                </span>
+                <span>{PERSONA_META[viewPersona].targetUrlLabel}</span>
               </label>
               <input
                 type="text"
@@ -732,9 +779,7 @@ export function PostPlaybookDrawer({
               disabled={saving}
               onClick={handleSave}
               className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-sm inline-flex items-center gap-1.5 transition-all ${
-                isCreator
-                  ? "bg-rose-600 hover:bg-rose-700"
-                  : "bg-indigo-600 hover:bg-indigo-700"
+                accent.button
               } disabled:opacity-50`}
             >
               {saving ? (
