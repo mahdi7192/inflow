@@ -1270,24 +1270,26 @@ export function InflowDashboard({
           </div>
 
         {/* 1-Click Slide-Over Playbook & Cheat Sheet Drawer (Spec 018) */}
-        <PostPlaybookDrawer
-          post={activeDrawerPost}
-          persona={accountPersona}
-          accountUsername={currentAccount}
-          postMetrics={
-            drawerShortcode ? liveInsights?.post_metrics?.[drawerShortcode] : undefined
-          }
-          onClose={() => setDrawerShortcode(null)}
-          onSaved={(updatedPost) => {
-            setPosts((prev) =>
-              prev.map((p) =>
-                p.shortcode === updatedPost.shortcode
-                  ? ({ ...p, ...updatedPost } as unknown as PostRow)
-                  : p
-              )
-            );
-          }}
-        />
+        {drawerShortcode && activeDrawerPost && (
+          <PostPlaybookDrawer
+            post={activeDrawerPost}
+            persona={accountPersona}
+            accountUsername={currentAccount}
+            postMetrics={
+              drawerShortcode ? liveInsights?.post_metrics?.[drawerShortcode] : undefined
+            }
+            onClose={() => setDrawerShortcode(null)}
+            onSaved={(updatedPost) => {
+              setPosts((prev) =>
+                prev.map((p) =>
+                  p.shortcode === updatedPost.shortcode
+                    ? ({ ...p, ...updatedPost } as unknown as PostRow)
+                    : p
+                )
+              );
+            }}
+          />
+        )}
 
         {/* Logs Modal */}
         {logsShortcode && activeLogPost && (

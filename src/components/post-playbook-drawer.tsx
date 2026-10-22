@@ -186,6 +186,15 @@ export function PostPlaybookDrawer({
     setSaveSuccess(false);
   }, [post, accountPersona]);
 
+  useEffect(() => {
+    if (!post) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [post]);
+
   if (!post) return null;
 
   const activePreset = getPlaybookById(selectedPlaybook, lang) || playbooks[0];
@@ -250,14 +259,6 @@ export function PostPlaybookDrawer({
       setSaving(false);
     }
   };
-
-  useEffect(() => {
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = orig;
-    };
-  }, []);
 
   // Parse post metrics
   let metrics: Record<string, unknown> = postMetrics || {};
