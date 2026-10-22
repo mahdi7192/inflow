@@ -39,8 +39,8 @@ inFlow is designed as a **Self-Contained Next.js Control Plane** powered by the 
 | **Framework** | Next.js 16 (App Router) | Turbopack enabled |
 | **Database** | SQLite via `better-sqlite3` | Stored in `data/inflow.db` (WAL mode enabled) |
 | **Instagram Provider** | SocialAPI.ai (`src/lib/social-api.ts`) | `https://api.social-api.ai/v1` + Signed Webhooks |
-| **Styling & UI** | Tailwind CSS v4 + shadcn/ui primitives | Light mode default (pure shadcn zinc theme), Vazirmatn font for Persian/Arabic |
-| **Typography** | `Vazirmatn`, `Geist`, `Geist Mono` | RTL / LTR bidirectional support |
+| **Styling & UI** | Tailwind CSS v4 + `inFlow Studio` Design System (`DESIGN.md`) | Alabaster Light Theme (`#F8FAFC` canvas, `#FFFFFF` cards, `#E2E8F0` borders, Dual-Persona accents) |
+| **Typography** | `Vazirmatn`, `Geist`, `Geist Mono` (`tabular-nums`) | RTL / LTR bidirectional support |
 
 ### Key Developer Commands
 ```bash
@@ -60,19 +60,27 @@ Database file is located at `data/inflow.db`. It is initialized and migrated aut
 
 ### Tables
 
-1. **`accounts` (Multi-Account Support)**:
+1. **`accounts` (Multi-Account Support & Dual-Persona Studio)**:
    * `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
    * `username` (TEXT UNIQUE NOT NULL) — e.g. `r9spoort1`, `inflow.shop`
    * `social_account_id` (TEXT DEFAULT NULL) — Mapped SocialAPI.ai account ID (`acc_...`)
    * `display_name`, `avatar_url`, `bio`, `followers_text`, `posts_count`
+   * `account_persona` (`'business'` | `'creator'`) — Adapts Studio Playbooks, vocabulary, and theme accents
+   * `brand_cheat_sheet` (TEXT) — Account-wide persistent facts (shipping, return rules, bio context) injected into all AI prompts
+   * `website_url` (TEXT), `insights_json` (TEXT) — Cached zero-credit SocialAPI account analytics & active 24h stories
    * `status` (`active` | `paused`)
    * `session_status` (`unauthenticated` | `active` | `reauth_required` | `paused` | `error`)
    * `last_sync_at`, `last_heartbeat_at`, `updated_at`, `created_at`
-2. **`posts` (1-to-1 Post / Reel Mapping)**:
+2. **`posts` (1-to-1 Post / Reel Mapping, Playbooks & Cheat Sheets)**:
    * `shortcode` (TEXT UNIQUE NOT NULL), `media_id` (Remote post ID), `account_username`, `post_type`, `thumbnail_url`, `caption`, `auto_reply`, `trigger_type`, `trigger_context`, `trigger_keywords`, `comment_action_type`, `comment_action_text`, `dm_action_type`, `dm_action_text`, `dm_require_follow`
+   * `playbook_id` (`'custom'` | `'auto_seller'` | `'viral_gate'` | `'lead_closer'` | `'creator_magnet'` | `'creator_twin'` | `'sponsor_campaign'`)
+   * `cheat_sheet` (TEXT) — Supplemental post facts not written in the Instagram caption (price, sizes, stock, promo codes, prompts) bridged across both comment replies and DM conversations
+   * `target_url` (TEXT) — Post destination link automatically enriched with `?utm_source=instagram_inflow&utm_content={shortcode}&ig_user={username}`
+   * `smart_moderation` (INTEGER) — Zero-credit competitor poaching & spam comment auto-hide (`0` | `1`)
+   * `metrics_json` (TEXT) — Cached deep post metrics (`views`, `reach`, `saves`, `shares`, `follows`, `skip_rate`)
 3. **`comment_logs` & `dm_logs` (Idempotency Locks & History)**:
    * `comment_logs.comment_id` (TEXT UNIQUE NOT NULL) — Guarantees no comment is ever replied to twice.
-   * `dm_logs.message_id` (TEXT UNIQUE NOT NULL) — Guarantees no incoming DM is ever auto-replied to twice.
+   * `dm_logs.message_id` (TEXT UNIQUE NOT NULL) — Guarantees no incoming DM is ever auto-replied to twice (`read_at` tracks `dm.status.read` webhook receipts).
 4. **`app_settings` (Platform Credentials)**:
    * Stores `social_api_key`, `social_webhook_secret`, `social_webhook_id`, `ai_provider`, `ai_api_key`, and `ai_model`.
 5. **`users`, `user_sessions`, `user_accounts` (Multi-Tenant RBAC)**:
@@ -96,4 +104,7 @@ Database file is located at `data/inflow.db`. It is initialized and migrated aut
 2. **Preserve Next.js Server External Packages:** `better-sqlite3` must remain in `serverExternalPackages` within `next.config.ts`.
 3. **Persian & RTL Standards:** All user-facing Persian text must support RTL and use the `Vazirmatn` font. Maintain 100% key parity across `src/locales/{fa,en,ar}.json`.
 4. **Idempotency Over Everything:** Never bypass or remove `comment_id` or `message_id` unique constraints.
-5. **Unified Design System & shadcn/ui Light Mode Standard:** Use `src/components/ui/` primitives in canonical Light Mode.
+5. **Unified Studio Design System (`DESIGN.md` & `docs/design-system.md`):**
+   * Strictly follow `/DESIGN.md` and `/docs/design-system.md`.
+   * Use **inFlow Studio Light Theme** (`#F8FAFC` Cool Alabaster canvas, `#FFFFFF` pure white surfaces, `#E2E8F0` hairline borders, `--persona-business: #4F46E5` for Business/Stores, `--persona-creator: #E11D48` for Creators/Influencers, `--status-active: #059669` for active Autopilot).
+   * Maintain the **Slide-Over Context Drawer (`PostPlaybookDrawer`)**, **1-Click Playbook Cards (`src/lib/playbooks.ts`)**, and **Supplemental Cheat Sheet (`cheat_sheet` / تقلب‌نامه پست و پیج)** patterns across all new features.
