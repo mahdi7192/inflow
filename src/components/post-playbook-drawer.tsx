@@ -302,7 +302,7 @@ export function PostPlaybookDrawer({
                   <Eye className="w-3 h-3 text-slate-400" />
                   <span>ویو / ریچ</span>
                 </div>
-                <div className="text-sm font-bold font-mono tabular-nums text-slate-900 mt-1">
+                <div className="text-sm font-bold tabular-nums text-slate-900 mt-1">
                   {views > 0 ? views.toLocaleString("fa-IR") : "—"}
                 </div>
                 {reach > 0 && (
@@ -317,7 +317,7 @@ export function PostPlaybookDrawer({
                   <MessageCircle className="w-3 h-3 text-indigo-500" />
                   <span>کامنت و پاسخ</span>
                 </div>
-                <div className="text-sm font-bold font-mono tabular-nums text-slate-900 mt-1">
+                <div className="text-sm font-bold tabular-nums text-slate-900 mt-1">
                   {(post.logs_count || 0).toLocaleString("fa-IR")}
                 </div>
                 <div className="text-[10px] text-emerald-600 mt-0.5">
@@ -330,7 +330,7 @@ export function PostPlaybookDrawer({
                   <Send className="w-3 h-3 text-emerald-600" />
                   <span>دایرکت ارسالی</span>
                 </div>
-                <div className="text-sm font-bold font-mono tabular-nums text-emerald-700 mt-1">
+                <div className="text-sm font-bold tabular-nums text-emerald-700 mt-1">
                   {(post.dms_count || 0).toLocaleString("fa-IR")}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
@@ -343,7 +343,7 @@ export function PostPlaybookDrawer({
                   <UserPlus className="w-3 h-3 text-rose-500" />
                   <span>فالوور / سیو</span>
                 </div>
-                <div className="text-sm font-bold font-mono tabular-nums text-rose-600 mt-1">
+                <div className="text-sm font-bold tabular-nums text-rose-600 mt-1">
                   +{follows.toLocaleString("fa-IR")}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">

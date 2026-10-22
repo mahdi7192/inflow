@@ -1113,8 +1113,117 @@ export async function processIncomingDm(
     // Pending comment rewards stay locked in `pending_follow`, and we proceed to evaluate the DM module below!
   }
 
-  // 5. Standard DM Automation Module Evaluation
-  if (!dmRule || dmRule.enabled !== 1) {
+  // 4.8. Spec 018 Step 2 & 3: Cross-Channel Origin Lookup, Lead Capture & Human Takeover Check
+  const recentCommentOrigin = db
+    .prepare(`
+      SELECT c.shortcode, c.comment_text, c.dm_text, p.caption, p.cheat_sheet, p.target_url, p.auto_reply, p.dm_action_type, p.dm_action_text
+      FROM comment_logs c
+      LEFT JOIN posts p ON p.shortcode = c.shortcode
+      WHERE c.account_username = ?
+        AND (c.user_id = ? OR LOWER(c.username) = ?)
+      ORDER BY c.id DESC
+      LIMIT 1
+    `)
+    .get(
+      account.username,
+      identity.userId || "__none__",
+      identity.username.toLowerCase()
+    ) as
+    | {
+        shortcode: string;
+        comment_text: string;
+        dm_text: string;
+        caption?: string;
+        cheat_sheet?: string;
+        target_url?: string;
+        auto_reply?: number;
+        dm_action_type?: string;
+        dm_action_text?: string;
+      }
+    | undefined;
+
+  // Auto-extract Iranian phone number & buying intent into captured_leads
+  try {
+    const normalizedDigits = (event.incomingText || "")
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+    const phoneCandidate = normalizedDigits
+      .replace(/[\s\-_().]/g, "")
+      .match(/(?:\+98|0098|98|0)?(9\d{9})/);
+    const extractedPhone = phoneCandidate ? `0${phoneCandidate[1]}` : "";
+    const hasOrderIntent =
+      Boolean(extractedPhone) ||
+      /(سفارش|خرید|شماره|تماس|کارت به کارت|بیعانه|ارسال|موجوده|قیمت|چنده|آدرس|ادرس)/i.test(
+        normalizedDigits
+      );
+
+    if (extractedPhone || (hasOrderIntent && recentCommentOrigin?.shortcode)) {
+      const leadPhoneKey = extractedPhone || "بدون شماره (درخواست خرید)";
+      const intentLabel = extractedPhone
+        ? "شماره تماس ثبت‌شده در دایرکت"
+        : "مشتری علاقه‌مند از پست";
+      db.prepare(`
+        INSERT INTO captured_leads (
+          account_username, sender_username, sender_full_name, sender_id,
+          phone_number, source_shortcode, intent_summary, last_message,
+          status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)
+        ON CONFLICT(account_username, sender_username, phone_number) DO UPDATE SET
+          sender_full_name = CASE WHEN excluded.sender_full_name != '' THEN excluded.sender_full_name ELSE captured_leads.sender_full_name END,
+          source_shortcode = CASE WHEN excluded.source_shortcode != '' THEN excluded.source_shortcode ELSE captured_leads.source_shortcode END,
+          last_message = excluded.last_message,
+          updated_at = excluded.updated_at
+      `).run(
+        account.username,
+        identity.username,
+        identity.fullName || "",
+        identity.userId || "",
+        leadPhoneKey,
+        recentCommentOrigin?.shortcode || "",
+        intentLabel,
+        (event.incomingText || "").slice(0, 300),
+        nowTimestamp(),
+        nowTimestamp()
+      );
+    }
+  } catch (leadErr) {
+    console.warn("[automation-engine] Lead extraction warning:", leadErr);
+  }
+
+  // Check Human Takeover (Bot Pause per User)
+  const threadState = db
+    .prepare(
+      "SELECT bot_paused FROM dm_thread_states WHERE account_username = ? AND LOWER(sender_username) = ?"
+    )
+    .get(account.username, identity.username.toLowerCase()) as
+    | { bot_paused: number }
+    | undefined;
+
+  if (threadState?.bot_paused === 1) {
+    db.prepare(`
+      UPDATE dm_logs
+      SET trigger_matched = 0,
+          reply_status = 'skipped',
+          reply_text = '[⏸️ ربات برای این کاربر متوقف است — مکالمه در اختیار ادمین انسانی]',
+          processed_at = ?
+      WHERE id = ?
+    `).run(nowTimestamp(), dmLogId);
+    return {
+      processed: true,
+      trigger_matched: false,
+      reply_status: "skipped",
+    };
+  }
+
+  const isPostContinuation = Boolean(
+    recentCommentOrigin &&
+      recentCommentOrigin.auto_reply === 1 &&
+      recentCommentOrigin.dm_action_type === "ai"
+  );
+  const globalDmEnabled = Boolean(dmRule && dmRule.enabled === 1);
+
+  // 5. Standard DM Automation Module Evaluation (or Seamless Post-to-DM Continuation)
+  if (!globalDmEnabled && !isPostContinuation) {
     db.prepare(`
       UPDATE dm_logs
       SET trigger_matched = 0, reply_status = 'skipped', processed_at = ?
@@ -1127,8 +1236,8 @@ export async function processIncomingDm(
     };
   }
 
-  // Skip messages created before DM automation was activated
-  if (event.messageCreatedAt && dmRule.activated_at) {
+  // Skip messages created before DM automation was activated (only when relying purely on global DM rule)
+  if (globalDmEnabled && !isPostContinuation && event.messageCreatedAt && dmRule?.activated_at) {
     const msgTimeMs = new Date(event.messageCreatedAt).getTime();
     const actTimeMs = new Date(
       dmRule.activated_at.includes("T")
@@ -1151,7 +1260,7 @@ export async function processIncomingDm(
     }
   }
 
-  if (event.isStoryReply && dmRule.story_handling_mode === "ignore") {
+  if (event.isStoryReply && dmRule?.story_handling_mode === "ignore") {
     db.prepare(`
       UPDATE dm_logs
       SET trigger_matched = 0, reply_status = 'skipped', processed_at = ?
@@ -1176,11 +1285,13 @@ export async function processIncomingDm(
 
   // 7. Evaluate DM Trigger (`all` | `keywords` | `ai_context` + Active AI Conversation Continuation)
   let matched = false;
-  if (dmRule.trigger_type === "all") {
+  if (isPostContinuation) {
     matched = true;
-  } else if (dmRule.trigger_type === "keywords") {
+  } else if (dmRule?.trigger_type === "all") {
+    matched = true;
+  } else if (dmRule?.trigger_type === "keywords") {
     matched = matchesKeywords(event.incomingText, dmRule.trigger_keywords);
-  } else if (dmRule.trigger_type === "ai_context") {
+  } else if (dmRule?.trigger_type === "ai_context") {
     matched = await evaluateTriggerWithAi({
       postCaption: event.storyContent || account.bio || "Instagram Direct Message",
       commentText: event.incomingText,
@@ -1192,7 +1303,7 @@ export async function processIncomingDm(
   }
 
   // If this user is already in an active AI conversation in this thread, continue the conversation naturally!
-  if (!matched && dmRule.reply_mode === "ai" && conversationHistory.length > 0) {
+  if (!matched && (dmRule?.reply_mode === "ai" || isPostContinuation) && conversationHistory.length > 0) {
     matched = true;
   }
 
@@ -1211,7 +1322,8 @@ export async function processIncomingDm(
 
   // 8. Generate DM Reply (`direct` | `ai` with Conversation History, User Name & Panel Language)
   let replyText = "";
-  if (dmRule.reply_mode === "direct") {
+  const effectiveReplyMode = isPostContinuation ? "ai" : dmRule?.reply_mode || "ai";
+  if (effectiveReplyMode === "direct" && dmRule) {
     replyText =
       interpolateStaticText(dmRule.direct_reply_text, {
         username: identity.username,
@@ -1219,31 +1331,6 @@ export async function processIncomingDm(
       }) || "سلام! پیام شما دریافت شد 🙏";
   } else {
     // Spec 018: Cross-Channel Comment-to-DM Context Bridge + Supplemental Cheat Sheets
-    const recentCommentOrigin = db
-      .prepare(`
-        SELECT c.shortcode, c.comment_text, c.dm_text, p.caption, p.cheat_sheet, p.target_url
-        FROM comment_logs c
-        LEFT JOIN posts p ON p.shortcode = c.shortcode
-        WHERE c.account_username = ?
-          AND (c.user_id = ? OR LOWER(c.username) = ?)
-        ORDER BY c.id DESC
-        LIMIT 1
-      `)
-      .get(
-        account.username,
-        identity.userId || "__none__",
-        identity.username.toLowerCase()
-      ) as
-      | {
-          shortcode: string;
-          comment_text: string;
-          dm_text: string;
-          caption?: string;
-          cheat_sheet?: string;
-          target_url?: string;
-        }
-      | undefined;
-
     const catalogCheatSheets = db
       .prepare(`
         SELECT shortcode, caption, cheat_sheet, target_url
@@ -1327,19 +1414,22 @@ export async function processIncomingDm(
       isFollowing: identity.isFollowing,
       appLanguage,
       incomingText: event.incomingText,
-      instructions: dmRule.ai_prompt_instructions,
+      instructions:
+        [recentCommentOrigin?.dm_action_text, dmRule?.ai_prompt_instructions]
+          .filter(Boolean)
+          .join("\n") || "با لحن محترمانه و صمیمی بر اساس تقلب‌نامه پست و پیج پاسخ بده.",
       conversationHistory,
       fallbackText:
-        dmRule.direct_reply_text?.trim() || "سلام! چطور می‌توانم کمکتان کنم؟ 🙏",
+        dmRule?.direct_reply_text?.trim() || "سلام! چطور می‌توانم کمکتان کنم؟ 🙏",
     });
   }
 
-  // 9. Check DM Follow Gate (`dmRule.require_follow === 1` AND `!identity.isFollowing`)
-  if (dmRule.require_follow === 1 && !identity.isFollowing) {
+  // 9. Check DM Follow Gate (`dmRule?.require_follow === 1` AND `!identity.isFollowing`)
+  if (dmRule?.require_follow === 1 && !identity.isFollowing) {
     const followTexts = getLocalizedFollowTexts(
       appLanguage,
       account.username,
-      dmRule.follow_prompt_text
+      dmRule?.follow_prompt_text
     );
     const followButtons: InstagramButton[] = [
       {

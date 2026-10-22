@@ -257,6 +257,32 @@ export interface ActionQueueRow {
   updated_at: string;
 }
 
+export interface DMThreadStateRow {
+  id: number;
+  account_username: string;
+  sender_username: string;
+  sender_id: string;
+  thread_id: string;
+  bot_paused: number; // 0 or 1 (Human Takeover)
+  paused_by: string;
+  updated_at: string;
+}
+
+export interface CapturedLeadRow {
+  id: number;
+  account_username: string;
+  sender_username: string;
+  sender_full_name: string;
+  sender_id: string;
+  phone_number: string;
+  source_shortcode: string;
+  intent_summary: string;
+  last_message: string;
+  status: "new" | "contacted" | "converted";
+  created_at: string;
+  updated_at: string;
+}
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "inflow.db");
 
@@ -567,6 +593,36 @@ function migrateSchema(db: Database.Database) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_action_queue_dedupe_key
     ON action_queue(dedupe_key)
     WHERE dedupe_key IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS dm_thread_states (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT NOT NULL,
+      sender_username TEXT NOT NULL,
+      sender_id TEXT NOT NULL DEFAULT '',
+      thread_id TEXT NOT NULL DEFAULT '',
+      bot_paused INTEGER NOT NULL DEFAULT 0,
+      paused_by TEXT NOT NULL DEFAULT 'admin',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(account_username, sender_username)
+    );
+    CREATE INDEX IF NOT EXISTS idx_dm_thread_states_acc_user ON dm_thread_states(account_username, sender_username);
+
+    CREATE TABLE IF NOT EXISTS captured_leads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT NOT NULL,
+      sender_username TEXT NOT NULL,
+      sender_full_name TEXT NOT NULL DEFAULT '',
+      sender_id TEXT NOT NULL DEFAULT '',
+      phone_number TEXT NOT NULL DEFAULT '',
+      source_shortcode TEXT NOT NULL DEFAULT '',
+      intent_summary TEXT NOT NULL DEFAULT '',
+      last_message TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'new',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(account_username, sender_username, phone_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_captured_leads_account ON captured_leads(account_username, updated_at DESC);
   `);
 
   // Drop deprecated dm_knowledge_pages table if exists

@@ -721,7 +721,7 @@ export function InflowDashboard({
                     <Eye className="w-4 h-4 text-slate-400" />
                   </div>
                   <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-xl font-bold font-mono tabular-nums text-slate-900">
+                    <span className="text-xl font-bold tabular-nums text-slate-900">
                       {(liveInsights?.funnel?.views || 0).toLocaleString("fa-IR")}
                     </span>
                     {liveInsights?.funnel?.avg_skip_rate ? (
@@ -742,7 +742,7 @@ export function InflowDashboard({
                     <MessageSquare className="w-4 h-4 text-indigo-500" />
                   </div>
                   <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-xl font-bold font-mono tabular-nums text-slate-900">
+                    <span className="text-xl font-bold tabular-nums text-slate-900">
                       {(
                         liveInsights?.funnel?.total_comments ??
                         posts.reduce(
@@ -764,7 +764,7 @@ export function InflowDashboard({
                     <Send className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-xl font-bold font-mono tabular-nums text-emerald-700">
+                    <span className="text-xl font-bold tabular-nums text-emerald-700">
                       {(liveInsights?.funnel?.total_dms_sent || 0).toLocaleString("fa-IR")}
                     </span>
                     <span className="text-[11px] text-slate-600 font-medium">
@@ -779,7 +779,7 @@ export function InflowDashboard({
                     <UserCheck className="w-4 h-4 text-rose-500" />
                   </div>
                   <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-xl font-bold font-mono tabular-nums text-rose-600">
+                    <span className="text-xl font-bold tabular-nums text-rose-600">
                       +{(liveInsights?.funnel?.follows_gained || 0).toLocaleString("fa-IR")}
                     </span>
                     <span className="text-[11px] text-slate-600 font-medium">
@@ -1070,23 +1070,23 @@ export function InflowDashboard({
                           </p>
 
                           {/* Mini Funnel Metrics Row on Card */}
-                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 pt-0.5">
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-0.5">
                             {pViews > 0 && (
-                              <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                              <span className="inline-flex items-center gap-1 tabular-nums font-medium">
                                 <Eye className="w-3.5 h-3.5 text-slate-400" />
                                 {pViews.toLocaleString("fa-IR")} ویو
                               </span>
                             )}
-                            <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                            <span className="inline-flex items-center gap-1 tabular-nums font-medium">
                               <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
                               {pLogsCount.toLocaleString("fa-IR")} کامنت
                             </span>
-                            <span className="inline-flex items-center gap-1 font-mono tabular-nums text-emerald-700 font-medium">
+                            <span className="inline-flex items-center gap-1 tabular-nums text-emerald-700 font-semibold">
                               <Send className="w-3.5 h-3.5 text-emerald-600" />
                               {pDmsCount.toLocaleString("fa-IR")} دایرکت
                             </span>
                             {pFollows > 0 && (
-                              <span className="inline-flex items-center gap-1 font-mono tabular-nums text-rose-600 font-bold">
+                              <span className="inline-flex items-center gap-1 tabular-nums text-rose-600 font-bold">
                                 +{pFollows.toLocaleString("fa-IR")} فالوور
                               </span>
                             )}

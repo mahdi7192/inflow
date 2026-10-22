@@ -35,7 +35,7 @@ export default function RootLayout({
       dir="rtl"
       className={`${geistSans.variable} ${geistMono.variable} ${vazirmatn.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-zinc-200 selection:text-zinc-900">
+      <body className={`${vazirmatn.className} min-h-full flex flex-col bg-background text-foreground antialiased selection:bg-indigo-100 selection:text-indigo-950`}>
         {children}
       </body>
     </html>
