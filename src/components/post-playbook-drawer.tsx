@@ -5,6 +5,7 @@ import {
   X,
   Sparkles,
   CheckCircle2,
+  Check,
   Eye,
   MessageCircle,
   Send,
@@ -21,6 +22,7 @@ import {
   Save,
   RefreshCw,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   type AccountPersona,
   type PlaybookId,
@@ -249,6 +251,14 @@ export function PostPlaybookDrawer({
     }
   };
 
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
   // Parse post metrics
   let metrics: Record<string, unknown> = postMetrics || {};
   if (!postMetrics && post.metrics_json) {
@@ -274,7 +284,7 @@ export function PostPlaybookDrawer({
       {/* Slide-Over Panel */}
       <div
         dir={dir}
-        className="relative w-full max-w-xl bg-white h-full shadow-2xl border-s border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-left duration-200"
+        className="relative w-full max-w-xl bg-white h-[100dvh] max-h-[100dvh] shadow-2xl border-s border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-start duration-200"
       >
         {/* Top Sticky Header */}
         <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3">
@@ -343,7 +353,7 @@ export function PostPlaybookDrawer({
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
               <div className="bg-white rounded-xl p-2.5 border border-slate-200/80">
                 <div className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
                   <Eye className="w-3 h-3 text-slate-400" />
@@ -403,39 +413,56 @@ export function PostPlaybookDrawer({
           {/* 2. Master Autopilot Toggle */}
           <div
             onClick={() => setAutoReply(!autoReply)}
-            className={`cursor-pointer rounded-2xl p-4 border transition-all flex items-center justify-between ${
+            className={`cursor-pointer rounded-2xl p-3.5 sm:p-4 border transition-all flex items-center justify-between gap-3 ${
               autoReply
-                ? "bg-emerald-50/70 border-emerald-300 shadow-xs"
+                ? "bg-emerald-50/80 border-emerald-300 shadow-xs"
                 : "bg-slate-50 border-slate-200"
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center transition-colors ${
                   autoReply
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-emerald-600 text-white shadow-xs"
                     : "bg-slate-200 text-slate-500"
                 }`}
               >
                 <Zap className="w-5 h-5" />
               </div>
-              <div>
-                <div className="text-sm font-bold text-slate-900">
+              <div className="min-w-0">
+                <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
                   {autoReply ? t("drawerAutopilotOn") : t("drawerAutopilotOff")}
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">
+                <div className="text-[11px] text-slate-500 mt-0.5 leading-normal">
                   {autoReply ? t("drawerAutopilotOnHint") : t("drawerAutopilotOffHint")}
                 </div>
               </div>
             </div>
-            <div
-              className={`px-3 py-1 rounded-full text-xs font-bold ${
-                autoReply
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-200 text-slate-600"
-              }`}
-            >
-              {autoReply ? t("drawerStatusActive") : t("drawerStatusInactive")}
+
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold whitespace-nowrap transition-colors ${
+                  autoReply
+                    ? "bg-emerald-600 text-white shadow-2xs"
+                    : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                {autoReply ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("drawerStatusActive")}</span>
+                  </>
+                ) : (
+                  <span>{t("drawerStatusInactive")}</span>
+                )}
+              </span>
+              <div onClick={(e) => e.stopPropagation()}>
+                <Switch
+                  checked={autoReply}
+                  onCheckedChange={setAutoReply}
+                  className="cursor-pointer"
+                />
+              </div>
             </div>
           </div>
 
@@ -478,7 +505,7 @@ export function PostPlaybookDrawer({
                     key={pb.id}
                     type="button"
                     onClick={() => handleSelectPlaybook(pb.id)}
-                    className={`w-full text-start p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${
+                    className={`w-full text-start p-3 sm:p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${
                       isSelected
                         ? activeBorderClass
                         : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
@@ -488,7 +515,7 @@ export function PostPlaybookDrawer({
                       {pb.emoji}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-bold text-slate-900">
                           {pb.title}
                         </span>
@@ -502,15 +529,15 @@ export function PostPlaybookDrawer({
                         {pb.subtitle}
                       </p>
                     </div>
-                    <div className="pt-1 shrink-0">
+                    <div className="pt-0.5 shrink-0">
                       <div
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
                           isSelected
-                            ? accent.radio
-                            : "border-slate-300"
+                            ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                            : "border-slate-300 bg-white"
                         }`}
                       >
-                        {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                     </div>
                   </button>
@@ -527,8 +554,8 @@ export function PostPlaybookDrawer({
                   <FileText className="w-4 h-4 text-indigo-600" />
                   <span>{t("drawerStep2")}</span>
                 </label>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  مثل وقتی به ادمین انسانی پیام می‌دهید، قیمت، سایز، موجودی، کد تخفیف یا نکات مکمل را اینجا بنویسید تا هوش مصنوعی هم در کامنت و هم در ادامه چت دایرکت از آن استفاده کند.
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  {t("drawerStep2Hint")}
                 </p>
               </div>
             </div>

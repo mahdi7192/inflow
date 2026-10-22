@@ -23,6 +23,7 @@ import {
   Zap,
   Flame,
   CheckCircle2,
+  CheckCheck,
   Link2,
   Film,
   Image as ImageIcon,
@@ -48,10 +49,24 @@ const PERSONA_TAB_KEY: Record<AccountPersona, string> = {
   creator: "personaCreator",
 };
 const PERSONA_STUDIO_KEY: Record<AccountPersona, string> = {
-  ecommerce: "studioEcommerce",
-  service_b2b: "studioServiceB2b",
-  creator: "studioCreator",
+  ecommerce: "personaEcommerceStudio",
+  service_b2b: "personaServiceB2bStudio",
+  creator: "personaCreatorStudio",
 };
+
+function getProxiedImageUrl(rawUrl?: string): string {
+  if (!rawUrl) return "";
+  let cleanUrl = rawUrl.trim();
+  while (cleanUrl.startsWith("/api/media/proxy?url=") || cleanUrl.startsWith("/api/image-proxy?url=")) {
+    const splitIndex = cleanUrl.indexOf("url=");
+    if (splitIndex !== -1) {
+      cleanUrl = decodeURIComponent(cleanUrl.slice(splitIndex + 4));
+    } else {
+      break;
+    }
+  }
+  return `/api/media/proxy?url=${encodeURIComponent(cleanUrl)}`;
+}
 const PERSONA_STYLE: Record<
   AccountPersona,
   { badge: string; active: string; action: string }
@@ -692,7 +707,7 @@ export function InflowDashboard({
 
               {/* 4-Stage True Revenue & Engagement Funnel Strip (Flat Borderless Ribbon — Zero Card-in-Card) */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0 pt-4 border-t border-slate-100 lg:divide-x lg:divide-x-reverse lg:divide-slate-100">
-                <div className="lg:pl-5 flex flex-col justify-between">
+                <div className="lg:ps-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-medium">1. {t("metricTotalViews")}</span>
                     <Eye className="w-4 h-4 text-slate-400" />
@@ -738,13 +753,15 @@ export function InflowDashboard({
                     <span className="text-xl font-bold tabular-nums text-emerald-700">
                       {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
                     </span>
-                    <span className="text-[11px] text-slate-600 font-medium tabular-nums">
-                      {formatNumber(liveInsights?.funnel?.dms_read || 0)} {t("metricRead")} ✓✓
+                    <span className="text-[11px] text-slate-600 font-medium tabular-nums inline-flex items-center gap-1">
+                      <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
+                      <span>{t("metricRead")}</span>
+                      <CheckCheck className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                     </span>
                   </div>
                 </div>
 
-                <div className="lg:pr-5 flex flex-col justify-between">
+                <div className="lg:pe-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-medium">4. {t("metricFollowersLeads")}</span>
                     <UserCheck className="w-4 h-4 text-rose-500" />
@@ -988,7 +1005,7 @@ export function InflowDashboard({
                           )}
                           {post.thumbnail_url && (
                             <img
-                              src={post.thumbnail_url}
+                              src={getProxiedImageUrl(post.thumbnail_url)}
                               alt=""
                               referrerPolicy="no-referrer"
                               className="absolute inset-0 w-full h-full object-cover"
@@ -1026,13 +1043,13 @@ export function InflowDashboard({
                             {hasTargetUrl && (
                               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 inline-flex items-center gap-1">
                                 <Link2 className="w-3 h-3" />
-                                <span>لینک مقصد</span>
+                                <span>{t("badgeTargetLink")}</span>
                               </span>
                             )}
                             {post.smart_moderation === 1 && (
                               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 inline-flex items-center gap-1">
                                 <ShieldCheck className="w-3 h-3" />
-                                <span>سپر ضد-اسپم</span>
+                                <span>{t("badgeSpamShield")}</span>
                               </span>
                             )}
                           </div>
@@ -1066,7 +1083,7 @@ export function InflowDashboard({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                      <div className="w-full pt-2.5 mt-2 border-t border-slate-100 flex items-center justify-between gap-2 lg:w-auto lg:pt-0 lg:mt-0 lg:border-0 lg:justify-end shrink-0">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1086,6 +1103,9 @@ export function InflowDashboard({
                           onClick={(e) => e.stopPropagation()}
                           className="flex items-center gap-2 ps-1"
                         >
+                          <span className="text-[11px] font-bold text-slate-500 lg:hidden">
+                            {isActive ? t("drawerStatusActive") : t("drawerStatusInactive")}
+                          </span>
                           <Switch
                             checked={isActive}
                             onCheckedChange={(checked) => handleQuickToggle(post.shortcode, checked)}
@@ -1132,7 +1152,7 @@ export function InflowDashboard({
                         </div>
                         {post.thumbnail_url && (
                           <img
-                            src={post.thumbnail_url}
+                            src={getProxiedImageUrl(post.thumbnail_url)}
                             alt=""
                             referrerPolicy="no-referrer"
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -1165,7 +1185,7 @@ export function InflowDashboard({
                                 isActive ? "text-emerald-700" : "text-slate-400"
                               )}
                             >
-                              {isActive ? "فعال" : "خاموش"}
+                              {isActive ? t("drawerStatusActive") : t("drawerStatusInactive")}
                             </span>
                             <Switch
                               checked={isActive}

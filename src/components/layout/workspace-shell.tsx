@@ -99,11 +99,11 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex h-screen bg-background text-foreground overflow-hidden font-vazir antialiased select-none"
+      className="flex h-[100dvh] max-h-[100dvh] w-full bg-background text-foreground overflow-hidden font-vazir antialiased select-none"
       dir={dir}
     >
       {/* 1. Desktop Persistent Sidebar */}
-      <div className="hidden lg:block shrink-0 sticky top-0 h-screen z-30 select-none">
+      <div className="hidden lg:block shrink-0 sticky top-0 h-[100dvh] z-20 select-none">
         <SidebarNav
           currentAccount={account}
           accounts={accounts}
@@ -121,12 +121,12 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
       {/* 2. Mobile Slide-Over Drawer */}
       {mobileDrawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex overflow-hidden">
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in"
             onClick={() => setMobileDrawerOpen(false)}
           />
-          <div className="relative w-64 max-w-[80vw] h-full bg-card z-10 shadow-2xl animate-in slide-in-from-start duration-200">
+          <div className="relative w-64 max-w-[80vw] h-full bg-card z-10 shadow-2xl animate-in slide-in-from-start duration-200 flex flex-col overflow-hidden">
             <SidebarNav
               currentAccount={account}
               accounts={accounts}
@@ -165,12 +165,12 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Persistent Top Navigation Bar */}
-        <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-card/85 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-30 h-14 shrink-0 border-b border-border bg-card/95 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 shadow-2xs">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-1.5 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              className="lg:hidden p-1.5 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors cursor-pointer shrink-0"
               aria-label={t("openMenu")}
             >
               <Menu className="w-4 h-4" />
@@ -196,7 +196,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             {/* Zero-Bot Standard: Session Health Badge */}
             <SessionHealthBadge
               account={account}
@@ -212,7 +212,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* 4. Single Unified Vertical Scroll Container */}
-        <main className="flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] p-4 sm:p-5 lg:p-6">
+        <main className="flex-1 overflow-y-auto overscroll-contain min-w-0 bg-[#F8FAFC] p-3 sm:p-5 lg:p-6">
           <div className="w-full max-w-6xl mx-auto">
             {children}
           </div>

@@ -25,7 +25,10 @@ import {
   Copy,
   Check,
   Settings2,
+  ArrowRight,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 interface CapturedLeadItem {
   id: number;
@@ -83,6 +86,7 @@ export function DmAutomationView({
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSender, setSelectedSender] = useState<string | null>(null);
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   const [config, setConfig] = useState<DMAutomationRow | null>(initialAutomation);
   const [logs, setLogs] = useState<DMLogRow[]>(initialLogs);
@@ -552,7 +556,7 @@ export function DmAutomationView({
         </div>
 
         {/* 3-Tab Segmented Control */}
-        <div className="inline-flex items-center bg-slate-200/75 p-1 rounded-xl self-start lg:self-auto shrink-0">
+        <div className="inline-flex items-center bg-slate-200/75 p-1 rounded-xl max-w-full overflow-x-auto self-start lg:self-auto shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("inbox")}
@@ -617,7 +621,7 @@ export function DmAutomationView({
       {activeTab === "inbox" && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
           {/* RIGHT PANE: Thread List */}
-          <div className="lg:col-span-4 border-b lg:border-b-0 lg:border-l border-slate-100 flex flex-col bg-white">
+          <div className={cn("lg:col-span-4 border-b lg:border-b-0 lg:border-l border-slate-100 flex flex-col bg-white", showMobileChat ? "hidden lg:flex" : "flex")}>
             {/* Search & Filter Header */}
             <div className="p-3.5 border-b border-slate-100 space-y-2.5">
               <div className="flex items-center gap-2">
@@ -703,7 +707,10 @@ export function DmAutomationView({
                     <button
                       key={conv.sender_username}
                       type="button"
-                      onClick={() => setSelectedSender(conv.sender_username)}
+                      onClick={() => {
+                        setSelectedSender(conv.sender_username);
+                        setShowMobileChat(true);
+                      }}
                       className={`w-full text-right px-4 py-3.5 flex items-start gap-3 transition-colors cursor-pointer ${
                         isSelected
                           ? "bg-indigo-50/60"
@@ -765,7 +772,7 @@ export function DmAutomationView({
           </div>
 
           {/* LEFT PANE: Active Conversation Stream & 1-Click Bot Pause */}
-          <div className="lg:col-span-8 flex flex-col bg-slate-50/40">
+          <div className={cn("lg:col-span-8 flex flex-col bg-slate-50/40", !showMobileChat ? "hidden lg:flex" : "flex")}>
             {!activeConversation ? (
               <div className="flex-1 flex flex-col items-center justify-center p-10 text-center space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
@@ -789,9 +796,17 @@ export function DmAutomationView({
             ) : (
               <>
                 {/* Conversation Top Bar */}
-                <div className="bg-white border-b border-slate-100 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-mono text-xs font-bold flex items-center justify-center">
+                <div className="bg-white border-b border-slate-100 px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileChat(false)}
+                      className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+                      title="بازگشت به لیست گفتگوها"
+                    >
+                      <ArrowRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                    </button>
+                    <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-mono text-xs font-bold flex items-center justify-center shrink-0">
                       {activeConversation.sender_username.slice(0, 1).toUpperCase()}
                     </div>
                     <div>
@@ -921,7 +936,10 @@ export function DmAutomationView({
                                     ? "🔒 پیام دعوت به فالو"
                                     : "🤖 پاسخ خودکار استودیو"}
                                 </span>
-                                <span>✓ ارسال شد</span>
+                                <span className="inline-flex items-center gap-1 font-medium">
+                                  <Check className="w-3 h-3 text-emerald-300" />
+                                  <span>ارسال شد</span>
+                                </span>
                               </div>
                               <p className="leading-relaxed whitespace-pre-wrap">
                                 {msg.reply_text}
@@ -1200,22 +1218,26 @@ export function DmAutomationView({
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  handleSave({
-                    story_handling_mode:
-                      config.story_handling_mode === "ignore" ? "auto" : "ignore",
-                  })
-                }
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 cursor-pointer ${
-                  config.story_handling_mode !== "ignore"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-100 text-slate-500"
-                }`}
-              >
-                {config.story_handling_mode !== "ignore" ? "فعال ✓" : "غیرفعال"}
-              </button>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                    config.story_handling_mode !== "ignore"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {config.story_handling_mode !== "ignore" ? "فعال" : "غیرفعال"}
+                </span>
+                <Switch
+                  checked={config.story_handling_mode !== "ignore"}
+                  onCheckedChange={(checked) =>
+                    handleSave({
+                      story_handling_mode: checked ? "auto" : "ignore",
+                    })
+                  }
+                  className="cursor-pointer"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-4">
@@ -1230,23 +1252,26 @@ export function DmAutomationView({
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  handleSave({
-                    require_follow: config.require_follow === 1 ? 0 : 1,
-                  })
-                }
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 cursor-pointer ${
-                  config.require_follow === 1
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "bg-slate-100 text-slate-500"
-                }`}
-              >
-                {config.require_follow === 1
-                  ? "قفل فالو روشن 🔒"
-                  : "آزاد (بدون قفل)"}
-              </button>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                    config.require_follow === 1
+                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {config.require_follow === 1 ? "روشن 🔒" : "آزاد"}
+                </span>
+                <Switch
+                  checked={config.require_follow === 1}
+                  onCheckedChange={(checked) =>
+                    handleSave({
+                      require_follow: checked ? 1 : 0,
+                    })
+                  }
+                  className="cursor-pointer"
+                />
+              </div>
             </div>
           </div>
 
