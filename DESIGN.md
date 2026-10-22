@@ -107,8 +107,12 @@ A unified natural-language textarea accompanied by 1-click prompt chips (`+ قی
 
 ---
 
-## 6. Guardrails & Anti-Patterns
+## 6. Guardrails & Anti-Patterns (Strict v2 Anti-Clutter Laws)
 
-- **NEVER** introduce dark-mode-only hardcoded colors (`bg-zinc-950`, `text-white` on page canvas). All surfaces must adhere to the Studio Light palette.
-- **NEVER** use physical directional classes (`ml-*`, `mr-*`, `pl-*`, `pr-*`, `left-*`, `right-*`, `text-left`, `text-right`) for layout structure; always use logical properties (`ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`, `text-start`, `text-end`).
-- **NEVER** overwhelm the default post configuration view with more than 3 primary visual blocks (Playbook Selector, Cheat Sheet + Target Link, and Optional Advanced Accordion).
+- **ZERO Nested Borders / Box-in-Box Prohibition**: On the `#F8FAFC` canvas, only **one** elevated white card surface (`bg-white rounded-2xl border border-slate-200/80 shadow-xs`) is allowed per visual section. Inside a white card, NEVER render nested bordered cards (`border border-slate-200`). Separate internal items exclusively with subtle hairline dividers (`divide-y divide-slate-100` or `divide-x divide-x-reverse divide-slate-100`) or soft borderless fills (`bg-slate-50/70`).
+- **Guaranteed Shell Padding (`WorkspaceShell`)**: The `<main>` viewport in `src/components/layout/workspace-shell.tsx` MUST always enforce `bg-[#F8FAFC] p-5 sm:p-6 lg:p-8` wrapping `<div className="w-full max-w-6xl mx-auto">`. Individual page views MUST NOT add conflicting outer padding or touch the sidebar/header edges.
+- **No Stacked Multi-Card Form Pages**:
+  - **Direct & Story Inbox (`/@[account]/dms`)**: MUST always use the unified 3-Tab Studio view (`src/components/dms/dm-automation-view.tsx`) featuring a **2-Column Split Messenger (`💬 گفتگوهای دایرکت`)** with a 1-click per-user bot pause toggle (`توقف ربات برای این کاربر`), a dedicated **Captured Leads CRM tab (`🔥 شماره‌های شکارشده`)**, and an isolated **Settings tab (`⚙️ تنظیمات استوری و دایرکت`)**. Never stack forms, cheat sheets, and log tables vertically on the same screen.
+  - **Posts & Reels Catalog (`/@[account]/comments`)**: MUST default to the **3-Column Instagram Visual Grid (`viewMode = "grid"`)** with cover thumbnails, Persian captions, 3 flat metrics, and a 1-click button opening `PostPlaybookDrawer`. Never display raw technical shortcodes (`DVf8k2...`) on visual grid cards or duplicate sidebar actions (`همگام‌سازی` / `حذف حساب`) inside the top content card.
+- **Keep `shadcn/ui` + Radix Headless Primitives, Purge Legacy Form Wrappers**: Retain `src/components/ui/` headless primitives (`Dialog`, `Switch`, `Button`, `Sonner`), but NEVER re-introduce legacy form wrappers (`PostDetailView`, `StickySaveBar`, `ActivationCard`, `DmLogsTable`, `DmLiveInboxModal`).
+- **Persian Numerals & Typography**: Never apply `font-mono` to Persian text or metric numbers (`tabular-nums` with `Vazirmatn` + `.toLocaleString("fa-IR")` is mandatory). Reserve `font-mono` strictly for `@username` handles and URLs wrapped in `<bdi>`.

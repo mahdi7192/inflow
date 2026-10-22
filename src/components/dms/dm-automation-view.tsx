@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { DMAutomationRow, DMLogRow } from "@/lib/db";
-import { t, Lang } from "@/lib/i18n";
-import { DmLogsTable } from "./dm-logs-table";
-import { DmLiveInboxModal } from "./dm-live-inbox-modal";
+import { Lang } from "@/lib/i18n";
 import {
   Send,
   Sparkles,
@@ -12,7 +10,6 @@ import {
   CheckCircle2,
   Loader2,
   UserCheck,
-  Inbox,
   Film,
   Flame,
   Phone,
@@ -20,10 +17,13 @@ import {
   PauseCircle,
   PlayCircle,
   BookOpen,
-  ChevronDown,
-  ChevronUp,
   CheckCheck,
   Trash2,
+  Search,
+  RefreshCw,
+  Copy,
+  Check,
+  Settings2,
 } from "lucide-react";
 
 interface CapturedLeadItem {
@@ -65,30 +65,27 @@ export interface DmAutomationViewProps {
   lang?: Lang;
 }
 
+type StudioDmTab = "inbox" | "leads" | "settings";
+type InboxFilter = "all" | "story" | "paused";
+
 export function DmAutomationView({
   account,
   initialAutomation = null,
   initialLogs = [],
-  lang = "fa",
 }: DmAutomationViewProps) {
   const accountUsername = account;
+  const [activeTab, setActiveTab] = useState<StudioDmTab>("inbox");
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSender, setSelectedSender] = useState<string | null>(null);
+
   const [config, setConfig] = useState<DMAutomationRow | null>(initialAutomation);
   const [logs, setLogs] = useState<DMLogRow[]>(initialLogs);
-  const [logsStats, setLogsStats] = useState({
-    totalReceived: initialLogs.length,
-    repliedCount: initialLogs.filter((l) => l.reply_status === "sent").length,
-    pendingFollowCount: initialLogs.filter(
-      (l) => l.reply_status === "pending_follow"
-    ).length,
-    skippedCount: initialLogs.filter((l) => l.reply_status === "skipped").length,
-  });
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [liveInboxOpen, setLiveInboxOpen] = useState(false);
-  const [showAdvancedRules, setShowAdvancedRules] = useState(false);
 
-  // Leads & Active Threads State (Step 2 & 3)
+  // Leads & Active Threads State
   const [leads, setLeads] = useState<CapturedLeadItem[]>([]);
   const [threads, setThreads] = useState<ThreadSummaryItem[]>([]);
   const [brandCheatSheet, setBrandCheatSheet] = useState("");
@@ -96,6 +93,12 @@ export function DmAutomationView({
   const [savingCheatSheet, setSavingCheatSheet] = useState(false);
   const [cheatSheetSaved, setCheatSheetSaved] = useState(false);
   const [togglingUser, setTogglingUser] = useState<string | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+
+  // Manual Direct Reply State
+  const [manualReplyText, setManualReplyText] = useState("");
+  const [sendingManual, setSendingManual] = useState(false);
+  const [manualNotice, setManualNotice] = useState<string | null>(null);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -131,35 +134,24 @@ export function DmAutomationView({
   }, [accountUsername]);
 
   const fetchLogs = useCallback(async () => {
-    setLogsLoading(true);
     try {
       const res = await fetch(
-        `/api/accounts/${encodeURIComponent(accountUsername)}/dm-logs?limit=50`
+        `/api/accounts/${encodeURIComponent(accountUsername)}/dm-logs?limit=100`
       );
       if (res.ok) {
         const data = await res.json();
-        const loadedLogs: DMLogRow[] = data.logs || [];
-        setLogs(loadedLogs);
-        if (data.stats) {
-          setLogsStats(data.stats);
-        } else {
-          setLogsStats({
-            totalReceived: loadedLogs.length,
-            repliedCount: loadedLogs.filter((l) => l.reply_status === "sent").length,
-            pendingFollowCount: loadedLogs.filter(
-              (l) => l.reply_status === "pending_follow"
-            ).length,
-            skippedCount: loadedLogs.filter((l) => l.reply_status === "skipped")
-              .length,
-          });
-        }
+        setLogs(data.logs || []);
       }
     } catch (e) {
       console.error("Failed to load DM logs:", e);
-    } finally {
-      setLogsLoading(false);
     }
   }, [accountUsername]);
+
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchLogs(), fetchLeadsAndThreads()]);
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     if (!initialAutomation) {
@@ -167,6 +159,122 @@ export function DmAutomationView({
     }
     fetchLeadsAndThreads();
   }, [initialAutomation, fetchConfig, fetchLeadsAndThreads]);
+
+  // Build unified conversation list from logs + threads metadata
+  const conversationList = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        sender_username: string;
+        sender_full_name: string;
+        thread_id: string;
+        last_incoming: string;
+        last_reply: string;
+        reply_status: string;
+        is_story_reply: boolean;
+        read_at: string | null;
+        created_at: string;
+        source_shortcode: string;
+        bot_paused: boolean;
+        messages: DMLogRow[];
+      }
+    >();
+
+    // Seed with threads metadata from /leads API
+    for (const th of threads) {
+      const key = th.sender_username.toLowerCase();
+      map.set(key, {
+        sender_username: th.sender_username,
+        sender_full_name: th.sender_full_name || "",
+        thread_id: th.thread_id || "",
+        last_incoming: th.last_incoming || "",
+        last_reply: th.last_reply || "",
+        reply_status: th.reply_status || "",
+        is_story_reply: Boolean(th.is_story_reply),
+        read_at: th.read_at || null,
+        created_at: th.created_at || "",
+        source_shortcode: th.source_shortcode || "",
+        bot_paused: Boolean(th.bot_paused),
+        messages: [],
+      });
+    }
+
+    // Group all logs into their conversation
+    for (const log of logs) {
+      const username = log.sender_username || "unknown";
+      const key = username.toLowerCase();
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, {
+          sender_username: username,
+          sender_full_name: log.sender_full_name || "",
+          thread_id: log.thread_id || "",
+          last_incoming: log.incoming_text || "",
+          last_reply: log.reply_text || "",
+          reply_status: log.reply_status || "",
+          is_story_reply: log.is_story_reply === 1,
+          read_at: log.read_at || null,
+          created_at: log.created_at || "",
+          source_shortcode: "",
+          bot_paused: false,
+          messages: [log],
+        });
+      } else {
+        existing.messages.push(log);
+        if (!existing.thread_id && log.thread_id) existing.thread_id = log.thread_id;
+        if (log.is_story_reply === 1) existing.is_story_reply = true;
+      }
+    }
+
+    const list = Array.from(map.values()).map((conv) => {
+      conv.messages.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      return conv;
+    });
+
+    return list;
+  }, [threads, logs]);
+
+  // Filter conversations by search & pill filter
+  const filteredConversations = useMemo(() => {
+    return conversationList.filter((c) => {
+      if (inboxFilter === "story" && !c.is_story_reply) return false;
+      if (inboxFilter === "paused" && !c.bot_paused) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.sender_username.toLowerCase().includes(q) ||
+          c.sender_full_name.toLowerCase().includes(q) ||
+          c.last_incoming.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [conversationList, inboxFilter, searchQuery]);
+
+  // Auto-select first conversation when available
+  useEffect(() => {
+    if (
+      !selectedSender &&
+      filteredConversations.length > 0 &&
+      filteredConversations[0]
+    ) {
+      setSelectedSender(filteredConversations[0].sender_username);
+    }
+  }, [filteredConversations, selectedSender]);
+
+  const activeConversation = useMemo(() => {
+    if (!selectedSender) return filteredConversations[0] || null;
+    return (
+      conversationList.find(
+        (c) => c.sender_username.toLowerCase() === selectedSender.toLowerCase()
+      ) ||
+      filteredConversations[0] ||
+      null
+    );
+  }, [conversationList, filteredConversations, selectedSender]);
 
   const handleSave = async (overrides?: Partial<DMAutomationRow>) => {
     if (!config) return;
@@ -242,18 +350,82 @@ export function DmAutomationView({
         }
       );
       if (res.ok) {
-        setThreads((prev) =>
-          prev.map((th) =>
+        setThreads((prev) => {
+          const exists = prev.some(
+            (th) =>
+              th.sender_username.toLowerCase() === senderUsername.toLowerCase()
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                sender_username: senderUsername,
+                sender_full_name: "",
+                sender_id: "",
+                thread_id: "",
+                messages_count: 1,
+                last_incoming: "",
+                last_reply: "",
+                reply_status: "",
+                is_story_reply: false,
+                read_at: null,
+                created_at: new Date().toISOString(),
+                source_shortcode: "",
+                bot_paused: !currentPaused,
+              },
+            ];
+          }
+          return prev.map((th) =>
             th.sender_username.toLowerCase() === senderUsername.toLowerCase()
               ? { ...th, bot_paused: !currentPaused }
               : th
-          )
-        );
+          );
+        });
       }
     } catch (e) {
       console.error("Failed to toggle bot pause:", e);
     } finally {
       setTogglingUser(null);
+    }
+  };
+
+  const handleSendManualReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeConversation || !manualReplyText.trim() || sendingManual) return;
+
+    setSendingManual(true);
+    setManualNotice(null);
+    const textToSend = manualReplyText.trim();
+    try {
+      const res = await fetch(
+        `/api/accounts/${encodeURIComponent(accountUsername)}/inbox`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversation_id: activeConversation.thread_id || undefined,
+            target: activeConversation.sender_username,
+            text: textToSend,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setManualReplyText("");
+        // Automatically pause bot for this user when human admin steps in
+        if (!activeConversation.bot_paused) {
+          await handleToggleBotPause(activeConversation.sender_username, false);
+        }
+        setManualNotice("پیام شما ارسال شد و ربات برای این کاربر متوقف گردید.");
+        setTimeout(() => setManualNotice(null), 4000);
+        await fetchLogs();
+      } else {
+        setManualNotice(data.error || "ارسال پیام نیازمند نشست فعال اینستاگرام است.");
+      }
+    } catch {
+      setManualNotice("خطا در ارتباط با سرور هنگام ارسال پیام.");
+    } finally {
+      setSendingManual(false);
     }
   };
 
@@ -305,6 +477,12 @@ export function DmAutomationView({
     }
   };
 
+  const handleCopyPhone = (phone: string) => {
+    navigator.clipboard.writeText(phone);
+    setCopiedPhone(phone);
+    setTimeout(() => setCopiedPhone(null), 2000);
+  };
+
   const handleExportCsv = () => {
     if (leads.length === 0) return;
     const headers = [
@@ -342,560 +520,807 @@ export function DmAutomationView({
     return (
       <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
         <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">در حال بارگذاری صندوق دایرکت و لیدها...</span>
+        <span className="text-sm">در حال بارگذاری صندوق دایرکت...</span>
       </div>
     );
   }
 
   const isEnabled = config.enabled === 1;
-  const pausedCount = threads.filter((t) => t.bot_paused).length;
+  const pausedCount = conversationList.filter((c) => c.bot_paused).length;
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Studio Unified Header & Architecture Guide */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg font-bold text-slate-900">
-                  صندوق دایرکت، ریپلای استوری و لیدهای شکارشده
-                </h1>
-                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  inFlow Studio CRM
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                دایرکت‌های مربوط به هر پست یا ریلز به صورت خودکار از روی{" "}
-                <strong className="text-slate-900">«سناریو و تقلب‌نامه همان پست»</strong>{" "}
-                ادامه پیدا می‌کنند. در این صفحه می‌توانید{" "}
-                <strong className="text-emerald-700">شماره‌های تماس دریافتی</strong> را ببینید،
-                ربات را برای چت‌های خاص{" "}
-                <strong className="text-amber-700">متوقف کنید (پاسخ ادمین)</strong>، و پاسخگوی{" "}
-                <strong className="text-indigo-700">ریپلای استوری‌ها و پیام‌های عمومی</strong> را مدیریت کنید.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setLiveInboxOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-xs cursor-pointer"
-            >
-              <Inbox className="w-4 h-4 text-emerald-400" />
-              <span>مشاهده چت‌های زنده دایرکت</span>
-            </button>
-          </div>
+    <div className="w-full space-y-5 pb-10">
+      {/* Unified Studio Header & Segmented Switcher (Single Flat Bar — No Nested Cards) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+            <span>صندوق دایرکت، استوری و مشتریان</span>
+            {pausedCount > 0 && (
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 tabular-nums">
+                {pausedCount.toLocaleString("fa-IR")} چت در دست ادمین
+              </span>
+            )}
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            مکالمات پست‌ها به صورت خودکار ادامه می‌یابند. در اینجا گفتگوها را ببینید، ربات را برای هر کاربر متوقف کنید یا شماره‌های تماس را بردارید.
+          </p>
         </div>
 
-        {/* 4 Summary KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
-          <div className="rounded-xl bg-rose-50/60 border border-rose-200/80 p-3 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-rose-700 font-medium">
-                🔥 شماره‌ها و لیدهای شکارشده
-              </div>
-              <div className="text-xl font-bold tabular-nums text-rose-700 mt-1">
-                {leads.length.toLocaleString("fa-IR")}
-              </div>
-            </div>
-            <Phone className="w-5 h-5 text-rose-500" />
-          </div>
+        {/* 3-Tab Segmented Control */}
+        <div className="inline-flex items-center bg-slate-200/75 p-1 rounded-xl self-start lg:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("inbox")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "inbox"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+            <span>گفتگوهای دایرکت</span>
+            <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 text-[11px] tabular-nums">
+              {conversationList.length.toLocaleString("fa-IR")}
+            </span>
+          </button>
 
-          <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/80 p-3 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-emerald-800 font-medium">
-                ✉️ پاسخ‌های هوشمند ارسالی
-              </div>
-              <div className="text-xl font-bold tabular-nums text-emerald-700 mt-1">
-                {logsStats.repliedCount.toLocaleString("fa-IR")}
-              </div>
-            </div>
-            <Send className="w-5 h-5 text-emerald-600" />
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("leads")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "leads"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-rose-500" />
+            <span>شماره‌های شکارشده</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-md text-[11px] tabular-nums ${
+                leads.length > 0
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {leads.length.toLocaleString("fa-IR")}
+            </span>
+          </button>
 
-          <div className="rounded-xl bg-amber-50/60 border border-amber-200/80 p-3 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-amber-800 font-medium">
-                ⏸️ چت‌های در اختیار ادمین انسانی
-              </div>
-              <div className="text-xl font-bold tabular-nums text-amber-700 mt-1">
-                {pausedCount.toLocaleString("fa-IR")}
-              </div>
-            </div>
-            <PauseCircle className="w-5 h-5 text-amber-600" />
-          </div>
-
-          <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-slate-600 font-medium">
-                🔒 منتظر تایید فالو پیج
-              </div>
-              <div className="text-xl font-bold tabular-nums text-slate-900 mt-1">
-                {logsStats.pendingFollowCount.toLocaleString("fa-IR")}
-              </div>
-            </div>
-            <UserCheck className="w-5 h-5 text-indigo-500" />
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("settings")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "settings"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Settings2 className="w-3.5 h-3.5 text-slate-600" />
+            <span>تنظیمات استوری و دایرکت</span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isEnabled ? "bg-emerald-500" : "bg-slate-400"
+              }`}
+            />
+          </button>
         </div>
       </div>
 
-      {/* SECTION 1: CAPTURED LEADS & PHONE NUMBERS CRM */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center">
-              <Flame className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span>مشتریان داغ و شماره‌های تماس شکارشده</span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 tabular-nums font-bold">
-                  {leads.length.toLocaleString("fa-IR")} مورد
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                هر کاربری در دایرکت شماره موبایل بفرستد یا از روی پست درخواست خرید ثبت کند، خودکار اینجا لیست می‌شود.
-              </p>
-            </div>
-          </div>
+      {/* =====================================================================
+          TAB 1: 2-COLUMN SPLIT MESSENGER INBOX (Telegram Web / Intercom Style)
+         ===================================================================== */}
+      {activeTab === "inbox" && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
+          {/* RIGHT PANE: Thread List */}
+          <div className="lg:col-span-4 border-b lg:border-b-0 lg:border-l border-slate-100 flex flex-col bg-white">
+            {/* Search & Filter Header */}
+            <div className="p-3.5 border-b border-slate-100 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="جستجوی کاربر یا متن پیام..."
+                    className="w-full rounded-xl bg-slate-100/80 pr-8 pl-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshAll}
+                  disabled={refreshing}
+                  title="بروزرسانی گفتگوها"
+                  className="p-2 rounded-xl bg-slate-100/80 hover:bg-slate-200/70 text-slate-600 transition-colors cursor-pointer"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
+              </div>
 
-          {leads.length > 0 && (
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>دانلود اکسل شماره‌ها (CSV)</span>
-            </button>
-          )}
-        </div>
-
-        {leads.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center space-y-1.5">
-            <Phone className="w-6 h-6 text-slate-400 mx-auto" />
-            <div className="text-xs font-bold text-slate-700">
-              هنوز شماره تماسی در دایرکت ثبت نشده است
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setInboxFilter("all")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                    inboxFilter === "all"
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                  }`}
+                >
+                  همه ({conversationList.length.toLocaleString("fa-IR")})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInboxFilter("story")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                    inboxFilter === "story"
+                      ? "bg-rose-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                  }`}
+                >
+                  📸 ریپلای استوری
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInboxFilter("paused")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                    inboxFilter === "paused"
+                      ? "bg-amber-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                  }`}
+                >
+                  ⏸️ در دست ادمین ({pausedCount.toLocaleString("fa-IR")})
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-              وقتی سناریوی «🎯 شکارچی شماره تماس و ثبت سفارش» را روی پست‌های خود فعال کنید، شماره‌های موبایل ارسالی مشتریان به صورت خودکار در این جدول ذخیره می‌شوند.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto border border-slate-200/80 rounded-xl">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-600 font-bold">
-                <tr>
-                  <th className="py-2.5 px-3">مشتری</th>
-                  <th className="py-2.5 px-3">شماره تماس / نوع لید</th>
-                  <th className="py-2.5 px-3">پست مبدا</th>
-                  <th className="py-2.5 px-3">آخرین پیام مشتری</th>
-                  <th className="py-2.5 px-3">وضعیت پیگیری</th>
-                  <th className="py-2.5 px-3 text-center">عملیات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {leads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-2.5 px-3">
-                      <div className="font-bold text-slate-900">
-                        <bdi className="font-mono text-indigo-700">@{lead.sender_username}</bdi>
-                      </div>
-                      {lead.sender_full_name && (
-                        <div className="text-[11px] text-slate-500">{lead.sender_full_name}</div>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span
-                        dir="ltr"
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold tabular-nums"
-                      >
-                        <Phone className="w-3 h-3" />
-                        {lead.phone_number}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      {lead.source_shortcode ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-mono text-[11px]">
-                          🎬 <bdi>{lead.source_shortcode}</bdi>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">دایرکت مستقیم</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 max-w-xs">
-                      <div className="truncate text-slate-700" title={lead.last_message}>
-                        {lead.last_message}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <select
-                        value={lead.status}
-                        onChange={(e) =>
-                          handleLeadStatusChange(
-                            lead.id,
-                            e.target.value as "new" | "contacted" | "converted"
-                          )
-                        }
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border outline-none cursor-pointer ${
-                          lead.status === "converted"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                            : lead.status === "contacted"
-                              ? "bg-amber-50 text-amber-800 border-amber-300"
-                              : "bg-rose-50 text-rose-800 border-rose-300"
+
+            {/* Scrollable Conversation Rows */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-[500px]">
+              {filteredConversations.length === 0 ? (
+                <div className="p-8 text-center space-y-2 text-slate-400">
+                  <MessageSquare className="w-6 h-6 mx-auto opacity-60" />
+                  <div className="text-xs font-semibold text-slate-600">
+                    گفتگویی در این بخش وجود ندارد
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    به محض اینکه کاربری در دایرکت پیام بدهد یا استوری شما را ریپلای کند، مکالمه‌اش در این ستون ظاهر می‌شود.
+                  </p>
+                </div>
+              ) : (
+                filteredConversations.map((conv) => {
+                  const isSelected =
+                    activeConversation?.sender_username.toLowerCase() ===
+                    conv.sender_username.toLowerCase();
+                  return (
+                    <button
+                      key={conv.sender_username}
+                      type="button"
+                      onClick={() => setSelectedSender(conv.sender_username)}
+                      className={`w-full text-right px-4 py-3.5 flex items-start gap-3 transition-colors cursor-pointer ${
+                        isSelected
+                          ? "bg-indigo-50/60"
+                          : "hover:bg-slate-50/80 bg-white"
+                      }`}
+                    >
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center font-mono text-xs font-bold shrink-0 ${
+                          conv.bot_paused
+                            ? "bg-amber-100 text-amber-800"
+                            : isSelected
+                              ? "bg-indigo-600 text-white"
+                              : "bg-slate-100 text-slate-700"
                         }`}
                       >
-                        <option value="new">🔥 جدید (منتظر تماس)</option>
-                        <option value="contacted">📞 تماس گرفته شد</option>
-                        <option value="converted">✅ تبدیل به فروش شد</option>
-                      </select>
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteLead(lead.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="حذف"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        {conv.sender_username.slice(0, 1).toUpperCase()}
+                      </div>
 
-      {/* SECTION 2: LIVE THREADS & HUMAN TAKEOVER (BOT PAUSE PER USER) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
-              <PauseCircle className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                مکالمات فعال دایرکت و کلید «توقف ربات برای ادمین» (Human Takeover)
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                هر زمان خودتان وسط مکالمه با یک مشتری وارد شدید، دکمه «توقف ربات» آن کاربر را بزنید تا هوش مصنوعی وسط حرف شما نپرد.
-              </p>
-            </div>
-          </div>
-        </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-mono text-xs font-bold text-slate-900 truncate">
+                            <bdi>@{conv.sender_username}</bdi>
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {conv.bot_paused && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
+                                ⏸️ ادمین
+                              </span>
+                            )}
+                            {conv.is_story_reply && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold">
+                                📸 استوری
+                              </span>
+                            )}
+                            {conv.source_shortcode && !conv.is_story_reply && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold">
+                                🎬 پست
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-        {threads.length === 0 ? (
-          <div className="text-center py-6 text-xs text-slate-400">
-            هنوز مکالمه‌ای در دایرکت ثبت نشده است.
+                        <p className="text-xs text-slate-600 truncate mt-1">
+                          {conv.last_incoming || "—"}
+                        </p>
+
+                        {conv.last_reply && (
+                          <p className="text-[11px] text-emerald-700 truncate mt-0.5 flex items-center gap-1">
+                            <CheckCheck className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{conv.last_reply}</span>
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {threads.slice(0, 8).map((th) => (
-              <div
-                key={th.sender_username}
-                className={`rounded-xl border p-3.5 flex flex-col justify-between gap-3 transition-all ${
-                  th.bot_paused
-                    ? "bg-amber-50/50 border-amber-300"
-                    : "bg-slate-50/60 border-slate-200/90 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-xs text-slate-900">
-                        <bdi className="font-mono text-indigo-700">@{th.sender_username}</bdi>
-                      </span>
-                      {th.is_story_reply && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-semibold">
-                          📸 ریپلای استوری
-                        </span>
-                      )}
-                      {th.source_shortcode && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
-                          🎬 پست <bdi className="font-mono">{th.source_shortcode}</bdi>
-                        </span>
-                      )}
-                      {th.read_at && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                          <CheckCheck className="w-3 h-3" />
-                          سین شده
-                        </span>
-                      )}
+
+          {/* LEFT PANE: Active Conversation Stream & 1-Click Bot Pause */}
+          <div className="lg:col-span-8 flex flex-col bg-slate-50/40">
+            {!activeConversation ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-10 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                  <MessageSquare className="w-6 h-6" />
+                </div>
+                <div className="text-sm font-bold text-slate-700">
+                  هنوز مکالمه‌ای در صندوق دایرکت ثبت نشده است
+                </div>
+                <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+                  وقتی مخاطبان زیر پست‌های شما کامنت بگذارند یا در دایرکت و استوری پیام بدهند، تمام پیام‌ها و پاسخ‌های هوش مصنوعی به شکل چت زنده در این صفحه نمایش داده می‌شود.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("settings")}
+                  className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span>بررسی تنظیمات پاسخگوی خودکار استوری و دایرکت</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Conversation Top Bar */}
+                <div className="bg-white border-b border-slate-100 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-mono text-xs font-bold flex items-center justify-center">
+                      {activeConversation.sender_username.slice(0, 1).toUpperCase()}
                     </div>
-                    <p className="text-xs text-slate-700 mt-1.5 line-clamp-1">
-                      <span className="text-slate-400">مشتری: </span>
-                      {th.last_incoming || "—"}
-                    </p>
-                    {th.last_reply && (
-                      <p className="text-[11px] text-emerald-700 mt-0.5 line-clamp-1">
-                        <span className="text-slate-400">پاسخ: </span>
-                        {th.last_reply}
-                      </p>
-                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-bold text-slate-900">
+                          <bdi>@{activeConversation.sender_username}</bdi>
+                        </span>
+                        {activeConversation.read_at && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                            <CheckCheck className="w-3 h-3" />
+                            سین شده
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        {activeConversation.is_story_reply ? (
+                          <span className="text-rose-600 font-medium">
+                            📸 شروع مکالمه از ریپلای استوری
+                          </span>
+                        ) : activeConversation.source_shortcode ? (
+                          <span className="text-indigo-600 font-medium">
+                            🎬 ادامه خودکار سناریوی پست
+                          </span>
+                        ) : (
+                          <span>💬 پیام مستقیم در دایرکت</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
+                  {/* 1-Click Human Takeover Switch */}
                   <button
                     type="button"
-                    disabled={togglingUser === th.sender_username}
+                    disabled={togglingUser === activeConversation.sender_username}
                     onClick={() =>
-                      handleToggleBotPause(th.sender_username, th.bot_paused)
+                      handleToggleBotPause(
+                        activeConversation.sender_username,
+                        activeConversation.bot_paused
+                      )
                     }
-                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
-                      th.bot_paused
-                        ? "bg-amber-600 text-white border-amber-600 hover:bg-amber-700"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeConversation.bot_paused
+                        ? "bg-amber-500 hover:bg-amber-600 text-white shadow-xs"
+                        : "bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800"
                     }`}
                   >
-                    {togglingUser === th.sender_username ? (
+                    {togglingUser === activeConversation.sender_username ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : th.bot_paused ? (
+                    ) : activeConversation.bot_paused ? (
                       <>
-                        <PlayCircle className="w-3.5 h-3.5" />
-                        <span>ربات متوقف است (فعال‌سازی)</span>
+                        <PlayCircle className="w-4 h-4" />
+                        <span>ربات برای این کاربر متوقف است (فعال‌سازی مجدد)</span>
                       </>
                     ) : (
                       <>
-                        <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
-                        <span>توقف ربات (ورود ادمین)</span>
+                        <PauseCircle className="w-4 h-4 text-amber-600" />
+                        <span>توقف ربات برای این کاربر (پاسخ توسط خودم)</span>
                       </>
                     )}
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* SECTION 3: UNIFIED STORY REPLIES & GENERAL DM AUTOPILOT */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div className="flex items-start gap-3">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                isEnabled
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-900">
-                  پاسخگوی خودکار «ریپلای استوری‌ها» و «دایرکت‌های عمومی»
-                </h2>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    isEnabled
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
+                {/* Chat Messages Stream */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 max-h-[420px]">
+                  {activeConversation.messages.length === 0 ? (
+                    <div className="space-y-3">
+                      {activeConversation.last_incoming && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-white border border-slate-200/80 px-4 py-2.5 text-xs text-slate-800 shadow-2xs">
+                            <div className="font-semibold text-[10px] text-slate-400 mb-1">
+                              پیام مشتری
+                            </div>
+                            <p className="leading-relaxed">
+                              {activeConversation.last_incoming}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {activeConversation.last_reply && (
+                        <div className="flex justify-end">
+                          <div className="max-w-[78%] rounded-2xl rounded-tl-sm bg-indigo-600 text-white px-4 py-2.5 text-xs shadow-2xs">
+                            <div className="font-semibold text-[10px] text-indigo-200 mb-1">
+                              پاسخ هوشمند پیج
+                            </div>
+                            <p className="leading-relaxed">
+                              {activeConversation.last_reply}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    activeConversation.messages.map((msg) => (
+                      <div key={msg.id} className="space-y-2.5">
+                        {/* Customer Incoming Bubble */}
+                        {msg.incoming_text && (
+                          <div className="flex justify-start">
+                            <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-white border border-slate-200/80 px-4 py-2.5 text-xs text-slate-800 shadow-2xs">
+                              <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
+                                <span>مشتری</span>
+                                {msg.is_story_reply === 1 && (
+                                  <span className="text-rose-600 font-semibold">
+                                    • 📸 ریپلای روی استوری
+                                  </span>
+                                )}
+                              </div>
+                              <p className="leading-relaxed whitespace-pre-wrap">
+                                {msg.incoming_text}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bot/Admin Outgoing Bubble */}
+                        {msg.reply_text ? (
+                          <div className="flex justify-end">
+                            <div
+                              className={`max-w-[78%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-xs shadow-2xs ${
+                                msg.reply_status === "pending_follow"
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-indigo-600 text-white"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3 text-[10px] text-indigo-100 mb-1">
+                                <span>
+                                  {msg.reply_status === "pending_follow"
+                                    ? "🔒 پیام دعوت به فالو"
+                                    : "🤖 پاسخ خودکار استودیو"}
+                                </span>
+                                <span>✓ ارسال شد</span>
+                              </div>
+                              <p className="leading-relaxed whitespace-pre-wrap">
+                                {msg.reply_text}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          msg.reply_status === "skipped" && (
+                            <div className="flex justify-end">
+                              <div className="rounded-xl bg-slate-100 text-slate-500 px-3 py-1.5 text-[11px]">
+                                بدون پاسخ خودکار (رد شده طبق قوانین)
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Manual Direct Reply Input Bar */}
+                <form
+                  onSubmit={handleSendManualReply}
+                  className="bg-white border-t border-slate-100 p-3.5 space-y-2"
                 >
-                  {isEnabled ? "فعال (۲۴/۷)" : "غیرفعال"}
+                  {manualNotice && (
+                    <div className="text-[11px] font-medium text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                      {manualNotice}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={manualReplyText}
+                      onChange={(e) => setManualReplyText(e.target.value)}
+                      placeholder={`ارسال پیام مستقیم به @${activeConversation.sender_username} (با ارسال پیام، ربات برای این کاربر متوقف می‌شود)...`}
+                      className="flex-1 rounded-xl bg-slate-100/80 px-4 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendingManual || !manualReplyText.trim()}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+                    >
+                      {sendingManual ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>ارسال پیام</span>
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          TAB 2: CAPTURED LEADS & PHONE NUMBERS CRM (Single Clean Surface)
+         ===================================================================== */}
+      {activeTab === "leads" && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Flame className="w-4 h-4 text-rose-500" />
+                <span>مشتریان داغ و شماره‌های موبایل شکارشده</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 tabular-nums font-bold">
+                  {leads.length.toLocaleString("fa-IR")} مورد
                 </span>
-              </div>
+              </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                وقتی کاربری بدون کامنت گذاشتن زیر پست، مستقیم استوری شما را ریپلای کند یا در دایرکت سوال کلی بپرسد، از روی «تقلب‌نامه کلی پیج» به او پاسخ داده می‌شود.
+                شماره‌های موبایل ارسالی در دایرکت یا کامنت به صورت خودکار استخراج و در این لیست ذخیره می‌شوند.
               </p>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={() => handleSave({ enabled: isEnabled ? 0 : 1 })}
-            disabled={saving}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-              isEnabled
-                ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-            }`}
-          >
-            {isEnabled ? "🟢 پاسخگوی استوری و عمومی روشن است" : "⚪ روشن کردن پاسخگوی استوری و عمومی"}
-          </button>
-        </div>
-
-        {/* Direct Connection to Brand Cheat Sheet */}
-        <div className="rounded-xl bg-slate-50/80 border border-slate-200/90 p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-              <BookOpen className="w-4 h-4 text-indigo-600" />
-              <span>تقلب‌نامه کلی پیج (منبع پاسخگویی به استوری‌ها و سوالات عمومی دایرکت)</span>
-            </div>
-            {cheatSheetSaved && (
-              <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                ذخیره شد
-              </span>
+            {leads.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>دانلود فایل اکسل شماره‌ها (CSV)</span>
+              </button>
             )}
           </div>
-          <textarea
-            rows={3}
-            value={brandCheatSheet}
-            onChange={(e) => setBrandCheatSheet(e.target.value)}
-            placeholder="مثال: ارسال به سراسر ایران با تیپاکس (۴۵ هزار تومان) | تحویل تهران ۲۴ ساعته | آدرس سایت: myshop.ir | پشتیبانی تلفنی: ۰۲۱xxxxxxx"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none leading-relaxed"
-          />
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-1">
-              <span className="text-[11px] text-slate-500 shrink-0">لینک اصلی سایت/بیو:</span>
-              <input
-                type="url"
-                dir="ltr"
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="https://myshop.ir"
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-mono text-slate-800 focus:border-indigo-500 focus:outline-none"
-              />
+
+          {leads.length === 0 ? (
+            <div className="p-12 text-center space-y-2">
+              <Phone className="w-7 h-7 text-slate-300 mx-auto" />
+              <div className="text-sm font-bold text-slate-700">
+                هنوز شماره تماسی از مشتریان دریافت نشده است
+              </div>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                به محض اینکه کاربری در دایرکت یا کامنت شماره موبایل خود را بفرستد، شماره او به همراه نام کاربری و پست مبدا در این جدول آماده تماس خواهد بود.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSaveBrandCheatSheet}
-              disabled={savingCheatSheet}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors cursor-pointer"
-            >
-              {savingCheatSheet ? "در حال ذخیره..." : "بروزرسانی تقلب‌نامه پیج"}
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Toggles: Story Replies & Follow Gate */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-slate-200/90 p-3.5 flex items-center justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <Film className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
-              <div>
-                <div className="text-xs font-bold text-slate-900">
-                  پاسخ خودکار به ریپلای استوری‌ها (Story Replies)
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
-                  وقتی مخاطب روی استوری شما ریپلای می‌زند یا قیمت می‌پرسد، با توجه به متن استوری و تقلب‌نامه پاسخ دهد.
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                handleSave({
-                  story_handling_mode:
-                    config.story_handling_mode === "ignore" ? "auto" : "ignore",
-                })
-              }
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer ${
-                config.story_handling_mode !== "ignore"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {config.story_handling_mode !== "ignore" ? "فعال ✓" : "غیرفعال"}
-            </button>
-          </div>
-
-          <div className="rounded-xl border border-slate-200/90 p-3.5 flex items-center justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <UserCheck className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
-              <div>
-                <div className="text-xs font-bold text-slate-900">
-                  قفل فالو در دایرکت عمومی
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
-                  قبل از پاسخ کامل در دایرکت، بررسی کند که کاربر حتماً پیج را فالو داشته باشد.
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                handleSave({
-                  require_follow: config.require_follow === 1 ? 0 : 1,
-                })
-              }
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer ${
-                config.require_follow === 1
-                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                  : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {config.require_follow === 1 ? "قفل فالو روشن 🔒" : "آزاد (بدون قفل)"}
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Advanced AI Instructions for General DM */}
-        <div className="pt-1">
-          <button
-            type="button"
-            onClick={() => setShowAdvancedRules((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
-          >
-            {showAdvancedRules ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-            <span>تنظیمات پیشرفته دستورالعمل هوش مصنوعی و فیلتر کلمات کلیدی دایرکت</span>
-          </button>
-
-          {showAdvancedRules && (
-            <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  دستورالعمل لحن و رفتار دستیار در دایرکت عمومی:
-                </label>
-                <textarea
-                  rows={3}
-                  value={config.ai_prompt_instructions || ""}
-                  onChange={(e) =>
-                    setConfig({ ...config, ai_prompt_instructions: e.target.value })
-                  }
-                  placeholder="مثال: با لحن صمیمی و کوتاه پاسخ بده و اگر مشتری قصد خرید داشت شماره تماس یا سایز مورد نظرش را بپرس."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                {saveSuccess && (
-                  <span className="text-xs text-emerald-600 font-bold">
-                    ✓ ذخیره شد
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleSave()}
-                  disabled={saving}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
-                >
-                  {saving ? "در حال ذخیره..." : t("dmSaveConfigBtn", undefined, lang)}
-                </button>
-              </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold">
+                  <tr>
+                    <th className="py-3 px-4">مشتری</th>
+                    <th className="py-3 px-4">شماره تماس</th>
+                    <th className="py-3 px-4">پست مبدا</th>
+                    <th className="py-3 px-4">پیام مشتری</th>
+                    <th className="py-3 px-4">وضعیت پیگیری</th>
+                    <th className="py-3 px-4 text-center">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {leads.map((lead) => (
+                    <tr
+                      key={lead.id}
+                      className="hover:bg-slate-50/60 transition-colors"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-900">
+                          <bdi className="font-mono text-indigo-700">
+                            @{lead.sender_username}
+                          </bdi>
+                        </div>
+                        {lead.sender_full_name && (
+                          <div className="text-[11px] text-slate-500">
+                            {lead.sender_full_name}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPhone(lead.phone_number)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold tabular-nums transition-colors cursor-pointer"
+                          title="کپی شماره"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span dir="ltr">{lead.phone_number}</span>
+                          {copiedPhone === lead.phone_number ? (
+                            <Check className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3 h-3 opacity-60" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4">
+                        {lead.source_shortcode ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-semibold">
+                            🎬 پست پیج
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">
+                            دایرکت / استوری
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 max-w-xs">
+                        <div
+                          className="truncate text-slate-700"
+                          title={lead.last_message}
+                        >
+                          {lead.last_message}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={lead.status}
+                          onChange={(e) =>
+                            handleLeadStatusChange(
+                              lead.id,
+                              e.target.value as
+                                | "new"
+                                | "contacted"
+                                | "converted"
+                            )
+                          }
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold outline-none cursor-pointer ${
+                            lead.status === "converted"
+                              ? "bg-emerald-50 text-emerald-800"
+                              : lead.status === "contacted"
+                                ? "bg-amber-50 text-amber-800"
+                                : "bg-rose-50 text-rose-800"
+                          }`}
+                        >
+                          <option value="new">🔥 جدید (منتظر تماس)</option>
+                          <option value="contacted">📞 تماس گرفته شد</option>
+                          <option value="converted">✅ تبدیل به فروش شد</option>
+                        </select>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSender(lead.sender_username);
+                              setActiveTab("inbox");
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                          >
+                            مشاهده چت
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLead(lead.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* SECTION 4: FULL DM LOGS TABLE */}
-      <DmLogsTable
-        logs={logs}
-        onRefresh={() => {
-          fetchLogs();
-          fetchLeadsAndThreads();
-        }}
-        loading={logsLoading}
-        lang={lang}
-      />
+      {/* =====================================================================
+          TAB 3: STORY REPLIES & GENERAL DM AUTOPILOT SETTINGS (Single Surface)
+         ===================================================================== */}
+      {activeTab === "settings" && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100">
+          {/* Row 1: Master Autopilot Toggle */}
+          <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  isEnabled
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-100 text-slate-400"
+                }`}
+              >
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  پاسخگوی خودکار «ریپلای استوری‌ها» و «دایرکت‌های عمومی»
+                </h2>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  توجه: دایرکت‌های مربوط به پست‌ها همیشه از روی سناریوی همان پست پاسخ می‌گیرند. این کلید برای زمانی است که کاربری روی استوری شما ریپلای بزند یا بدون کامنت، مستقیم وارد دایرکت شود.
+                </p>
+              </div>
+            </div>
 
-      {/* Live Inbox Modal */}
-      <DmLiveInboxModal
-        isOpen={liveInboxOpen}
-        onClose={() => setLiveInboxOpen(false)}
-        account={accountUsername}
-      />
+            <button
+              type="button"
+              onClick={() => handleSave({ enabled: isEnabled ? 0 : 1 })}
+              disabled={saving}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                isEnabled
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+              }`}
+            >
+              {isEnabled
+                ? "🟢 پاسخگوی استوری و دایرکت عمومی روشن است"
+                : "⚪ روشن کردن پاسخگوی استوری و دایرکت عمومی"}
+            </button>
+          </div>
+
+          {/* Row 2: Flat Switches for Story Replies & Follow Gate */}
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-2.5">
+                <Film className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-slate-900">
+                    پاسخ هوشمند به ریپلای استوری‌ها
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    پاسخگویی خودکار به مخاطبانی که روی استوری‌های شما سوال می‌پرسند یا ریپلای می‌زنند.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSave({
+                    story_handling_mode:
+                      config.story_handling_mode === "ignore" ? "auto" : "ignore",
+                  })
+                }
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 cursor-pointer ${
+                  config.story_handling_mode !== "ignore"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {config.story_handling_mode !== "ignore" ? "فعال ✓" : "غیرفعال"}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-2.5">
+                <UserCheck className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-slate-900">
+                    قفل فالو در دایرکت عمومی
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    قبل از ارسال پاسخ کامل در دایرکت، بررسی کند که کاربر پیج را فالو داشته باشد.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSave({
+                    require_follow: config.require_follow === 1 ? 0 : 1,
+                  })
+                }
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 cursor-pointer ${
+                  config.require_follow === 1
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {config.require_follow === 1
+                  ? "قفل فالو روشن 🔒"
+                  : "آزاد (بدون قفل)"}
+              </button>
+            </div>
+          </div>
+
+          {/* Row 3: Brand Cheat Sheet & Tone */}
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <BookOpen className="w-4 h-4 text-indigo-600" />
+                <span>
+                  تقلب‌نامه کلی پیج (اطلاعات ثابت برند، نحوه ارسال، قیمت‌های کلی و آدرس)
+                </span>
+              </div>
+              {(cheatSheetSaved || saveSuccess) && (
+                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  ذخیره شد
+                </span>
+              )}
+            </div>
+
+            <textarea
+              rows={3}
+              value={brandCheatSheet}
+              onChange={(e) => setBrandCheatSheet(e.target.value)}
+              placeholder="مثال: ارسال به سراسر ایران با تیپاکس (۴۵ هزار تومان) | تحویل تهران ۲۴ ساعته | آدرس سایت: myshop.ir"
+              className="w-full rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none leading-relaxed"
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  لینک اصلی سایت یا خرید:
+                </label>
+                <input
+                  type="url"
+                  dir="ltr"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://myshop.ir"
+                  className="w-full rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-2 text-xs font-mono text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  لحن دلخواه دستیار در دایرکت (اختیاری):
+                </label>
+                <input
+                  type="text"
+                  value={config.ai_prompt_instructions || ""}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      ai_prompt_instructions: e.target.value,
+                    })
+                  }
+                  placeholder="مثال: صمیمی، کوتاه و محترمانه؛ در صورت قصد خرید شماره تماس بپرس"
+                  className="w-full rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-2 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  await Promise.all([handleSaveBrandCheatSheet(), handleSave()]);
+                }}
+                disabled={savingCheatSheet || saving}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                {savingCheatSheet || saving
+                  ? "در حال ذخیره..."
+                  : "ذخیره تنظیمات استوری و دایرکت"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

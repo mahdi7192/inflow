@@ -104,7 +104,9 @@ Database file is located at `data/inflow.db`. It is initialized and migrated aut
 2. **Preserve Next.js Server External Packages:** `better-sqlite3` must remain in `serverExternalPackages` within `next.config.ts`.
 3. **Persian & RTL Standards:** All user-facing Persian text must support RTL and use the `Vazirmatn` font. Maintain 100% key parity across `src/locales/{fa,en,ar}.json`.
 4. **Idempotency Over Everything:** Never bypass or remove `comment_id` or `message_id` unique constraints.
-5. **Unified Studio Design System (`DESIGN.md` & `docs/design-system.md`):**
+5. **Unified Studio v2 Design System (`DESIGN.md` & `docs/design-system.md`):**
    * Strictly follow `/DESIGN.md` and `/docs/design-system.md`.
    * Use **inFlow Studio Light Theme** (`#F8FAFC` Cool Alabaster canvas, `#FFFFFF` pure white surfaces, `#E2E8F0` hairline borders, `--persona-business: #4F46E5` for Business/Stores, `--persona-creator: #E11D48` for Creators/Influencers, `--status-active: #059669` for active Autopilot).
-   * Maintain the **Slide-Over Context Drawer (`PostPlaybookDrawer`)**, **1-Click Playbook Cards (`src/lib/playbooks.ts`)**, and **Supplemental Cheat Sheet (`cheat_sheet` / تقلب‌نامه پست و پیج)** patterns across all new features.
+   * **Zero Box-in-Box Law**: Never nest bordered cards inside another bordered card; separate internal elements using `divide-y divide-slate-100` or `divide-x divide-x-reverse divide-slate-100`.
+   * **Global Shell Padding**: `src/components/layout/workspace-shell.tsx` enforces global `<main>` padding (`p-5 sm:p-6 lg:p-8`) and `max-w-6xl mx-auto`.
+   * **Split-Pane Messenger (`/dms`) & Visual Grid (`/comments`)**: Maintain the 3-tab Split Messenger Inbox (`src/components/dms/dm-automation-view.tsx`), the 3-column Instagram Visual Grid (`src/components/inflow-dashboard.tsx`), and the **Slide-Over Context Drawer (`PostPlaybookDrawer`)**. Never re-introduce deleted legacy form components (`PostDetailView`, `StickySaveBar`, `ActivationCard`, `DmLogsTable`, `DmLiveInboxModal`).

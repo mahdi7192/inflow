@@ -10,7 +10,6 @@ import { SessionHealthBadge } from "@/components/layout/session-health-badge";
 import { SessionExpiryBanner } from "@/components/layout/session-expiry-banner";
 import { AccountLoginDialog } from "@/components/auth/account-login-dialog";
 import { Toaster, toast } from "@/components/ui/sonner";
-import { UnsavedChangesModal } from "@/components/ui/unsaved-changes-modal";
 import { DeleteAccountModal } from "@/components/modals/delete-account-modal";
 import { WorkspaceProvider, useRequiredWorkspace } from "./workspace-context";
 import type { AccountRow } from "@/lib/db";
@@ -213,21 +212,12 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* 4. Single Unified Vertical Scroll Container */}
-        <main className="flex-1 overflow-y-auto min-w-0 bg-zinc-50/50">
-          {children}
+        <main className="flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] p-5 sm:p-6 lg:p-8">
+          <div className="w-full max-w-6xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
-
-      {/* 5. Persistent Global Modals */}
-      <UnsavedChangesModal
-        isOpen={pendingNavigation !== null}
-        onStay={() => setPendingNavigation(null)}
-        onDiscard={confirmDiscardAndNavigate}
-        title={t("unsavedChangesTitle")}
-        description={t("unsavedChangesDesc")}
-        stayLabel={t("stayOnPage")}
-        discardLabel={t("discardChanges")}
-      />
 
       {/* Global Toast Provider */}
       <Toaster />

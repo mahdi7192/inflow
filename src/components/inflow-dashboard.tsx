@@ -25,22 +25,18 @@ import {
   Flame,
   CheckCircle2,
   Link2,
+  Film,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
-import { SessionHealthBadge } from "@/components/layout/session-health-badge";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
-import { LanguageDropdown } from "@/components/ui/language-dropdown";
-import { SidebarNav } from "@/components/sidebar-nav";
 import { I18N, Lang } from "@/lib/i18n";
 import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
-import { EmptyTenancyView } from "./empty-tenancy-view";
-import { PostDetailView } from "./post-detail-view";
 import { PostPlaybookDrawer, type DrawerPostData } from "./post-playbook-drawer";
 import { getPlaybookById, type AccountPersona } from "@/lib/playbooks";
 import { LogsModal } from "./modals/logs-modal";
-import { AccountLoginDialog } from "@/components/auth/account-login-dialog";
 import { DeleteAccountModal } from "./modals/delete-account-modal";
 import { useWorkspace } from "@/components/layout/workspace-context";
 import { cn } from "@/lib/utils";
@@ -113,7 +109,7 @@ export function InflowDashboard({
   const [filterTab, setFilterTab] = useState<
     "all" | "active" | "inactive" | "reels" | "posts"
   >("all");
-  const [viewMode, setViewMode] = useState<"cards" | "grid">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "grid">("grid");
 
   // Selected post for detail configuration screen
   const [selectedShortcode, setSelectedShortcode] = useState<string | null>(
@@ -122,9 +118,9 @@ export function InflowDashboard({
 
   // Modals & Slide-Over Playbook Drawer (Spec 018)
   const [logsShortcode, setLogsShortcode] = useState<string | null>(null);
-  const [drawerShortcode, setDrawerShortcode] = useState<string | null>(null);
-  const [agentApiOpen, setAgentApiOpen] = useState(false);
-  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [drawerShortcode, setDrawerShortcode] = useState<string | null>(
+    initialSelectedShortcode || null
+  );
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   // Spec 018: Persona, Brand Cheat Sheet & Live SocialAPI Insights
@@ -343,9 +339,6 @@ export function InflowDashboard({
         await fetchAccounts();
       } else {
         toast.error(data.error || "خطا در همگام‌سازی پست‌ها");
-        if (data.session_required) {
-          setLoginModalOpen(true);
-        }
       }
     } catch {
       toast.error("خطای شبکه هنگام ارتباط با سرور");
@@ -519,23 +512,9 @@ export function InflowDashboard({
   const cheatSheetCount = posts.filter((p) => (p.cheat_sheet || "").trim().length > 0).length;
   const isCreatorPersona = accountPersona === "creator";
 
-  if (embeddedInShell) {
-    return (
-      <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {selectedShortcode && activeDetailPost ? (
-          <PostDetailView
-            post={activeDetailPost}
-            lang={lang}
-            onBack={handleBackToList}
-            onSaveSuccess={(updated) => {
-              setPosts((prev) =>
-                prev.map((p) => (p.shortcode === updated.shortcode ? updated : p))
-              );
-            }}
-            onOpenLogs={(sc) => setLogsShortcode(sc)}
-          />
-        ) : (
-          <div className="space-y-6">
+  return (
+    <div className="w-full space-y-6 pb-10">
+      <div className="space-y-6">
             {/* Studio Account Command Bar, Adaptive Persona Switcher & True ROI Funnel (Spec 018) */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-5 space-y-5 shadow-2xs">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -614,10 +593,10 @@ export function InflowDashboard({
                     type="button"
                     onClick={() => setBrandSheetOpen(!brandSheetOpen)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                      "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
                       brandCheatSheet.trim()
-                        ? "border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100/70"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100/80"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200/70"
                     )}
                   >
                     <FileText className="w-3.5 h-3.5" />
@@ -626,36 +605,12 @@ export function InflowDashboard({
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     )}
                   </button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={syncing}
-                    onClick={() => {
-                      handleSync();
-                      fetchLiveInsights(currentAccount, true);
-                    }}
-                    className="text-xs gap-1.5 rounded-xl cursor-pointer shadow-2xs"
-                  >
-                    <RotateCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
-                    <span>{syncing ? t("syncing") : t("navSync")}</span>
-                  </Button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDeleteAccountOpen(true)}
-                    title="حذف حساب از سامانه"
-                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-100/60 text-red-600 text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </div>
 
               {/* Collapsible Account-Level Brand Cheat Sheet Drawer */}
               {brandSheetOpen && (
-                <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/30 p-4 space-y-3 animate-in fade-in duration-150">
+                <div className="pt-4 border-t border-slate-100 space-y-3 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -664,7 +619,7 @@ export function InflowDashboard({
                           تقلب‌نامه و حافظه کلی پیج (مشترک برای تمام پست‌ها و چت‌های دایرکت)
                         </span>
                       </h3>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5">
                         اطلاعات ثابتی که در کپشن‌ها نمی‌نویسید (مثل هزینه و زمان ارسال، شرایط تعویض، آدرس، لینک سایت یا معرفی خودتان) را یک بار اینجا بنویسید تا دستیار هوش مصنوعی همیشه بداند.
                       </p>
                     </div>
@@ -678,7 +633,7 @@ export function InflowDashboard({
                         ? "مثال: من مهدی هستم، تولیدکننده محتوای تکنولوژی و هوش مصنوعی. لحن پاسخگویی باید صمیمی و پرانرژی باشد. لینک کانال تلگرام و یوتیوب در بایو هست..."
                         : "مثال: ارسال به سراسر ایران با پست پیشتاز (۶۵ هزار تومان، بالای ۲ میلیون رایگان) | تحویل تهران با پیک | امکان تعویض سایز تا ۴۸ ساعت..."
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 flex-1">
@@ -689,14 +644,14 @@ export function InflowDashboard({
                         value={websiteUrl}
                         onChange={(e) => setWebsiteUrl(e.target.value)}
                         placeholder="https://your-site.ir (وب‌سایت یا لینک اصلی پیج)"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-mono text-slate-800"
+                        className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-1.5 text-xs font-mono text-slate-800 focus:bg-white"
                       />
                     </div>
                     <div className="flex items-center gap-2 justify-end">
                       <button
                         type="button"
                         onClick={() => setBrandSheetOpen(false)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200/50"
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
                       >
                         بستن
                       </button>
@@ -713,35 +668,29 @@ export function InflowDashboard({
                 </div>
               )}
 
-              {/* 4-Stage True Revenue & Engagement Funnel Strip */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+              {/* 4-Stage True Revenue & Engagement Funnel Strip (Flat Borderless Ribbon — Zero Card-in-Card) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0 pt-4 border-t border-slate-100 lg:divide-x lg:divide-x-reverse lg:divide-slate-100">
+                <div className="lg:pl-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-medium">۱. ویو و ریچ محتوا</span>
                     <Eye className="w-4 h-4 text-slate-400" />
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between">
+                  <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-slate-900">
                       {(liveInsights?.funnel?.views || 0).toLocaleString("fa-IR")}
                     </span>
-                    {liveInsights?.funnel?.avg_skip_rate ? (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                        پرش ریلز: %{liveInsights.funnel.avg_skip_rate}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-slate-500">
-                        ریچ: {(liveInsights?.funnel?.reach || 0).toLocaleString("fa-IR")}
-                      </span>
-                    )}
+                    <span className="text-[11px] text-slate-500 tabular-nums">
+                      ریچ: {(liveInsights?.funnel?.reach || 0).toLocaleString("fa-IR")}
+                    </span>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                <div className="lg:px-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-medium">۲. کامنت و پاسخ عمومی</span>
                     <MessageSquare className="w-4 h-4 text-indigo-500" />
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between">
+                  <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-slate-900">
                       {(
                         liveInsights?.funnel?.total_comments ??
@@ -752,38 +701,38 @@ export function InflowDashboard({
                         )
                       ).toLocaleString("fa-IR")}
                     </span>
-                    <span className="text-[11px] text-emerald-700 font-medium">
+                    <span className="text-[11px] text-emerald-700 font-medium tabular-nums">
                       {(liveInsights?.funnel?.comment_replies_sent || 0).toLocaleString("fa-IR")} پاسخ ارسالی
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                <div className="lg:px-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">۳. دایرکت و نرخ سین (Read)</span>
+                    <span className="font-medium">۳. دایرکت و نرخ سین</span>
                     <Send className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between">
+                  <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-emerald-700">
                       {(liveInsights?.funnel?.total_dms_sent || 0).toLocaleString("fa-IR")}
                     </span>
-                    <span className="text-[11px] text-slate-600 font-medium">
+                    <span className="text-[11px] text-slate-600 font-medium tabular-nums">
                       {(liveInsights?.funnel?.dms_read || 0).toLocaleString("fa-IR")} خوانده‌شده ✓✓
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                <div className="lg:pr-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-medium">۴. فالوور جذب‌شده و خلبان</span>
                     <UserCheck className="w-4 h-4 text-rose-500" />
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between">
+                  <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-rose-600">
                       +{(liveInsights?.funnel?.follows_gained || 0).toLocaleString("fa-IR")}
                     </span>
-                    <span className="text-[11px] text-slate-600 font-medium">
-                      {activeCount} پست فعال ({cheatSheetCount} تقلب‌نامه)
+                    <span className="text-[11px] text-slate-600 font-medium tabular-nums">
+                      {activeCount.toLocaleString("fa-IR")} پست فعال ({cheatSheetCount.toLocaleString("fa-IR")} تقلب‌نامه)
                     </span>
                   </div>
                 </div>
@@ -1140,61 +1089,167 @@ export function InflowDashboard({
                 })}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredPosts.map((post) => {
                   const isActive = post.auto_reply === 1;
                   const pbPreset = getPlaybookById(post.playbook_id);
                   const hasCheatSheet = Boolean((post.cheat_sheet || "").trim());
+                  const logsCount = Number(
+                    (post as unknown as { logs_count: number }).logs_count || 0
+                  );
+                  const pm = liveInsights?.post_metrics?.[post.shortcode];
+                  const viewsCount = Number(pm?.views || pm?.play_count || 0);
+                  const dmsSentCount = Number(pm?.dms_sent || 0);
+
                   return (
                     <div
                       key={post.id}
                       onClick={() => setDrawerShortcode(post.shortcode)}
                       className={cn(
-                        "group rounded-2xl border bg-white overflow-hidden transition-all cursor-pointer flex flex-col",
+                        "group rounded-2xl border bg-white overflow-hidden transition-all cursor-pointer flex flex-col justify-between",
                         isActive
-                          ? "border-emerald-300 shadow-xs"
-                          : "border-slate-200 hover:border-slate-300 hover:shadow-xs"
+                          ? "border-emerald-300/90 shadow-xs"
+                          : "border-slate-200/80 hover:border-slate-300 hover:shadow-xs"
                       )}
                     >
-                      <div className="aspect-square bg-slate-100 relative overflow-hidden">
+                      {/* Cover Media Area */}
+                      <div className="aspect-[16/10] bg-slate-100 relative overflow-hidden">
                         {post.thumbnail_url ? (
                           <img
                             src={post.thumbnail_url}
                             alt=""
                             referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
                             }}
                           />
-                        ) : null}
-                        <div className="absolute top-2 start-2 flex flex-wrap gap-1">
-                          <Badge variant="secondary" className="text-[10px] uppercase font-mono backdrop-blur-md">
-                            {post.post_type}
-                          </Badge>
-                          {hasCheatSheet && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600/90 text-white backdrop-blur-md">
-                              📝 تقلب‌نامه
-                            </span>
-                          )}
-                        </div>
-                        {pbPreset && (
-                          <div className="absolute bottom-2 inset-x-2">
-                            <div className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-900/80 text-white backdrop-blur-md truncate">
-                              {pbPreset.emoji} {pbPreset.title}
-                            </div>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            {post.post_type === "reel" ? (
+                              <Film className="w-8 h-8" />
+                            ) : (
+                              <ImageIcon className="w-8 h-8" />
+                            )}
                           </div>
                         )}
+
+                        {/* Top Overlay: Media Type & Instant Switch */}
+                        <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-900/75 text-white backdrop-blur-md">
+                              {post.post_type === "reel" ? "🎬 ریلز" : "📷 پست"}
+                            </span>
+                            {hasCheatSheet && (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-600/90 text-white backdrop-blur-md">
+                                📝 دارای تقلب‌نامه
+                              </span>
+                            )}
+                          </div>
+
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white/95 backdrop-blur-md px-2 py-1 rounded-xl shadow-xs flex items-center gap-1.5"
+                          >
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold",
+                                isActive ? "text-emerald-700" : "text-slate-400"
+                              )}
+                            >
+                              {isActive ? "فعال" : "خاموش"}
+                            </span>
+                            <Switch
+                              checked={isActive}
+                              onCheckedChange={(checked) =>
+                                handleQuickToggle(post.shortcode, checked)
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="p-3 flex items-center justify-between gap-2 border-t border-slate-100">
-                        <span className="text-xs font-mono font-bold text-slate-800 truncate">
-                          {post.shortcode}
-                        </span>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Switch
-                            checked={isActive}
-                            onCheckedChange={(checked) => handleQuickToggle(post.shortcode, checked)}
-                          />
+
+                      {/* Card Content Body */}
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3.5">
+                        <div className="space-y-2">
+                          <p className="text-xs text-slate-800 font-medium line-clamp-2 leading-relaxed min-h-[2.5rem]">
+                            {post.caption || "بدون متن کپشن (برای افزودن تقلب‌نامه و سناریوی فروش کلیک کنید)"}
+                          </p>
+
+                          {/* Active Playbook Indicator */}
+                          {pbPreset ? (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-bold">
+                              <span>{pbPreset.emoji}</span>
+                              <span className="truncate">{pbPreset.title}</span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-medium">
+                              <span>⚡ سناریوی پیش‌فرض هوشمند</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Flat 3-Metric Strip + Action Button */}
+                        <div className="pt-3 border-t border-slate-100 space-y-3">
+                          <div className="grid grid-cols-3 text-center divide-x divide-x-reverse divide-slate-100 text-[11px]">
+                            <div>
+                              <div className="text-slate-400">ویو</div>
+                              <div className="font-bold text-slate-800 tabular-nums mt-0.5">
+                                {viewsCount > 0
+                                  ? viewsCount.toLocaleString("fa-IR")
+                                  : "—"}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400">پاسخ کامنت</div>
+                              <div className="font-bold text-slate-800 tabular-nums mt-0.5">
+                                {logsCount.toLocaleString("fa-IR")}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400">دایرکت</div>
+                              <div className="font-bold text-emerald-700 tabular-nums mt-0.5">
+                                {dmsSentCount.toLocaleString("fa-IR")}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDrawerShortcode(post.shortcode);
+                              }}
+                              className={cn(
+                                "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer",
+                                isActive
+                                  ? "bg-slate-900 hover:bg-slate-800 text-white"
+                                  : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700"
+                              )}
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>
+                                {isActive
+                                  ? "تنظیم سناریو و تقلب‌نامه"
+                                  : "فعال‌سازی ۱-کلیکی سناریو"}
+                              </span>
+                            </button>
+
+                            {logsCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLogsShortcode(post.shortcode);
+                                }}
+                                title="مشاهده تاریخچه پاسخ‌ها"
+                                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/70 text-slate-600 transition-colors cursor-pointer shrink-0"
+                              >
+                                <Clock className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1203,7 +1258,6 @@ export function InflowDashboard({
               </div>
             )}
           </div>
-        )}
 
         {/* 1-Click Slide-Over Playbook & Cheat Sheet Drawer (Spec 018) */}
         <PostPlaybookDrawer
@@ -1244,612 +1298,6 @@ export function InflowDashboard({
             onDeleted={handleAccountDeleted}
           />
         )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-zinc-50/50 text-foreground">
-      {/* Desktop Sidebar Navigation (Persistent on >= lg viewports) */}
-      <div className="hidden lg:block shrink-0 sticky top-0 h-screen z-30">
-        <SidebarNav
-          currentAccount={currentAccount}
-          accounts={accounts}
-          onSelectAccount={handleSelectAccount}
-          onOpenAddAccount={() => setLoginModalOpen(true)}
-          onSync={handleSync}
-          syncing={syncing}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          lang={lang}
-          isCatalogActive={!selectedShortcode}
-          onNavigateCatalog={handleBackToList}
-          onOpenDeleteAccount={() => setDeleteAccountOpen(true)}
-        />
-      </div>
-
-      {/* Mobile Drawer (Accessible on < lg viewports) */}
-      {mobileDrawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          {/* Backdrop Overlay */}
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
-            onClick={() => setMobileDrawerOpen(false)}
-          />
-          {/* Slide-over Drawer */}
-          <div className="relative w-64 max-w-[80vw] h-full z-10 animate-in slide-in-from-start duration-200">
-            <SidebarNav
-              currentAccount={currentAccount}
-              accounts={accounts}
-              onSelectAccount={(username) => {
-                handleSelectAccount(username);
-                setMobileDrawerOpen(false);
-              }}
-              onOpenAddAccount={() => {
-                setMobileDrawerOpen(false);
-                setLoginModalOpen(true);
-              }}
-              onSync={handleSync}
-              syncing={syncing}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-              lang={lang}
-              onCloseMobileDrawer={() => setMobileDrawerOpen(false)}
-              isCatalogActive={!selectedShortcode}
-              onNavigateCatalog={() => {
-                handleBackToList();
-                setMobileDrawerOpen(false);
-              }}
-              onOpenDeleteAccount={() => {
-                setMobileDrawerOpen(false);
-                setDeleteAccountOpen(true);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Main Content Viewport */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-        {/* Decluttered Top Header Navigation */}
-        <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-white/80 backdrop-blur-md px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Mobile Hamburger Drawer Toggle */}
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-1.5 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors cursor-pointer"
-              aria-label={t("openMenu")}
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-
-            {/* Contextual Title / Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs">
-              {selectedShortcode ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleBackToList}
-                    className="text-muted-foreground hover:text-foreground font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <span>{t("navCatalog")}</span>
-                  </button>
-                  <span className="text-zinc-300">/</span>
-                  <span className="font-mono font-semibold text-foreground">
-                    {selectedShortcode}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="font-semibold text-foreground">
-                    {t("dashboardTitle") || "داشبورد اتوماسیون"}
-                  </span>
-                  <span className="text-zinc-300">/</span>
-                  <span className="font-mono text-muted-foreground">
-                    @{currentAccount || "---"}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Clean Right Actions: Session Health Badge & Language Dropdown */}
-          <div className="flex items-center gap-2">
-            {currentAccount && (
-              <SessionHealthBadge
-                account={currentAccount}
-                status={profile?.session_status || "unauthenticated"}
-                onReLogin={() => setLoginModalOpen(true)}
-              />
-            )}
-
-            <LanguageDropdown
-              currentLang={lang}
-              onLangChange={handleSetLang}
-              size="sm"
-            />
-          </div>
-        </header>
-
-        {/* Sync Status Alert Banner */}
-        {syncAlert && (
-          <div
-            className={cn(
-              "mx-4 mt-3 px-3 py-2 rounded-lg text-xs flex items-center justify-between border",
-              syncAlert.type === "success" &&
-                "bg-emerald-50 text-emerald-800 border-emerald-200",
-              syncAlert.type === "error" &&
-                "bg-red-50 text-red-800 border-red-200",
-              syncAlert.type === "info" &&
-                "bg-zinc-100 text-zinc-800 border-zinc-200"
-            )}
-          >
-            <span>{syncAlert.message}</span>
-            <button
-              type="button"
-              onClick={() => setSyncAlert(null)}
-              className="text-muted-foreground hover:text-foreground text-xs cursor-pointer px-1.5 py-0.5"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Main Content Body */}
-        {!loading && accounts.length === 0 && currentUser?.role === "tenant" ? (
-          <EmptyTenancyView
-            user={currentUser}
-            lang={lang}
-            onLogout={handleLogout}
-          />
-        ) : selectedShortcode && activeDetailPost ? (
-          <PostDetailView
-            post={activeDetailPost}
-            lang={lang}
-            onBack={handleBackToList}
-            onSaveSuccess={(updated) => {
-              setPosts((prev) =>
-                prev.map((p) => (p.shortcode === updated.shortcode ? updated : p))
-              );
-            }}
-            onOpenLogs={(sc) => setLogsShortcode(sc)}
-          />
-        ) : (
-          <div className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-            {/* Account Meta & KPI Metrics Strip */}
-            <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-2xs">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  {profile?.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.display_name || currentAccount}
-                      className="w-12 h-12 rounded-full object-cover border border-border bg-secondary"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center text-sm font-bold font-mono text-muted-foreground shrink-0">
-                      {(currentAccount || "IN").slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <span>{profile?.display_name || currentAccount}</span>
-                      <span className="text-xs font-mono text-muted-foreground font-normal">
-                        @{currentAccount}
-                      </span>
-                    </h1>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                      {profile?.bio || "پلتفرم اتوماسیون هوشمند کامنت و دایرکت"}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setDeleteAccountOpen(true)}
-                  title="حذف حساب و پاک‌سازی کامل ربات از سامانه"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-destructive text-xs font-medium transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>حذف حساب و ربات</span>
-                </button>
-              </div>
-
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("totalPosts")}</div>
-                  <div className="text-xl font-bold font-mono text-foreground mt-1">
-                    {posts.length}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("activeAutomations")}</div>
-                  <div className="text-xl font-bold font-mono text-emerald-700 mt-1">
-                    {activeCount}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("configuredRules")}</div>
-                  <div className="text-xl font-bold font-mono text-amber-700 mt-1">
-                    {configuredCount}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{t("totalActions")}</div>
-                  <div className="text-xl font-bold font-mono text-sky-700 mt-1">
-                    {posts.reduce(
-                      (acc, p) =>
-                        acc +
-                        Number(
-                          (p as unknown as { logs_count: number }).logs_count || 0
-                        ),
-                      0
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Search, Filter Tabs & Relocated View Mode Toolbar */}
-            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-              {/* Search Input */}
-              <div className="relative flex-1">
-                <Input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("searchPlaceholder")}
-                  icon={<Search className="w-4 h-4 text-muted-foreground" />}
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              {/* Controls: Filter Tabs + View Mode Toggle */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-                {/* Filter Tabs */}
-                <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary text-xs">
-                  {(
-                    [
-                      { id: "all", label: t("filterAll") },
-                      { id: "active", label: t("filterActive") },
-                      { id: "inactive", label: t("filterInactive") },
-                      { id: "reels", label: t("filterReels") },
-                      { id: "posts", label: t("filterPosts") },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setFilterTab(tab.id)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-md whitespace-nowrap text-xs font-medium transition-colors cursor-pointer",
-                        filterTab === tab.id
-                          ? "bg-white text-foreground shadow-xs font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* View Mode Switcher (Relocated to Content Toolbar) */}
-                <div className="flex items-center p-0.5 rounded-lg border border-border bg-secondary shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("cards")}
-                    className={cn(
-                      "p-1.5 rounded-md transition-colors cursor-pointer",
-                      viewMode === "cards"
-                        ? "bg-white text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    title={t("viewCards") || "Card View"}
-                  >
-                    <List className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={cn(
-                      "p-1.5 rounded-md transition-colors cursor-pointer",
-                      viewMode === "grid"
-                        ? "bg-white text-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    title={t("viewGrid") || "Grid View"}
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Catalog Posts List / Grid */}
-            {loading ? (
-              <div className="py-20 text-center text-zinc-500 text-xs">
-                در حال بارگذاری پست‌های پیج...
-              </div>
-            ) : filteredPosts.length === 0 ? (
-              <div className="py-20 text-center space-y-3 rounded-xl border border-border bg-card">
-                <FolderOpen className="w-10 h-10 mx-auto text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">{t("noPostsMatch")}</p>
-              </div>
-            ) : viewMode === "cards" ? (
-              /* Cards / Rows View */
-              <div className="space-y-3">
-                {filteredPosts.map((p) => {
-                  const isActive = p.auto_reply === 1;
-                  const isReel = p.post_type === "reel";
-
-                  return (
-                    <div
-                      key={p.shortcode}
-                      onClick={() => handleSelectPost(p.shortcode)}
-                      className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all p-3.5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                        {/* Media Thumb */}
-                        <div className="relative w-14 h-18 sm:w-16 sm:h-20 shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          {p.thumbnail_url ? (
-                            <img
-                              src={p.thumbnail_url}
-                              alt="Thumbnail"
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-secondary text-muted-foreground p-1 text-center">
-                              <FolderOpen className="w-5 h-5 opacity-40 mb-1" />
-                            </div>
-                          )}
-                          <span className="absolute bottom-1 end-1 px-1 py-0.2 rounded text-[9px] font-mono bg-black/60 text-white">
-                            {isReel ? "REEL" : "POST"}
-                          </span>
-                        </div>
-
-                        {/* Content Snippet */}
-                        <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-semibold text-foreground truncate max-w-[130px] sm:max-w-none">
-                              {p.shortcode}
-                            </span>
-                            <span
-                              className={cn(
-                                "inline-block w-2 h-2 rounded-full shrink-0",
-                                isActive ? "bg-emerald-500" : "bg-zinc-300"
-                              )}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                            {p.caption || t("noCaption")}
-                          </p>
-
-                          {/* Active Rule Tags */}
-                          {isActive && (
-                            <div className="flex flex-wrap gap-1.5 pt-1">
-                              {p.trigger_type === "keywords" && (
-                                <Badge variant="amber">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  <span>{t("tagTriggerKeywords")}</span>
-                                </Badge>
-                              )}
-                              {p.trigger_type === "ai_context" && (
-                                <Badge variant="fuchsia">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  <span>{t("tagTriggerAi")}</span>
-                                </Badge>
-                              )}
-                              {p.trigger_type === "all" && (
-                                <Badge variant="amber">
-                                  <span>{t("tagTriggerAll")}</span>
-                                </Badge>
-                              )}
-                              {p.comment_action_type === "direct" && (
-                                <Badge variant="sky">
-                                  <MessageSquare className="w-2.5 h-2.5" />
-                                  <span>{t("tagCommentDirect")}</span>
-                                </Badge>
-                              )}
-                              {p.comment_action_type === "ai" && (
-                                <Badge variant="sky">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  <span>{t("tagCommentAi")}</span>
-                                </Badge>
-                              )}
-                              {p.dm_action_type === "direct" && (
-                                <Badge variant="purple">
-                                  <Send className="w-2.5 h-2.5" />
-                                  <span>{t("tagDmDirect")}</span>
-                                </Badge>
-                              )}
-                              {p.dm_action_type === "ai" && (
-                                <Badge variant="purple">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  <span>{t("tagDmAi")}</span>
-                                </Badge>
-                              )}
-                              {p.dm_require_follow === 1 && (
-                                <Badge variant="emerald">
-                                  <UserCheck className="w-2.5 h-2.5" />
-                                  <span>{t("tagRequireFollow")}</span>
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actions on Card */}
-                      <div
-                        className="flex items-center gap-3 shrink-0 self-end sm:self-center pt-2 sm:pt-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLogsShortcode(p.shortcode);
-                          }}
-                          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary px-2.5 py-1.5 rounded-lg border border-border transition-colors cursor-pointer"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-sky-600" />
-                          <span>{t("viewLogs")}</span>
-                        </button>
-
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "text-xs font-semibold",
-                              isActive ? "text-emerald-700" : "text-muted-foreground"
-                            )}
-                          >
-                            {isActive ? t("statusOn") : t("statusOff")}
-                          </span>
-                          <Switch
-                            checked={isActive}
-                            onCheckedChange={() => handleQuickToggle(p.shortcode, {} as unknown as React.MouseEvent)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Grid View */
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {filteredPosts.map((p) => {
-                  const isActive = p.auto_reply === 1;
-                  const isReel = p.post_type === "reel";
-
-                  return (
-                    <div
-                      key={p.shortcode}
-                      onClick={() => handleSelectPost(p.shortcode)}
-                      className="group rounded-xl border border-border bg-card hover:border-zinc-300 hover:shadow-xs transition-all overflow-hidden cursor-pointer flex flex-col"
-                    >
-                      <div className="relative aspect-4/5 bg-secondary">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {p.thumbnail_url ? (
-                          <img
-                            src={p.thumbnail_url}
-                            alt="Thumbnail"
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-secondary text-muted-foreground p-2 text-center">
-                            <FolderOpen className="w-6 h-6 opacity-40 mb-1" />
-                          </div>
-                        )}
-                        <span className="absolute top-2 start-2 px-1.5 py-0.5 rounded text-[9px] font-mono bg-black/60 text-white">
-                          {isReel ? "REEL" : "POST"}
-                        </span>
-                        <div className="absolute top-2 end-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={(e) => handleQuickToggle(p.shortcode, e)}
-                            className={cn(
-                              "w-2.5 h-2.5 rounded-full cursor-pointer transition-transform",
-                              isActive
-                                ? "bg-emerald-500 ring-4 ring-emerald-500/20"
-                                : "bg-zinc-300"
-                            )}
-                          />
-                        </div>
-                      </div>
-                      <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs font-semibold text-foreground truncate max-w-[130px] sm:max-w-none">
-                              {p.shortcode}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1">
-                            {p.caption || t("noCaption")}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2 border-t border-border text-[10px]">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setLogsShortcode(p.shortcode);
-                            }}
-                            className="text-sky-600 hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>{t("viewLogs")}</span>
-                          </button>
-                          <span
-                            className={cn(
-                              "font-semibold",
-                              isActive ? "text-emerald-700" : "text-muted-foreground"
-                            )}
-                          >
-                            {isActive ? t("statusOn") : t("statusOff")}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Logs Modal */}
-      {logsShortcode && activeLogPost && (
-        <LogsModal
-          post={activeLogPost}
-          lang={lang}
-          onClose={() => setLogsShortcode(null)}
-          onLogsUpdated={() => fetchPosts(currentAccount)}
-        />
-      )}
-
-      {/* Direct In-App Login Modal */}
-      {loginModalOpen && (
-        <AccountLoginDialog
-          isOpen={loginModalOpen}
-          onClose={() => setLoginModalOpen(false)}
-          defaultUsername={currentAccount}
-          lockUsername={true}
-          onSuccess={async () => {
-            setLoginModalOpen(false);
-            await handleSync();
-          }}
-        />
-      )}
-
-      {/* Delete Account & Wipe Bot Modal */}
-      {currentAccount && (
-        <DeleteAccountModal
-          open={deleteAccountOpen}
-          account={currentAccount}
-          onClose={() => setDeleteAccountOpen(false)}
-          onDeleted={handleAccountDeleted}
-        />
-      )}
     </div>
   );
 }

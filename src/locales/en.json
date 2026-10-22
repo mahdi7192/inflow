@@ -315,5 +315,6 @@
   "aiSettingsTitle": "AI API Key Settings",
   "aiSettingsSubtitle": "Configure direct API key for semantic comment evaluation and response drafting without external agents",
   "dmLiveInbox": "Live Direct Inbox",
-  "accountLoginTitle": "Direct Instagram Account Login"
+  "accountLoginTitle": "Direct Instagram Account Login",
+  "allAccounts": "All Accounts"
 }

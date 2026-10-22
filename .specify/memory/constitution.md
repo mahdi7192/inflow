@@ -96,15 +96,14 @@ No direct, unplanned code modifications are permitted for new features or struct
 * Root route (`/`) serves as the Account Selector Hub.
 * Individual workspaces are scoped under `/@{username}` (`/@[account]`).
 
-### XIII. Global UX Laws, Form State Lifecycles, Feedback Hierarchy & Information Architecture (NON-NEGOTIABLE)
-* Universal UX Form State Lifecycle (`Pristine`, `Dirty`, `Submitting`, `Success`, `Error`).
-* Sticky Save Dock Law (`Cmd+S` / `Ctrl+S`, cancel/save bar at viewport bottom).
-* Feature Activation & Progressive Disclosure Law (`ActivationCard`).
-* 5-tier Feedback Hierarchy (inline errors, Sonner toasts, sticky dock, modals, destructive confirm dialogs).
-* Single Scroll Container & Directional Predictability Law.
-* Multilingual JSON Store (`src/locales/{fa,en,ar}.json`) with 100% key parity.
+### XIII. Studio v2 Anti-Clutter, Split-Inbox & Zero Box-in-Box Architecture (NON-NEGOTIABLE)
+* **Global Shell Padding Law**: `src/components/layout/workspace-shell.tsx` enforces global `<main className="flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] p-5 sm:p-6 lg:p-8"><div className="w-full max-w-6xl mx-auto">{children}</div></main>`. No page may render flush (`0px` padding) against the sidebar or top header.
+* **Zero Box-in-Box (No Nested Bordered Cards)**: Inside any primary white surface (`bg-white rounded-2xl border border-slate-200/80`), nested bordered cards are strictly prohibited. Use `divide-y divide-slate-100` or `divide-x divide-x-reverse divide-slate-100` for internal separation (e.g., the 4-stage funnel ribbon).
+* **Split-Pane Messenger Inbox (`/dms`)**: The DM & Story workspace (`src/components/dms/dm-automation-view.tsx`) MUST remain a clean 3-tab interface (`💬 گفتگوهای دایرکت` 2-column live chat with 1-click per-user bot pause, `🔥 شماره‌های شکارشده` CRM table, and `⚙️ تنظیمات استوری و دایرکت`). Legacy stacked form cards (`ActivationCard`, `StickySaveBar`, `DmLogsTable`, `PostDetailView`) are permanently decommissioned and MUST NOT be recreated.
+* **Visual Grid Catalog (`/comments`)**: The Posts & Reels workspace (`src/components/inflow-dashboard.tsx`) defaults to a 3-column visual media grid without raw technical shortcodes (`DVf8k2`) or duplicate header buttons, opening `PostPlaybookDrawer` in 1 click.
+* **Multilingual JSON Store (`src/locales/{fa,en,ar}.json`)**: 100% key parity across `fa`, `en`, and `ar`, with Persian numerals (`toLocaleString("fa-IR")`) and `tabular-nums`.
 
 ## Governance
 
 This Constitution supersedes all ad-hoc coding practices in the repository.
-**Version**: 3.0.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-21
+**Version**: 3.1.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-22

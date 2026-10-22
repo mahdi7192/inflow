@@ -21,6 +21,7 @@
 * `src/lib/playbooks.ts`: Dual-Persona (`business` & `creator`) 1-Click Playbook presets, Supplemental Cheat Sheet (`cheat_sheet`) & attributed URL builders.
 * `src/lib/social-api.ts`: Official SocialAPI.ai client (including zero-credit account summary, deep post metrics, active 24h stories, and comment moderation).
 * `src/lib/instagram/automation-engine.ts`: Autonomous comment & DM automation engine with Cross-Channel Comment-to-DM Context Bridge.
-* `src/components/inflow-dashboard.tsx`: Main Studio workspace, Adaptive Persona Switcher, True ROI Funnel Strip, and Post Catalog.
+* `src/components/layout/workspace-shell.tsx`: Persistent Workspace Shell enforcing global `p-5 sm:p-6 lg:p-8` padding and `max-w-6xl mx-auto` alignment across all `/@[account]/*` routes.
+* `src/components/inflow-dashboard.tsx`: Main Studio workspace, Adaptive Persona Switcher, flat borderless 4-Stage ROI Funnel Ribbon, and 3-column Instagram Visual Grid Catalog.
 * `src/components/post-playbook-drawer.tsx`: 1-Click Slide-Over Playbook & Cheat Sheet Drawer.
-* `src/components/post-detail-view.tsx`: Full-page post automation rule & cheat sheet configuration.
+* `src/components/dms/dm-automation-view.tsx`: Unified 3-Tab DM & Story Studio (`💬 گفتگوهای دایرکت` 2-Column Split Messenger with 1-click per-user bot pause, `🔥 شماره‌های شکارشده` Leads CRM, and `⚙️ تنظیمات استوری و دایرکت`).
