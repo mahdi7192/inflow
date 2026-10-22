@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Search,
-  Clock,
   LayoutGrid,
   List,
   Sparkles,
@@ -31,7 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { Badge, Switch, Input } from "@/components/ui/primitives";
-import { I18N, Lang } from "@/lib/i18n";
+import { I18N, Lang, formatNumber as formatNumberI18n } from "@/lib/i18n";
 import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 import { PostPlaybookDrawer, type DrawerPostData } from "./post-playbook-drawer";
@@ -206,6 +205,8 @@ export function InflowDashboard({
   };
 
   const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
+  const formatNumber = (n: number | string | undefined | null) =>
+    workspace ? workspace.formatNumber(n) : formatNumberI18n(n, lang);
 
   // Sync saved language from localStorage if present
   useEffect(() => {
@@ -641,7 +642,7 @@ export function InflowDashboard({
                       <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                         <FileText className="w-4 h-4 text-indigo-600" />
                         <span>
-                          تقلب‌نامه و حافظه کلی پیج (مشترک برای تمام پست‌ها و چت‌های دایرکت)
+                          {t("brandMemoryTitle")}
                         </span>
                       </h3>
                       <p className="text-[11px] text-slate-500 mt-0.5">
@@ -674,15 +675,15 @@ export function InflowDashboard({
                         onClick={() => setBrandSheetOpen(false)}
                         className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
                       >
-                        بستن
+                        {t("close")}
                       </button>
                       <button
                         type="button"
                         disabled={savingBrandSheet}
                         onClick={handleSaveBrandCheatSheet}
-                        className="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {savingBrandSheet ? "در حال ذخیره..." : "ذخیره حافظه کلی پیج"}
+                        {savingBrandSheet ? t("savingBrandMemory") : t("saveBrandMemory")}
                       </button>
                     </div>
                   </div>
@@ -693,67 +694,67 @@ export function InflowDashboard({
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0 pt-4 border-t border-slate-100 lg:divide-x lg:divide-x-reverse lg:divide-slate-100">
                 <div className="lg:pl-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">۱. ویو و ریچ محتوا</span>
+                    <span className="font-medium">1. {t("metricTotalViews")}</span>
                     <Eye className="w-4 h-4 text-slate-400" />
                   </div>
                   <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-slate-900">
-                      {(liveInsights?.funnel?.views || 0).toLocaleString("fa-IR")}
+                      {formatNumber(liveInsights?.funnel?.views || 0)}
                     </span>
                     <span className="text-[11px] text-slate-500 tabular-nums">
-                      ریچ: {(liveInsights?.funnel?.reach || 0).toLocaleString("fa-IR")}
+                      {t("metricReach")}: {formatNumber(liveInsights?.funnel?.reach || 0)}
                     </span>
                   </div>
                 </div>
 
                 <div className="lg:px-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">۲. کامنت و پاسخ عمومی</span>
+                    <span className="font-medium">2. {t("metricComments")}</span>
                     <MessageSquare className="w-4 h-4 text-indigo-500" />
                   </div>
                   <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-slate-900">
-                      {(
+                      {formatNumber(
                         liveInsights?.funnel?.total_comments ??
-                        posts.reduce(
-                          (acc, p) =>
-                            acc + Number((p as unknown as { logs_count: number }).logs_count || 0),
-                          0
-                        )
-                      ).toLocaleString("fa-IR")}
+                          posts.reduce(
+                            (acc, p) =>
+                              acc + Number((p as unknown as { logs_count: number }).logs_count || 0),
+                            0
+                          )
+                      )}
                     </span>
                     <span className="text-[11px] text-emerald-700 font-medium tabular-nums">
-                      {(liveInsights?.funnel?.comment_replies_sent || 0).toLocaleString("fa-IR")} پاسخ ارسالی
+                      {formatNumber(liveInsights?.funnel?.comment_replies_sent || 0)} {t("metricPublicReplies")}
                     </span>
                   </div>
                 </div>
 
                 <div className="lg:px-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">۳. دایرکت و نرخ سین</span>
+                    <span className="font-medium">3. {t("metricSmartDms")}</span>
                     <Send className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-emerald-700">
-                      {(liveInsights?.funnel?.total_dms_sent || 0).toLocaleString("fa-IR")}
+                      {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
                     </span>
                     <span className="text-[11px] text-slate-600 font-medium tabular-nums">
-                      {(liveInsights?.funnel?.dms_read || 0).toLocaleString("fa-IR")} خوانده‌شده ✓✓
+                      {formatNumber(liveInsights?.funnel?.dms_read || 0)} {t("metricRead")} ✓✓
                     </span>
                   </div>
                 </div>
 
                 <div className="lg:pr-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">۴. فالوور جذب‌شده و خلبان</span>
+                    <span className="font-medium">4. {t("metricFollowersLeads")}</span>
                     <UserCheck className="w-4 h-4 text-rose-500" />
                   </div>
                   <div className="mt-1.5 flex items-baseline justify-between">
                     <span className="text-xl font-bold tabular-nums text-rose-600">
-                      +{(liveInsights?.funnel?.follows_gained || 0).toLocaleString("fa-IR")}
+                      +{formatNumber(liveInsights?.funnel?.follows_gained || 0)}
                     </span>
                     <span className="text-[11px] text-slate-600 font-medium tabular-nums">
-                      {activeCount.toLocaleString("fa-IR")} پست فعال ({cheatSheetCount.toLocaleString("fa-IR")} تقلب‌نامه)
+                      {formatNumber(activeCount)} {t("metricActivePosts")} ({formatNumber(cheatSheetCount)} {t("metricCheatSheets")})
                     </span>
                   </div>
                 </div>
@@ -911,10 +912,10 @@ export function InflowDashboard({
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-bold text-foreground">
-                    کاتالوگ پست‌ها هنوز همگام‌سازی نشده است
+                    {t("postsNotSyncedYet")}
                   </h3>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    پست‌ها و ریلزهای پیج هنوز دریافت نشده‌اند. با کلیک بر روی دکمه زیر، پست‌ها و ریلزها مستقیماً از اینستاگرام واکشی می‌شوند.
+                    {t("syncPostsSubtitle") || "پست‌ها و ریلزهای پیج هنوز دریافت نشده‌اند. با کلیک بر روی دکمه زیر، پست‌ها و ریلزها مستقیماً از اینستاگرام واکشی می‌شوند."}
                   </p>
                 </div>
                 <Button
@@ -924,7 +925,7 @@ export function InflowDashboard({
                   className="gap-2 cursor-pointer"
                 >
                   <RotateCw className={cn("w-4 h-4", syncing && "animate-spin")} />
-                  <span>{syncing ? "در حال دریافت پست‌ها..." : "همگام‌سازی پست‌ها با اینستاگرام"}</span>
+                  <span>{syncing ? t("syncingPostsWithInstagram") : t("syncPostsWithInstagram")}</span>
                 </Button>
               </div>
             ) : filteredPosts.length === 0 ? (
@@ -934,7 +935,7 @@ export function InflowDashboard({
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-foreground">
-                    {t("noPostsMatch")}
+                    {t("noPostsFound")}
                   </h3>
                   <p className="text-xs text-muted-foreground">
                     فیلتر یا عبارت جستجوی دیگری را امتحان کنید.
@@ -979,28 +980,31 @@ export function InflowDashboard({
                       )}
                     >
                       <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-                        {post.thumbnail_url ? (
-                          <img
-                            src={post.thumbnail_url}
-                            alt=""
-                            referrerPolicy="no-referrer"
-                            className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-mono text-slate-500 shrink-0">
-                            {post.post_type}
-                          </div>
-                        )}
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                          {post.post_type === "reel" ? (
+                            <Film className="w-6 h-6" />
+                          ) : (
+                            <ImageIcon className="w-6 h-6" />
+                          )}
+                          {post.thumbnail_url && (
+                            <img
+                              src={post.thumbnail_url}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              className="absolute inset-0 w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          )}
+                        </div>
                         <div className="space-y-1.5 min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-xs font-mono font-bold text-slate-900">
                               {post.shortcode}
                             </span>
                             <Badge variant="outline" className="text-[10px] uppercase font-mono">
-                              {post.post_type === "reel" ? "🎬 REEL" : "🖼️ POST"}
+                              {post.post_type === "reel" ? `🎬 ${t("postTypeReel")}` : `🖼️ ${t("postTypePost")}`}
                             </Badge>
                             {pbPreset && (
                               <span
@@ -1016,7 +1020,7 @@ export function InflowDashboard({
                             {hasCheatSheet && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
                                 <FileText className="w-3 h-3" />
-                                <span>دارای تقلب‌نامه</span>
+                                <span>{t("badgeHasCheatSheet")}</span>
                               </span>
                             )}
                             {hasTargetUrl && (
@@ -1042,20 +1046,20 @@ export function InflowDashboard({
                             {pViews > 0 && (
                               <span className="inline-flex items-center gap-1 tabular-nums font-medium">
                                 <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                {pViews.toLocaleString("fa-IR")} ویو
+                                {formatNumber(pViews)} {t("viewsLabel")}
                               </span>
                             )}
                             <span className="inline-flex items-center gap-1 tabular-nums font-medium">
                               <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
-                              {pLogsCount.toLocaleString("fa-IR")} کامنت
+                              {formatNumber(pLogsCount)} {t("commentReplyLabel")}
                             </span>
                             <span className="inline-flex items-center gap-1 tabular-nums text-emerald-700 font-semibold">
                               <Send className="w-3.5 h-3.5 text-emerald-600" />
-                              {pDmsCount.toLocaleString("fa-IR")} دایرکت
+                              {formatNumber(pDmsCount)} {t("dmLabel")}
                             </span>
                             {pFollows > 0 && (
                               <span className="inline-flex items-center gap-1 tabular-nums text-rose-600 font-bold">
-                                +{pFollows.toLocaleString("fa-IR")} فالوور
+                                +{formatNumber(pFollows)} {t("followersLabel")}
                               </span>
                             )}
                           </div>
@@ -1075,19 +1079,7 @@ export function InflowDashboard({
                           )}
                         >
                           <Zap className="w-3.5 h-3.5" />
-                          <span>تنظیم ۱-کلیکی و تقلب‌نامه</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectPost(post.shortcode);
-                          }}
-                          className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-slate-500" />
-                          <span>لاگ کامل</span>
+                          <span>{t("btnConfigureScenario")}</span>
                         </button>
 
                         <div
@@ -1131,35 +1123,34 @@ export function InflowDashboard({
                     >
                       {/* Cover Media Area */}
                       <div className="aspect-[16/10] bg-slate-100 relative overflow-hidden">
-                        {post.thumbnail_url ? (
+                        <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                          {post.post_type === "reel" ? (
+                            <Film className="w-8 h-8" />
+                          ) : (
+                            <ImageIcon className="w-8 h-8" />
+                          )}
+                        </div>
+                        {post.thumbnail_url && (
                           <img
                             src={post.thumbnail_url}
                             alt=""
                             referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
                             }}
                           />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300">
-                            {post.post_type === "reel" ? (
-                              <Film className="w-8 h-8" />
-                            ) : (
-                              <ImageIcon className="w-8 h-8" />
-                            )}
-                          </div>
                         )}
 
                         {/* Top Overlay: Media Type & Instant Switch */}
                         <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-900/75 text-white backdrop-blur-md">
-                              {post.post_type === "reel" ? "🎬 ریلز" : "📷 پست"}
+                              {post.post_type === "reel" ? `🎬 ${t("postTypeReel")}` : `📷 ${t("postTypePost")}`}
                             </span>
                             {hasCheatSheet && (
                               <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-600/90 text-white backdrop-blur-md">
-                                📝 دارای تقلب‌نامه
+                                📝 {t("badgeHasCheatSheet")}
                               </span>
                             )}
                           </div>
@@ -1210,23 +1201,21 @@ export function InflowDashboard({
                         <div className="pt-3 border-t border-slate-100 space-y-3">
                           <div className="grid grid-cols-3 text-center divide-x divide-x-reverse divide-slate-100 text-[11px]">
                             <div>
-                              <div className="text-slate-400">ویو</div>
+                              <div className="text-slate-400">{t("viewsLabel")}</div>
                               <div className="font-bold text-slate-800 tabular-nums mt-0.5">
-                                {viewsCount > 0
-                                  ? viewsCount.toLocaleString("fa-IR")
-                                  : "—"}
+                                {viewsCount > 0 ? formatNumber(viewsCount) : "—"}
                               </div>
                             </div>
                             <div>
-                              <div className="text-slate-400">پاسخ کامنت</div>
+                              <div className="text-slate-400">{t("commentReplyLabel")}</div>
                               <div className="font-bold text-slate-800 tabular-nums mt-0.5">
-                                {logsCount.toLocaleString("fa-IR")}
+                                {formatNumber(logsCount)}
                               </div>
                             </div>
                             <div>
-                              <div className="text-slate-400">دایرکت</div>
+                              <div className="text-slate-400">{t("dmLabel")}</div>
                               <div className="font-bold text-emerald-700 tabular-nums mt-0.5">
-                                {dmsSentCount.toLocaleString("fa-IR")}
+                                {formatNumber(dmsSentCount)}
                               </div>
                             </div>
                           </div>
@@ -1247,25 +1236,9 @@ export function InflowDashboard({
                             >
                               <Sparkles className="w-3.5 h-3.5" />
                               <span>
-                                {isActive
-                                  ? "تنظیم سناریو و تقلب‌نامه"
-                                  : "فعال‌سازی ۱-کلیکی سناریو"}
+                                {isActive ? t("btnConfigureScenario") : t("btnQuickActivate")}
                               </span>
                             </button>
-
-                            {logsCount > 0 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLogsShortcode(post.shortcode);
-                                }}
-                                title="مشاهده تاریخچه پاسخ‌ها"
-                                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/70 text-slate-600 transition-colors cursor-pointer shrink-0"
-                              >
-                                <Clock className="w-4 h-4" />
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>

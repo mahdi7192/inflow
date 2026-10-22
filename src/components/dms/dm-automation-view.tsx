@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { DMAutomationRow, DMLogRow } from "@/lib/db";
-import { Lang } from "@/lib/i18n";
+import { Lang, formatNumber as formatNumberI18n } from "@/lib/i18n";
+import { useWorkspace } from "@/components/layout/workspace-context";
 import {
   Send,
   Sparkles,
@@ -72,7 +73,11 @@ export function DmAutomationView({
   account,
   initialAutomation = null,
   initialLogs = [],
+  lang: langProp = "fa",
 }: DmAutomationViewProps) {
+  const workspace = useWorkspace();
+  const formatNumber = (val: number | string | undefined | null) =>
+    workspace ? workspace.formatNumber(val) : formatNumberI18n(val, langProp);
   const accountUsername = account;
   const [activeTab, setActiveTab] = useState<StudioDmTab>("inbox");
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
@@ -537,7 +542,7 @@ export function DmAutomationView({
             <span>صندوق دایرکت، استوری و مشتریان</span>
             {pausedCount > 0 && (
               <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 tabular-nums">
-                {pausedCount.toLocaleString("fa-IR")} چت در دست ادمین
+                {formatNumber(pausedCount)} چت در دست ادمین
               </span>
             )}
           </h1>
@@ -560,7 +565,7 @@ export function DmAutomationView({
             <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
             <span>گفتگوهای دایرکت</span>
             <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 text-[11px] tabular-nums">
-              {conversationList.length.toLocaleString("fa-IR")}
+              {formatNumber(conversationList.length)}
             </span>
           </button>
 
@@ -582,7 +587,7 @@ export function DmAutomationView({
                   : "bg-slate-100 text-slate-600"
               }`}
             >
-              {leads.length.toLocaleString("fa-IR")}
+              {formatNumber(leads.length)}
             </span>
           </button>
 
@@ -650,7 +655,7 @@ export function DmAutomationView({
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
                   }`}
                 >
-                  همه ({conversationList.length.toLocaleString("fa-IR")})
+                  همه ({formatNumber(conversationList.length)})
                 </button>
                 <button
                   type="button"
@@ -672,7 +677,7 @@ export function DmAutomationView({
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
                   }`}
                 >
-                  ⏸️ در دست ادمین ({pausedCount.toLocaleString("fa-IR")})
+                  ⏸️ در دست ادمین ({formatNumber(pausedCount)})
                 </button>
               </div>
             </div>
@@ -986,7 +991,7 @@ export function DmAutomationView({
                 <Flame className="w-4 h-4 text-rose-500" />
                 <span>مشتریان داغ و شماره‌های موبایل شکارشده</span>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 tabular-nums font-bold">
-                  {leads.length.toLocaleString("fa-IR")} مورد
+                  {formatNumber(leads.length)} مورد
                 </span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">

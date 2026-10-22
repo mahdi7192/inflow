@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { AccountRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
-import { Lang, isRTL, t as translate } from "@/lib/i18n";
+import { Lang, isRTL, t as translate, formatNumber } from "@/lib/i18n";
 
 export interface WorkspaceContextType {
   // Identity & Tenancy
@@ -17,6 +17,7 @@ export interface WorkspaceContextType {
   dir: "rtl" | "ltr";
   setLang: (lang: Lang) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
+  formatNumber: (num: number | string | undefined | null) => string;
 
   // Form Dirty Tracking & Navigation Guard
   isDirty: boolean;
@@ -91,6 +92,13 @@ export function WorkspaceProvider({
     [lang]
   );
 
+  const formatNumberFn = useCallback(
+    (num: number | string | undefined | null) => {
+      return formatNumber(num, lang);
+    },
+    [lang]
+  );
+
   const confirmDiscardAndNavigate = useCallback(() => {
     if (pendingNavigation) {
       setIsDirty(false);
@@ -111,6 +119,7 @@ export function WorkspaceProvider({
         dir,
         setLang,
         t,
+        formatNumber: formatNumberFn,
         isDirty,
         setIsDirty,
         dirtyCount,

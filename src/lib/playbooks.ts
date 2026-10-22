@@ -1,3 +1,4 @@
+import { Lang } from "./i18n";
 /**
  * Spec 018/019 — Triple-Persona 1-Click Playbooks & Supplemental Cheat Sheet Helpers
  * Supports E-Commerce (`ecommerce`), B2B Services & Consulting (`service_b2b`) and
@@ -348,15 +349,381 @@ export const PLAYBOOK_PRESETS: PlaybookPreset[] = [
   },
 ];
 
-export function getPlaybooksForPersona(persona?: AccountPersona | string | null): PlaybookPreset[] {
+
+export const PLAYBOOK_LOCALIZED: Partial<
+  Record<
+    PlaybookId,
+    Partial<
+      Record<
+        Lang,
+        {
+          title: string;
+          subtitle: string;
+          badge: string;
+          cheatSheetPlaceholder: string;
+          cheatSheetChips: { label: string; snippet: string }[];
+          targetUrlPlaceholder: string;
+        }
+      >
+    >
+  >
+> = {
+  auto_seller: {
+    en: {
+      title: "Auto Seller & Price Closer",
+      subtitle: "Smart comment reply + automated DM with price, stock & checkout link",
+      badge: "Best Seller",
+      cheatSheetPlaceholder: "Example: Price $49 | Sizes S to XL in stock (Black sold out) | Fast express shipping...",
+      cheatSheetChips: [
+        { label: "+ Price & Discount", snippet: "Price: $... (Special follower discount: $...)\n" },
+        { label: "+ Sizing & Stock", snippet: "Stock & Sizes: Sizes ... available (Color ... sold out)\n" },
+        { label: "+ Shipping Terms", snippet: "Shipping: Worldwide delivery in 2-3 business days\n" },
+        { label: "+ How to Order", snippet: "Ordering: Order via website link or DM confirmation\n" },
+      ],
+      targetUrlPlaceholder: "https://shop.com/product/... (Direct product checkout link)",
+    },
+    ar: {
+      title: "البائع الآلي ومجيب الأسعار",
+      subtitle: "رد ذكي على التعليقات + إرسال السعر والمخزون ورابط الشراء في الخاص",
+      badge: "الأكثر مبيعاً",
+      cheatSheetPlaceholder: "مثال: السعر ٤٩ دولار | المقاسات متوفرة من S إلى XL | شحن سريع خلال ٢-٣ أيام...",
+      cheatSheetChips: [
+        { label: "+ السعر والخصم", snippet: "السعر: ... (خصم خاص للمتابعين: ...)\n" },
+        { label: "+ المقاس والمخزون", snippet: "المقاسات المتوفرة: ... (اللون ... نفد)\n" },
+        { label: "+ تفاصيل الشحن", snippet: "الشحن: توصيل سريع لجميع المناطق\n" },
+        { label: "+ طريقة الطلب", snippet: "طريقة الطلب: عبر رابط المتجر أو عبر الخاص\n" },
+      ],
+      targetUrlPlaceholder: "https://shop.com/product/... (رابط شراء المنتج مباشرة)",
+    },
+  },
+  viral_gate: {
+    en: {
+      title: "Follower Gate & Catalog Delivery",
+      subtitle: "Turn Explore views into genuine followers; send catalog or discount link only after follow",
+      badge: "Follower Growth",
+      cheatSheetPlaceholder: "Example: New follower coupon: WELCOME15 | Complete catalog pricing...",
+      cheatSheetChips: [
+        { label: "+ Follower Coupon", snippet: "Follower Discount Code: ...\n" },
+        { label: "+ Price List", snippet: "Catalog Prices:\n- Item 1: ...\n- Item 2: ...\n" },
+        { label: "+ Warranty", snippet: "Warranty: 30-day money back guarantee\n" },
+      ],
+      targetUrlPlaceholder: "https://shop.com/collection/... (Catalog or product link)",
+    },
+    ar: {
+      title: "قفل المتابعة وإرسال الكتالوج",
+      subtitle: "تحويل مشاهدي الإكسبلور إلى متابعين حقيقيين؛ إرسال الكتالوج أو الرابط بعد المتابعة",
+      badge: "زيادة المتابعين",
+      cheatSheetPlaceholder: "مثال: كود خصم المتابعين الجدد: WELCOME15 | قائمة أسعار الموديلات...",
+      cheatSheetChips: [
+        { label: "+ كود خصم المتابعين", snippet: "كود خصم خاص بالمتابعين: ...\n" },
+        { label: "+ قائمة الأسعار", snippet: "قائمة أسعار الموديلات:\n- الأول: ...\n- الثاني: ...\n" },
+        { label: "+ الضمان والاستبدال", snippet: "الضمان: استبدال مجاني خلال ٧ أيام\n" },
+      ],
+      targetUrlPlaceholder: "https://shop.com/collection/... (رابط الكتالوج أو التشكيلة)",
+    },
+  },
+  lead_closer: {
+    en: {
+      title: "Direct Lead & Order Closer",
+      subtitle: "Ideal for pages without a website; guides customers to send their phone number and size",
+      badge: "No Website Needed",
+      cheatSheetPlaceholder: "Example: Orders handled in DM | Card transfer payment | Please provide phone number...",
+      cheatSheetChips: [
+        { label: "+ Payment Details", snippet: "Payment Method: Card transfer or direct payment\n" },
+        { label: "+ Booking Steps", snippet: "To reserve: Send your desired size and phone number\n" },
+        { label: "+ Delivery Estimate", snippet: "Estimated delivery: 2-4 business days\n" },
+      ],
+      targetUrlPlaceholder: "https://shop.com/order/... (Optional link)",
+    },
+    ar: {
+      title: "صياد أرقام التواصل وحجز الطلبات",
+      subtitle: "مناسب للحسابات بدون متجر إلكتروني؛ توجيه العميل لإرسال رقم الهاتف والمقاس",
+      badge: "بدون متجر",
+      cheatSheetPlaceholder: "مثال: تسجيل الطلبات في الخاص | تحويل بنكي | يرجى إرسال رقم الجوال...",
+      cheatSheetChips: [
+        { label: "+ تفاصيل الدفع", snippet: "طريقة الدفع: تحويل بنكي مباشر\n" },
+        { label: "+ خطوات الحجز", snippet: "لتثبيت الحجز: أرسل المقاس المطلوب ورقم الجوال\n" },
+        { label: "+ مدة التوصيل", snippet: "التوصيل المتوقع: خلال ٢ إلى ٤ أيام عمل\n" },
+      ],
+      targetUrlPlaceholder: "https://shop.com/order/... (رابط اختياري)",
+    },
+  },
+  brief_qualifier: {
+    en: {
+      title: "Smart Lead Qualification & Brief Intake",
+      subtitle: "Qualifies prospects in DM, gathers project budget and timeline without shopping carts",
+      badge: "Lead Qualification",
+      cheatSheetPlaceholder: "Example: UI/UX design and development | Budgets start at $1,500 | Timeline 3-6 weeks...",
+      cheatSheetChips: [
+        { label: "+ Project Requirements", snippet: "Project Requirements & Brief: ...\n" },
+        { label: "+ Starting Rates", snippet: "Starting Rates: Starting from $... depending on scope\n" },
+        { label: "+ Onboarding Process", snippet: "How to Start: Free discovery call followed by proposal\n" },
+        { label: "+ Portfolio Link", snippet: "Portfolio: Available upon request or via link\n" },
+      ],
+      targetUrlPlaceholder: "https://agency.com/brief (Brief intake form link)",
+    },
+    ar: {
+      title: "تأهيل العملاء وجمع متطلبات المشروع",
+      subtitle: "تأهيل العملاء المحتملين في الخاص وجمع الميزانية ومواعيد التسليم بدون سلة شراء",
+      badge: "تأهيل العملاء",
+      cheatSheetPlaceholder: "مثال: وكالة تسويق رقمي | الميزانيات تبدأ من ١٥٠٠ دولار | المدة ٣ أسابيع...",
+      cheatSheetChips: [
+        { label: "+ متطلبات المشروع", snippet: "معلومات موجز المشروع (البريف): ...\n" },
+        { label: "+ الأسعار التقديرية", snippet: "الأسعار المبدئية: تبدأ من ... حسب نطاق العمل\n" },
+        { label: "+ خطوات البدء", snippet: "خطوات البدء: مكالمة استكشافية مجانية ثم عرض مالي\n" },
+        { label: "+ رابط الأعمال", snippet: "معرض الأعمال: متاح عبر الرابط أو عند الطلب\n" },
+      ],
+      targetUrlPlaceholder: "https://agency.com/brief (رابط نموذج متطلبات المشروع)",
+    },
+  },
+  consultation_booking: {
+    en: {
+      title: "Consultation Booking & Phone Capture",
+      subtitle: "Invites prospective clients to book a discovery call or leave their phone number for follow-up",
+      badge: "High Conversion",
+      cheatSheetPlaceholder: "Example: Free 20-min strategy call | Send your phone number and preferred time...",
+      cheatSheetChips: [
+        { label: "+ Booking Calendar", snippet: "Booking Calendar: ...\n" },
+        { label: "+ Contact Hours", snippet: "Working hours & contact: Mon-Fri 9AM-5PM\n" },
+        { label: "+ Call Overview", snippet: "Session Overview: 1-on-1 strategy and project roadmap\n" },
+      ],
+      targetUrlPlaceholder: "https://calendly.com/... (Consultation booking link)",
+    },
+    ar: {
+      title: "حجز جلسات الاستشارة وجمع أرقام التواصل",
+      subtitle: "دعوة العملاء المحتملين لحجز مكالمة استكشافية أو إرسال رقم الهاتف",
+      badge: "تحويل عالي",
+      cheatSheetPlaceholder: "مثال: استشارة استراتيجية مجانية ٢٠ دقيقة | أرسل رقم الجوال والوقت المفضل...",
+      cheatSheetChips: [
+        { label: "+ رابط جدول المواعيد", snippet: "جدول المواعيد: ...\n" },
+        { label: "+ أوقات العمل", snippet: "ساعات العمل والتواصل: من الأحد إلى الخميس ٩ إلى ٥\n" },
+        { label: "+ محاور الجلسة", snippet: "محاور الجلسة: تحليل الاحتياج وخطة العمل المقترحة\n" },
+      ],
+      targetUrlPlaceholder: "https://calendly.com/... (رابط حجز جلسة الاستشارة)",
+    },
+  },
+  portfolio_showcase: {
+    en: {
+      title: "Portfolio & Case Study Showcase",
+      subtitle: "Sends your portfolio, service deck, and verified client testimonials directly to interested leads",
+      badge: "Trust Builder",
+      cheatSheetPlaceholder: "Example: Case study results: 240% ROI for client X | Download our full PDF deck...",
+      cheatSheetChips: [
+        { label: "+ Case Study Link", snippet: "Case Study & Results: ...\n" },
+        { label: "+ Client Testimonial", snippet: "Client Feedback: ...\n" },
+        { label: "+ Service Deck PDF", snippet: "Full Service Deck: ...\n" },
+      ],
+      targetUrlPlaceholder: "https://agency.com/cases (Portfolio or deck link)",
+    },
+    ar: {
+      title: "معرض الأعمال وقصص النجاح",
+      subtitle: "إرسال ملف الأعمال ونماذج المشاريع السابقة وآراء العملاء مباشرة في الخاص",
+      badge: "بناء الثقة",
+      cheatSheetPlaceholder: "مثال: نتائج قصة نجاح عميل: زيادة مبيعات بنسبة ٢٤٠٪ | حمل ملف الأعمال الكامل...",
+      cheatSheetChips: [
+        { label: "+ رابط قصة النجاح", snippet: "قصة النجاح والنتائج: ...\n" },
+        { label: "+ آراء العملاء", snippet: "رأي العميل: تقييم ممتاز ونتائج قياسية\n" },
+        { label: "+ الملف التعريفي", snippet: "الملف التعريفي والخدمات: ...\n" },
+      ],
+      targetUrlPlaceholder: "https://agency.com/cases (رابط معرض الأعمال أو الملف)",
+    },
+  },
+  creator_magnet: {
+    en: {
+      title: "Resource Delivery & Engagement Magnet",
+      subtitle: "Deliver free guides, prompt sheets, or presets in DM while boosting post comment rank",
+      badge: "Viral Magnet",
+      cheatSheetPlaceholder: "Example: Free 20-page AI guide | Download link active for 48 hours...",
+      cheatSheetChips: [
+        { label: "+ Download Link", snippet: "Download Link: ...\n" },
+        { label: "+ Next Steps", snippet: "After downloading: Join our community discussion\n" },
+        { label: "+ Bonus Resource", snippet: "Bonus Resource: Extra cheat sheet included\n" },
+      ],
+      targetUrlPlaceholder: "https://notion.so/... (Resource or guide link)",
+    },
+    ar: {
+      title: "توزيع الموارد ومغناطيس التفاعل",
+      subtitle: "إرسال ملف مجاني، كتاب إلكتروني أو قوالب في الخاص مع رفع تفاعل المنشور",
+      badge: "انتشار سريع",
+      cheatSheetPlaceholder: "مثال: دليل مجاني شامل للذكاء الاصطناعي | الرابط متاح لمدة ٤٨ ساعة...",
+      cheatSheetChips: [
+        { label: "+ رابط التحميل", snippet: "رابط التحميل المباشر: ...\n" },
+        { label: "+ الخطوة التالية", snippet: "بعد التحميل: انضم لمجتمع المناقشة\n" },
+        { label: "+ هدية إضافية", snippet: "هدية إضافية: ملخص جاهز مرفق\n" },
+      ],
+      targetUrlPlaceholder: "https://notion.so/... (رابط المورد أو الملف)",
+    },
+  },
+  creator_twin: {
+    en: {
+      title: "Creator Digital Twin & Community Chat",
+      subtitle: "Engages fans with your genuine personal tone, answering FAQs and sparking conversations",
+      badge: "Authentic Vibe",
+      cheatSheetPlaceholder: "Example: Gear I use: Sony A7IV + 24-70 GM | Editing: Final Cut Pro...",
+      cheatSheetChips: [
+        { label: "+ Creator Gear/Tools", snippet: "Gear & Tools: ...\n" },
+        { label: "+ Channel Links", snippet: "YouTube / Telegram: ...\n" },
+        { label: "+ FAQ Answer", snippet: "Common question answer: ...\n" },
+      ],
+      targetUrlPlaceholder: "https://youtube.com/@... (Channel link)",
+    },
+    ar: {
+      title: "النسخة الرقمية لصانع المحتوى والتفاعل",
+      subtitle: "تفاعل أصيل مع المتابعين بأسلوبك الشخصي والإجابة على الأسئلة الشائعة",
+      badge: "تفاعل أصيل",
+      cheatSheetPlaceholder: "مثال: معدات التصوير: كاميرا سوني | برامج المونتاج: فاينل كت...",
+      cheatSheetChips: [
+        { label: "+ المعدات والأدوات", snippet: "المعدات والبرامج: ...\n" },
+        { label: "+ روابط القنوات", snippet: "قناة يوتيوب وتليجرام: ...\n" },
+        { label: "+ إجابة سؤال شائع", snippet: "إجابة على السؤال المتكرر: ...\n" },
+      ],
+      targetUrlPlaceholder: "https://youtube.com/@... (رابط القناة أو الحساب)",
+    },
+  },
+  sponsor_campaign: {
+    en: {
+      title: "Sponsor Campaign & Tracked Referral",
+      subtitle: "Sends sponsor discount links or promo codes in DM with automated tracking",
+      badge: "Monetization",
+      cheatSheetPlaceholder: "Example: Sponsor: Brand X | Special promo code: CREATOR20 for 20% off...",
+      cheatSheetChips: [
+        { label: "+ Promo Code", snippet: "Sponsor Promo Code: ...\n" },
+        { label: "+ Campaign Link", snippet: "Direct Campaign Link: ...\n" },
+        { label: "+ Expiration Date", snippet: "Offer valid until: ...\n" },
+      ],
+      targetUrlPlaceholder: "https://brand.com/partner?... (Tracked sponsor link)",
+    },
+    ar: {
+      title: "حملات الرعاة وروابط الإحالة",
+      subtitle: "إرسال أكواد الخصم وروابط الرعاة المخصصة في الخاص مع تتبع النقرات",
+      badge: "تحقيق الدخل",
+      cheatSheetPlaceholder: "مثال: الراعي: متجر س | كود الخصم: CREATOR20 لخصم ٢٠٪...",
+      cheatSheetChips: [
+        { label: "+ كود الخصم", snippet: "كود الخصم الخاص: ...\n" },
+        { label: "+ رابط الحملة", snippet: "رابط الشراء المباشر للراعي: ...\n" },
+        { label: "+ تاريخ انتهاء العرض", snippet: "العرض سارٍ حتى: ...\n" },
+      ],
+      targetUrlPlaceholder: "https://brand.com/partner?... (رابط الرعاية مع التتبع)",
+    },
+  },
+};
+
+export const PERSONA_LOCALIZED: Record<
+  AccountPersona,
+  Partial<
+    Record<
+      Lang,
+      {
+        tabLabel: string;
+        studioLabel: string;
+        targetUrlLabel: string;
+        brandSheetPlaceholder: string;
+      }
+    >
+  >
+> = {
+  ecommerce: {
+    en: {
+      tabLabel: "Store & Products",
+      studioLabel: "Store Studio",
+      targetUrlLabel: "Direct Product Purchase or Catalog Link (Optional — with auto click tracking):",
+      brandSheetPlaceholder: "Example: Fast 2-3 business days delivery | 48-hour return & exchange policy | Orders over $50 ship free...",
+    },
+    ar: {
+      tabLabel: "متجر ومنتجات",
+      studioLabel: "استوديو المتجر",
+      targetUrlLabel: "رابط شراء المنتج مباشرة أو الكتالوج (اختياري — مع تتبع النقرات):",
+      brandSheetPlaceholder: "مثال: شحن سريع لجميع المناطق | إمكانية الاستبدال خلال ٤٨ ساعة | خدمة العملاء يومياً من ٩ إلى ٦...",
+    },
+  },
+  service_b2b: {
+    en: {
+      tabLabel: "Services & B2B",
+      studioLabel: "Services Studio",
+      targetUrlLabel: "Brief Form, Consultation Booking, or Portfolio Link (Optional — with auto click tracking):",
+      brandSheetPlaceholder: "Example: Content & digital marketing agency | Consultative & professional tone | Free 30-min discovery call | Hours Mon-Fri 9-5...",
+    },
+    ar: {
+      tabLabel: "خدمات واستشارات",
+      studioLabel: "استوديو الخدمات",
+      targetUrlLabel: "رابط نموذج البريف، حجز الاستشارة أو معرض الأعمال (اختياري — مع تتبع النقرات):",
+      brandSheetPlaceholder: "مثال: وكالة تسويق رقمي وإنتاج محتوى | أسلوب مهني واستشاري | جلسة استشارة مجانية ٣٠ دقيقة...",
+    },
+  },
+  creator: {
+    en: {
+      tabLabel: "Creator & Media",
+      studioLabel: "Creator Studio",
+      targetUrlLabel: "File, Video, or Sponsor Landing Link (Automated DM delivery with click tracking):",
+      brandSheetPlaceholder: "Example: Tech & AI creator | Energetic, friendly tone | Telegram channel and YouTube link in bio...",
+    },
+    ar: {
+      tabLabel: "صانع محتوى وميديا",
+      studioLabel: "استوديو صناع المحتوى",
+      targetUrlLabel: "رابط الملف، الفيديو أو صفحة الراعي (إرسال تلقائي في الخاص مع تتبع النقرات):",
+      brandSheetPlaceholder: "مثال: صانع محتوى في التقنية والذكاء الاصطناعي | أسلوب ودي وحيوي | رابط قناتي في البايو...",
+    },
+  },
+};
+
+export function getPersonaMeta(persona?: AccountPersona | string | null, lang: Lang = "fa") {
   const normalized = normalizePersona(persona);
-  return PLAYBOOK_PRESETS.filter((p) => p.persona === normalized);
+  const base = PERSONA_META[normalized];
+  const override = PERSONA_LOCALIZED[normalized]?.[lang];
+  if (!override) return base;
+  return {
+    ...base,
+    tabLabel: override.tabLabel || base.tabLabel,
+    studioLabel: override.studioLabel || base.studioLabel,
+    targetUrlLabel: override.targetUrlLabel || base.targetUrlLabel,
+    brandSheetPlaceholder: override.brandSheetPlaceholder || base.brandSheetPlaceholder,
+  };
 }
 
-export function getPlaybookById(id?: string | null): PlaybookPreset | undefined {
-  if (!id || id === "custom") return undefined;
-  return PLAYBOOK_PRESETS.find((p) => p.id === id);
+export function getPlaybooksForPersona(
+  persona?: AccountPersona | string | null,
+  lang: Lang = "fa"
+): PlaybookPreset[] {
+  const normalized = normalizePersona(persona);
+  const rawList = PLAYBOOK_PRESETS.filter((p) => p.persona === normalized);
+  if (lang === "fa") return rawList;
+
+  return rawList.map((p) => {
+    const loc = PLAYBOOK_LOCALIZED[p.id]?.[lang];
+    if (!loc) return p;
+    return {
+      ...p,
+      title: loc.title || p.title,
+      subtitle: loc.subtitle || p.subtitle,
+      badge: loc.badge || p.badge,
+      cheatSheetPlaceholder: loc.cheatSheetPlaceholder || p.cheatSheetPlaceholder,
+      cheatSheetChips: loc.cheatSheetChips || p.cheatSheetChips,
+      targetUrlPlaceholder: loc.targetUrlPlaceholder || p.targetUrlPlaceholder,
+    };
+  });
 }
+
+export function getPlaybookById(
+  id?: string | null,
+  lang: Lang = "fa"
+): PlaybookPreset | undefined {
+  if (!id || id === "custom") return undefined;
+  const p = PLAYBOOK_PRESETS.find((item) => item.id === id);
+  if (!p || lang === "fa") return p;
+  const loc = PLAYBOOK_LOCALIZED[p.id]?.[lang];
+  if (!loc) return p;
+  return {
+    ...p,
+    title: loc.title || p.title,
+    subtitle: loc.subtitle || p.subtitle,
+    badge: loc.badge || p.badge,
+    cheatSheetPlaceholder: loc.cheatSheetPlaceholder || p.cheatSheetPlaceholder,
+    cheatSheetChips: loc.cheatSheetChips || p.cheatSheetChips,
+    targetUrlPlaceholder: loc.targetUrlPlaceholder || p.targetUrlPlaceholder,
+  };
+}
+
+
 
 /**
  * Builds an attributed URL with UTM & Instagram user parameters so destination websites

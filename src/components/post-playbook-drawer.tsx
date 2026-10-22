@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import {
   X,
   Sparkles,
@@ -10,7 +9,6 @@ import {
   MessageCircle,
   Send,
   UserPlus,
-  ExternalLink,
   ShieldCheck,
   ChevronDown,
   ChevronUp,
@@ -30,7 +28,10 @@ import {
   getPlaybookById,
   normalizePersona,
   PERSONA_META,
+  getPersonaMeta,
 } from "@/lib/playbooks";
+import { I18N, formatNumber as formatNumberI18n } from "@/lib/i18n";
+import { useWorkspace } from "@/components/layout/workspace-context";
 
 const PERSONA_ORDER: AccountPersona[] = ["ecommerce", "service_b2b", "creator"];
 const PERSONA_ACCENT: Record<
@@ -102,8 +103,9 @@ interface PostPlaybookDrawerProps {
 
 function getProxiedImageUrl(url: string) {
   if (!url) return "";
+  if (url.startsWith("/api/")) return url;
   if (url.includes("cdninstagram.com") || url.includes("fbcdn.net")) {
-    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    return `/api/media/proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
 }
@@ -116,10 +118,16 @@ export function PostPlaybookDrawer({
   onClose,
   onSaved,
 }: PostPlaybookDrawerProps) {
+  const workspace = useWorkspace();
+  const lang = workspace?.lang ?? "fa";
+  const dir = workspace?.dir ?? "rtl";
+  const t = workspace?.t ?? ((key: string) => I18N.fa[key] || key);
+  const formatNumber =
+    workspace?.formatNumber ?? ((n: number | string | undefined | null) => formatNumberI18n(n, lang));
   const accountPersona = normalizePersona(persona);
   // Persona tab currently shown in the drawer (starts at the account persona)
   const [viewPersona, setViewPersona] = useState<AccountPersona>(accountPersona);
-  const playbooks = getPlaybooksForPersona(viewPersona);
+  const playbooks = getPlaybooksForPersona(viewPersona, lang);
   const defaultPlaybookId: PlaybookId = PERSONA_META[viewPersona].defaultPlaybook;
 
   const [autoReply, setAutoReply] = useState(true);
@@ -178,7 +186,7 @@ export function PostPlaybookDrawer({
 
   if (!post) return null;
 
-  const activePreset = getPlaybookById(selectedPlaybook) || playbooks[0];
+  const activePreset = getPlaybookById(selectedPlaybook, lang) || playbooks[0];
 
   const handleSelectPlaybook = (pbId: PlaybookId) => {
     setSelectedPlaybook(pbId);
@@ -265,29 +273,30 @@ export function PostPlaybookDrawer({
 
       {/* Slide-Over Panel */}
       <div
-        dir="rtl"
+        dir={dir}
         className="relative w-full max-w-xl bg-white h-full shadow-2xl border-s border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-left duration-200"
       >
         {/* Top Sticky Header */}
         <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-200 border border-slate-200 shrink-0">
-              {post.thumbnail_url ? (
+            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center text-slate-400">
+              {post.post_type === "reel" ? <Film className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />}
+              {post.thumbnail_url && (
                 <img
                   src={getProxiedImageUrl(post.thumbnail_url)}
                   alt={post.shortcode}
-                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                  }}
                 />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400">
-                  {post.post_type === "reel" ? <Film className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />}
-                </div>
               )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-slate-900">
-                  تنظیم ۱-کلیکی خلبان خودکار پست
+                  {t("drawerTitle")}
                 </span>
                 <span
                   dir="ltr"
@@ -297,23 +306,16 @@ export function PostPlaybookDrawer({
                 </span>
               </div>
               <p className="text-xs text-slate-500 truncate mt-0.5">
-                {post.caption || "بدون کپشن — از کادر تقلب‌نامه پایین برای تغذیه هوش مصنوعی استفاده کنید"}
+                {post.caption || t("noCaptionFallback")}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href={`/${accountUsername}/comments/${post.shortcode}`}
-              className="text-xs font-medium text-slate-600 hover:text-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 inline-flex items-center gap-1"
-            >
-              <span>لاگ‌ها و تاریخچه</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              aria-label="بستن"
+              aria-label={t("close")}
             >
               <X className="w-5 h-5" />
             </button>
@@ -321,13 +323,13 @@ export function PostPlaybookDrawer({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           {/* 1. Post Live ROI Funnel Ribbon */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
             <div className="flex items-center justify-between mb-2.5">
               <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-amber-500" />
-                قیف عملکرد واقعی این پست (SocialAPI Live)
+                {t("drawerLiveFunnel")}
               </span>
               {skipRate !== null && (
                 <span
@@ -345,14 +347,14 @@ export function PostPlaybookDrawer({
               <div className="bg-white rounded-xl p-2.5 border border-slate-200/80">
                 <div className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
                   <Eye className="w-3 h-3 text-slate-400" />
-                  <span>ویو / ریچ</span>
+                  <span>{t("funnelViewsReach")}</span>
                 </div>
                 <div className="text-sm font-bold tabular-nums text-slate-900 mt-1">
-                  {views > 0 ? views.toLocaleString("fa-IR") : "—"}
+                  {views > 0 ? formatNumber(views) : "—"}
                 </div>
                 {reach > 0 && (
                   <div className="text-[10px] text-slate-400 mt-0.5">
-                    ریچ: {reach.toLocaleString("fa-IR")}
+                    {t("funnelReachLabel")} {formatNumber(reach)}
                   </div>
                 )}
               </div>
@@ -360,39 +362,39 @@ export function PostPlaybookDrawer({
               <div className="bg-white rounded-xl p-2.5 border border-slate-200/80">
                 <div className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
                   <MessageCircle className="w-3 h-3 text-indigo-500" />
-                  <span>کامنت و پاسخ</span>
+                  <span>{t("funnelCommentsReplies")}</span>
                 </div>
                 <div className="text-sm font-bold tabular-nums text-slate-900 mt-1">
-                  {(post.logs_count || 0).toLocaleString("fa-IR")}
+                  {formatNumber(post.logs_count || 0)}
                 </div>
                 <div className="text-[10px] text-emerald-600 mt-0.5">
-                  {(post.replies_count || 0).toLocaleString("fa-IR")} پاسخ عمومی
+                  {formatNumber(post.replies_count || 0)} {t("funnelPublicRepliesLabel")}
                 </div>
               </div>
 
               <div className="bg-white rounded-xl p-2.5 border border-slate-200/80">
                 <div className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
                   <Send className="w-3 h-3 text-emerald-600" />
-                  <span>دایرکت ارسالی</span>
+                  <span>{t("funnelDmsSent")}</span>
                 </div>
                 <div className="text-sm font-bold tabular-nums text-emerald-700 mt-1">
-                  {(post.dms_count || 0).toLocaleString("fa-IR")}
+                  {formatNumber(post.dms_count || 0)}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
-                  ورود به مکالمه
+                  {t("funnelEnterConversation")}
                 </div>
               </div>
 
               <div className="bg-white rounded-xl p-2.5 border border-slate-200/80">
                 <div className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
                   <UserPlus className="w-3 h-3 text-rose-500" />
-                  <span>فالوور / سیو</span>
+                  <span>{t("funnelFollowersSaves")}</span>
                 </div>
                 <div className="text-sm font-bold tabular-nums text-rose-600 mt-1">
-                  +{follows.toLocaleString("fa-IR")}
+                  +{formatNumber(follows)}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
-                  {saves > 0 ? `${saves.toLocaleString("fa-IR")} سیو` : "جذب مستقیم"}
+                  {saves > 0 ? `${formatNumber(saves)} ${t("funnelSavesLabel")}` : t("funnelDirectFollowLabel")}
                 </div>
               </div>
             </div>
@@ -419,14 +421,10 @@ export function PostPlaybookDrawer({
               </div>
               <div>
                 <div className="text-sm font-bold text-slate-900">
-                  {autoReply
-                    ? "خلبان خودکار روی این پست روشن است"
-                    : "خلبان خودکار روی این پست خاموش است"}
+                  {autoReply ? t("drawerAutopilotOn") : t("drawerAutopilotOff")}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
-                  {autoReply
-                    ? "پاسخگویی هوشمند به کامنت‌ها و هدایت به دایرکت به صورت ۲۴/۷ فعال است"
-                    : "برای فعال‌سازی پاسخگویی خودکار، یکی از سناریوهای زیر را انتخاب کنید"}
+                  {autoReply ? t("drawerAutopilotOnHint") : t("drawerAutopilotOffHint")}
                 </div>
               </div>
             </div>
@@ -437,7 +435,7 @@ export function PostPlaybookDrawer({
                   : "bg-slate-200 text-slate-600"
               }`}
             >
-              {autoReply ? "فعال ✓" : "غیرفعال"}
+              {autoReply ? t("drawerStatusActive") : t("drawerStatusInactive")}
             </div>
           </div>
 
@@ -447,7 +445,7 @@ export function PostPlaybookDrawer({
               <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <Sparkles className={`w-4 h-4 ${accent.icon}`} />
                 <span>
-                  ۱. هدف این پست چیست؟ (انتخاب ۱-کلیکی سناریو — {PERSONA_META[viewPersona].tabLabel})
+                  {t("drawerStep1")} ({getPersonaMeta(viewPersona, lang).tabLabel})
                 </span>
               </label>
             </div>
@@ -464,7 +462,7 @@ export function PostPlaybookDrawer({
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  {PERSONA_META[p].emoji} {PERSONA_META[p].tabLabel}
+                  {PERSONA_META[p].emoji} {getPersonaMeta(p, lang).tabLabel}
                 </button>
               ))}
             </div>
@@ -527,7 +525,7 @@ export function PostPlaybookDrawer({
               <div>
                 <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-indigo-600" />
-                  <span>۲. تقلب‌نامه دستیار (اطلاعاتی که در کپشن پست نیست)</span>
+                  <span>{t("drawerStep2")}</span>
                 </label>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   مثل وقتی به ادمین انسانی پیام می‌دهید، قیمت، سایز، موجودی، کد تخفیف یا نکات مکمل را اینجا بنویسید تا هوش مصنوعی هم در کامنت و هم در ادامه چت دایرکت از آن استفاده کند.
@@ -561,7 +559,7 @@ export function PostPlaybookDrawer({
             <div className="pt-1">
               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 mb-1.5">
                 <Link2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>{PERSONA_META[viewPersona].targetUrlLabel}</span>
+                <span>{t("drawerStep3")}</span> — <span>{getPersonaMeta(viewPersona, lang).targetUrlLabel}</span>
               </label>
               <input
                 type="text"
@@ -577,9 +575,9 @@ export function PostPlaybookDrawer({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
               <label className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-slate-300">
                 <div className="text-[11px]">
-                  <div className="font-bold text-slate-800">🧲 قفل فالوورگیر دایرکت</div>
+                  <div className="font-bold text-slate-800">{t("followGateTitle")}</div>
                   <div className="text-[10px] text-slate-500">
-                    ارسال لینک/اطلاعات فقط پس از فالو کردن پیج
+                    {t("followGateDesc")}
                   </div>
                 </div>
                 <input
@@ -594,10 +592,10 @@ export function PostPlaybookDrawer({
                 <div className="text-[11px]">
                   <div className="font-bold text-slate-800 flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>سپر ضد-اسپم و رقبا</span>
+                    <span>{t("spamShieldTitle")}</span>
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    مخفی‌سازی خودکار کامنت‌های تبلیغاتی (رایگان)
+                    {t("spamShieldDesc")}
                   </div>
                 </div>
                 <input
@@ -615,9 +613,9 @@ export function PostPlaybookDrawer({
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full px-4 py-3 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center justify-between transition-colors"
+              className="w-full px-4 py-3 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
             >
-              <span>⚙️ تنظیمات دستی پیشرفته (شرط کلمه کلیدی، متن ثابت یا پرامپت سفارشی)</span>
+              <span>{t("advancedSettingsTitle")}</span>
               {showAdvanced ? (
                 <ChevronUp className="w-4 h-4" />
               ) : (
@@ -629,13 +627,13 @@ export function PostPlaybookDrawer({
               <div className="p-4 border-t border-slate-100 space-y-4 bg-slate-50/40">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
-                    شرط فعال‌سازی روی کامنت‌ها:
+                    {t("triggerConditionLabel")}
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: "all", label: "همه کامنت‌ها" },
-                      { id: "keywords", label: "کلمات کلیدی خاص" },
-                      { id: "ai_context", label: "تشخیص هوشمند موضوع" },
+                      { id: "all", label: t("triggerAllComments") },
+                      { id: "keywords", label: t("triggerSpecificKeywords") },
+                      { id: "ai_context", label: t("triggerAiContext") },
                     ].map((opt) => (
                       <button
                         key={opt.id}
@@ -643,10 +641,10 @@ export function PostPlaybookDrawer({
                         onClick={() =>
                           setTriggerType(opt.id as "all" | "ai_context" | "keywords")
                         }
-                        className={`py-2 px-2.5 rounded-xl text-[11px] font-medium border ${
+                        className={`py-2 px-2.5 rounded-xl text-[11px] font-medium border cursor-pointer ${
                           triggerType === opt.id
                             ? "bg-slate-900 text-white border-slate-900"
-                            : "bg-white text-slate-700 border-slate-200"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                         }`}
                       >
                         {opt.label}
@@ -675,13 +673,13 @@ export function PostPlaybookDrawer({
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    نحوه پاسخ زیر کامنت عمومی:
+                    {t("commentActionTypeLabel")}
                   </label>
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     {[
-                      { id: "ai", label: "هوش مصنوعی" },
-                      { id: "direct", label: "متن ثابت" },
-                      { id: "none", label: "بدون پاسخ عمومی" },
+                      { id: "ai", label: t("actionTypeAi") },
+                      { id: "direct", label: t("actionTypeDirect") },
+                      { id: "none", label: t("actionTypeNone") },
                     ].map((opt) => (
                       <button
                         key={opt.id}
@@ -757,11 +755,11 @@ export function PostPlaybookDrawer({
             {saveSuccess ? (
               <span className="text-emerald-600 font-bold flex items-center gap-1">
                 <CheckCircle2 className="w-4 h-4" />
-                تقلب‌نامه و سناریوی پست با موفقیت ذخیره شد!
+                {t("drawerSaveSuccess")}
               </span>
             ) : (
               <span className="text-slate-500">
-                تغییرات بلافاصله روی کامنت‌ها و دایرکت‌های جدید اعمال می‌شود.
+                {t("drawerAppliedImmediately")}
               </span>
             )}
           </div>
@@ -772,25 +770,25 @@ export function PostPlaybookDrawer({
               onClick={onClose}
               className="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
             >
-              بستن
+              {t("close")}
             </button>
             <button
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-sm inline-flex items-center gap-1.5 transition-all ${
+              className={`px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-md hover:shadow-lg active:scale-[0.98] inline-flex items-center gap-2 cursor-pointer transition-all ${
                 accent.button
-              } disabled:opacity-50`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {saving ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>در حال ذخیره...</span>
+                  <span>{t("btnSavingDrawer")}</span>
                 </>
               ) : (
                 <>
                   <Save className="w-3.5 h-3.5" />
-                  <span>ذخیره سناریو و تقلب‌نامه</span>
+                  <span>{t("btnSaveDrawer")}</span>
                 </>
               )}
             </button>

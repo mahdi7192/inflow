@@ -4,10 +4,43 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const targetUrl = searchParams.get("url");
+  let targetUrl = searchParams.get("url");
 
   if (!targetUrl) {
     return new NextResponse("Missing url parameter", { status: 400 });
+  }
+
+  // Unpack any nested proxies
+  while (
+    targetUrl &&
+    (targetUrl.includes("/api/media/proxy?url=") ||
+      targetUrl.includes("/api/image-proxy?url="))
+  ) {
+    const idx = targetUrl.indexOf("url=");
+    if (idx !== -1) {
+      try {
+        targetUrl = decodeURIComponent(targetUrl.substring(idx + 4));
+      } catch {
+        targetUrl = targetUrl.substring(idx + 4);
+      }
+    } else {
+      break;
+    }
+  }
+
+  if (
+    targetUrl &&
+    !targetUrl.startsWith("http://") &&
+    !targetUrl.startsWith("https://")
+  ) {
+    try {
+      const decoded = decodeURIComponent(targetUrl);
+      if (decoded.startsWith("http://") || decoded.startsWith("https://")) {
+        targetUrl = decoded;
+      }
+    } catch {
+      // ignore
+    }
   }
 
   try {

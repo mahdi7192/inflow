@@ -212,7 +212,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* 4. Single Unified Vertical Scroll Container */}
-        <main className="flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] p-5 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] p-4 sm:p-5 lg:p-6">
           <div className="w-full max-w-6xl mx-auto">
             {children}
           </div>
