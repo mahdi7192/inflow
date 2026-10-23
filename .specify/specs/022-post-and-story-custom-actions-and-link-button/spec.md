@@ -27,3 +27,8 @@
    - When `replyMode === 'ai'`, allow entering custom prompt instructions.
    - Replace plain target URL with dual button block (Button Text + Target URL), presets, and button preview.
    - Relocate Cheat Sheet to the end of the drawer.
+6. **Instagram Button Template Protocol Guard (`action-executor.ts` & `automation-engine.ts`)**:
+   - Instagram & Meta Graph API strictly enforce a maximum text length of 640 characters for messages containing a Button Template (`validation.text_too_long`).
+   - When an interactive button (`target_url`) is configured, do NOT append raw tracking URLs to the main body text; the URL lives inside the button. The raw URL is only appended in `fallbackText` if the button template fails.
+   - In `action-executor.ts`, clamp button message text to at most 640 characters (`clampTextForButtonTemplate`) before sending to prevent API 400 rejection.
+   - Log any button sending errors clearly instead of silently swallowing them.

@@ -661,9 +661,6 @@ export async function processIncomingComment(
         username: identity.username,
         fullName: identity.fullName,
       });
-      if (attributedTargetUrl && !dmText.includes("http")) {
-        dmText = `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim();
-      }
     } else if (post.dm_action_type === "ai") {
       dmText = await generateContextualReplyWithAi({
         mode: "comment_dm",
@@ -680,9 +677,15 @@ export async function processIncomingComment(
           post.dm_action_text || playbook?.defaults.dm_action_text || "",
         fallbackText: "سلام! اطلاعات درخواستی خدمت شما ارسال شد 🙏",
       });
-      if (attributedTargetUrl && !dmText.includes("http")) {
-        dmText = `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim();
-      }
+    }
+
+    const hasProductButton = Boolean(
+      attributedTargetUrl && /^https?:\/\//i.test(attributedTargetUrl)
+    );
+
+    // Only append raw link to dmText if no interactive button is configured
+    if (!hasProductButton && attributedTargetUrl && !dmText.includes("http")) {
+      dmText = `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim();
     }
 
     if (dmText) {
@@ -728,7 +731,7 @@ export async function processIncomingComment(
       } else {
         dmStatus = "queued";
         const productButtons: InstagramButton[] = [];
-        if (attributedTargetUrl && /^https?:\/\//i.test(attributedTargetUrl)) {
+        if (hasProductButton) {
           productButtons.push({
             type: "url",
             title: resolveButtonTitle(
@@ -738,6 +741,11 @@ export async function processIncomingComment(
             url: attributedTargetUrl,
           });
         }
+
+        const fallbackWithLink =
+          hasProductButton && !dmText.includes("http")
+            ? `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim()
+            : dmText;
 
         enqueueInstagramAction({
           dedupeKey: `cmt_dm:${commentId}`,
@@ -756,7 +764,7 @@ export async function processIncomingComment(
           metadata: {
             commentLogId,
             buttons: productButtons.length > 0 ? productButtons : undefined,
-            fallbackText: dmText,
+            fallbackText: fallbackWithLink,
             finalDmStatus: "sent",
             activityLogType: "dm_sent",
             activityLogTitle: `پاسخ دایرکت پست به @${identity.username} ارسال شد`,

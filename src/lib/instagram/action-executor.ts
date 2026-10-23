@@ -443,6 +443,12 @@ function updateLinkedLogsOnPermanentFailure(
   );
 }
 
+function clampTextForButtonTemplate(text: string, maxLen = 640): string {
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen - 3).trim() + "...";
+}
+
 async function executeSingleAction(
   provider: IInstagramProvider,
   row: ActionQueueRow,
@@ -499,19 +505,28 @@ async function executeSingleAction(
         title: (q.title || "").slice(0, 20),
       }));
 
+    const hasButtons = Boolean(sanitizedButtons && sanitizedButtons.length > 0);
+    const privateReplyText = hasButtons
+      ? clampTextForButtonTemplate(row.payload_text, 640)
+      : row.payload_text;
+
     if (postId && commentId) {
       try {
         await provider.sendPrivateReply({
           accountId: socialAccountId,
           postId,
           commentId,
-          text: row.payload_text,
-          buttons: sanitizedButtons && sanitizedButtons.length > 0 ? sanitizedButtons : undefined,
+          text: privateReplyText,
+          buttons: hasButtons ? sanitizedButtons : undefined,
         });
         return;
-      } catch (firstErr) {
+      } catch (firstErr: any) {
+        console.warn(
+          `[action-executor] sendPrivateReply with buttons failed for comment ${commentId}:`,
+          firstErr?.message || firstErr
+        );
         // If button template failed on Private Reply, retry plain Private Reply first
-        if (sanitizedButtons && sanitizedButtons.length > 0) {
+        if (hasButtons) {
           try {
             await provider.sendPrivateReply({
               accountId: socialAccountId,
@@ -520,7 +535,11 @@ async function executeSingleAction(
               text: fallbackText,
             });
             return;
-          } catch {
+          } catch (retryErr: any) {
+            console.warn(
+              `[action-executor] Plain sendPrivateReply retry failed for comment ${commentId}:`,
+              retryErr?.message || retryErr
+            );
             // Fall through to conversation fallback
           }
         }
@@ -539,13 +558,17 @@ async function executeSingleAction(
           throw firstErr;
         }
 
+        const dmTextToSend = hasButtons
+          ? clampTextForButtonTemplate(row.payload_text, 640)
+          : row.payload_text;
+
         try {
           await provider.sendDirectMessage({
             accountId: socialAccountId,
             conversationId: convId,
             recipientId: row.target_user_id || row.target_username,
-            text: row.payload_text,
-            buttons: sanitizedButtons && sanitizedButtons.length > 0 ? sanitizedButtons : undefined,
+            text: dmTextToSend,
+            buttons: hasButtons ? sanitizedButtons : undefined,
             quickReplies: sanitizedQuickReplies && sanitizedQuickReplies.length > 0 ? sanitizedQuickReplies : undefined,
           });
           return;
@@ -602,11 +625,15 @@ async function executeSingleAction(
         accountId: socialAccountId,
         conversationId,
         recipientId: row.target_user_id || row.target_username,
-        text: row.payload_text,
+        text: clampTextForButtonTemplate(row.payload_text, 640),
         buttons: sanitizedButtons,
       });
       return;
-    } catch {
+    } catch (btnErr: any) {
+      console.warn(
+        `[action-executor] sendDirectMessage with buttons failed for conversation ${conversationId}:`,
+        btnErr?.message || btnErr
+      );
       if (sanitizedQuickReplies && sanitizedQuickReplies.length > 0) {
         try {
           await provider.sendDirectMessage({
