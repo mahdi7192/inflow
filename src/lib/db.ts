@@ -42,6 +42,7 @@ export interface AccountRow {
   id: number;
   username: string;
   social_account_id?: string | null;
+  social_brand_id?: string | null;
   display_name: string;
   avatar_url: string;
   bio: string;
@@ -114,6 +115,24 @@ export interface BackofficeAccountItem {
   } | null;
 }
 
+/**
+ * Extracts UTC timestamp string ('YYYY-MM-DD HH:MM:SS') from an Instagram shortcode.
+ * Decodes the 64-bit snowflake ID: (id >> 23) + 1314220021000 ms.
+ */
+export function extractTimestampFromShortcode(shortcode: string): string | null {
+  if (!shortcode || typeof shortcode !== "string") return null;
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let mediaId = BigInt(0);
+  for (let i = 0; i < shortcode.length; i++) {
+    const idx = alphabet.indexOf(shortcode[i]);
+    if (idx === -1) return null;
+    mediaId = (mediaId * BigInt(64)) + BigInt(idx);
+  }
+  const tsMs = Number(mediaId >> BigInt(23)) + 1314220021000;
+  if (isNaN(tsMs) || tsMs <= 1314220021000) return null;
+  return new Date(tsMs).toISOString().replace("T", " ").slice(0, 19);
+}
+
 export interface PostRow {
   id: number;
   account_username: string;
@@ -139,6 +158,7 @@ export interface PostRow {
   metrics_json?: string | null;
   app_language?: "fa" | "en" | "ar";
   automation_enabled_at?: string | null;
+  posted_at?: string | null;
   synced_at: string;
   updated_at: string;
   sort_index: number;
@@ -323,6 +343,9 @@ function migrateSchema(db: Database.Database) {
   if (!accountCols.includes("social_account_id")) {
     db.exec("ALTER TABLE accounts ADD COLUMN social_account_id TEXT DEFAULT NULL");
   }
+  if (!accountCols.includes("social_brand_id")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN social_brand_id TEXT DEFAULT NULL");
+  }
   if (!accountCols.includes("session_status")) {
     db.exec("ALTER TABLE accounts ADD COLUMN session_status TEXT NOT NULL DEFAULT 'unauthenticated'");
   }
@@ -468,6 +491,26 @@ function migrateSchema(db: Database.Database) {
   }
   if (!postCols.includes("metrics_json")) {
     db.exec("ALTER TABLE posts ADD COLUMN metrics_json TEXT DEFAULT NULL");
+  }
+  if (!postCols.includes("posted_at")) {
+    db.exec("ALTER TABLE posts ADD COLUMN posted_at TEXT DEFAULT NULL");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_posts_posted_at ON posts(posted_at DESC)");
+  }
+
+  // Backfill posted_at for any existing posts that lack it
+  try {
+    const unbackfilledPosts = db.prepare("SELECT id, shortcode FROM posts WHERE posted_at IS NULL").all() as { id: number; shortcode: string }[];
+    if (unbackfilledPosts.length > 0) {
+      const updateStmt = db.prepare("UPDATE posts SET posted_at = ? WHERE id = ?");
+      for (const p of unbackfilledPosts) {
+        const ts = extractTimestampFromShortcode(p.shortcode);
+        if (ts) {
+          updateStmt.run(ts, p.id);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to backfill posts.posted_at:", err);
   }
 
   const accountSpec018Cols = (db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[]).map(c => c.name);
@@ -620,10 +663,53 @@ function migrateSchema(db: Database.Database) {
       status TEXT NOT NULL DEFAULT 'new',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(account_username, sender_username, phone_number)
+      UNIQUE(account_username, sender_username)
     );
     CREATE INDEX IF NOT EXISTS idx_captured_leads_account ON captured_leads(account_username, updated_at DESC);
   `);
+
+  // Check if captured_leads has the legacy 3-column unique constraint including phone_number
+  try {
+    const tableSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='captured_leads'").get() as { sql?: string } | undefined)?.sql || "";
+    if (tableSql.includes("account_username, sender_username, phone_number")) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS captured_leads_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_username TEXT NOT NULL,
+          sender_username TEXT NOT NULL,
+          sender_full_name TEXT NOT NULL DEFAULT '',
+          sender_id TEXT NOT NULL DEFAULT '',
+          phone_number TEXT NOT NULL DEFAULT '',
+          source_shortcode TEXT NOT NULL DEFAULT '',
+          intent_summary TEXT NOT NULL DEFAULT '',
+          last_message TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'new',
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE(account_username, sender_username)
+        );
+
+        INSERT INTO captured_leads_new (
+          id, account_username, sender_username, sender_full_name, sender_id,
+          phone_number, source_shortcode, intent_summary, last_message, status, created_at, updated_at
+        )
+        SELECT 
+          id, account_username, sender_username, sender_full_name, sender_id,
+          phone_number, source_shortcode, intent_summary, last_message, status, created_at, updated_at
+        FROM captured_leads
+        ORDER BY 
+          CASE WHEN phone_number != '' AND phone_number NOT LIKE '%بدون شماره%' THEN 1 ELSE 0 END DESC,
+          updated_at DESC
+        ON CONFLICT(account_username, sender_username) DO NOTHING;
+
+        DROP TABLE captured_leads;
+        ALTER TABLE captured_leads_new RENAME TO captured_leads;
+        CREATE INDEX IF NOT EXISTS idx_captured_leads_account ON captured_leads(account_username, updated_at DESC);
+      `);
+    }
+  } catch (migErr) {
+    console.error("[db] captured_leads migration error:", migErr);
+  }
 
   // Drop deprecated dm_knowledge_pages table if exists
   try {
@@ -686,11 +772,13 @@ function initSchema(db: Database.Database) {
       dm_require_follow INTEGER NOT NULL DEFAULT 0,
       synced_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      sort_index INTEGER NOT NULL DEFAULT 0
+      sort_index INTEGER NOT NULL DEFAULT 0,
+      posted_at TEXT DEFAULT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_posts_account ON posts(account_username);
     CREATE INDEX IF NOT EXISTS idx_posts_auto_reply ON posts(auto_reply);
+    CREATE INDEX IF NOT EXISTS idx_posts_posted_at ON posts(posted_at DESC);
 
     CREATE TABLE IF NOT EXISTS comment_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1711,12 +1799,56 @@ export function getRecentDmConversationHistory(params: {
     "done",
   ]);
 
+  // If conversation history is small or empty, check for recent comment DMs from this user to maintain full context
+  if (rows.length < limit) {
+    try {
+      const recentComments = db
+        .prepare(`
+          SELECT shortcode, comment_text, dm_text, created_at
+          FROM comment_logs
+          WHERE account_username = @account_username
+            AND (
+              (@sender_id != '' AND user_id = @sender_id)
+              OR (@sender_username != '' AND @sender_username != 'user' AND LOWER(username) = @sender_username)
+            )
+            AND dm_status IN ('sent', 'queued', 'pending_follow')
+            AND dm_text != ''
+          ORDER BY id DESC
+          LIMIT 2
+        `)
+        .all({
+          account_username: params.accountUsername,
+          sender_id: params.senderId || "",
+          sender_username: cleanSender,
+        }) as Array<{ shortcode: string; comment_text: string; dm_text: string; created_at: string }>;
+
+      for (const c of recentComments) {
+        const textNorm = c.dm_text.trim();
+        const alreadyInRows = rows.some((r) => r.reply_text.trim() === textNorm);
+        if (!alreadyInRows) {
+          const incomingSummary = c.shortcode
+            ? `[کاربر زیر پست ${c.shortcode} کامنت گذاشته: ${c.comment_text}]`
+            : `[کاربر کامنت گذاشته: ${c.comment_text}]`;
+          rows.push({
+            incoming_text: incomingSummary,
+            reply_text: c.dm_text,
+            created_at: c.created_at,
+          });
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+  }
+
+  // Sort chronologically ascending
+  rows.sort((a, b) => (a.created_at > b.created_at ? 1 : a.created_at < b.created_at ? -1 : 0));
+
   return rows
     .filter((r) => {
       const norm = r.incoming_text.trim().toLowerCase();
       return !followControlTokens.has(norm) && !norm.startsWith("follow_confirmed");
     })
-    .reverse()
     .map((r) => ({
       incomingText: r.incoming_text,
       replyText: r.reply_text,

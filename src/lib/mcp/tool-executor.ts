@@ -90,7 +90,7 @@ export async function executeMcpTool(
 
       const activePosts = db
         .prepare(
-          "SELECT * FROM posts WHERE account_username = ? AND auto_reply = 1 ORDER BY sort_index ASC"
+          "SELECT * FROM posts WHERE account_username = ? AND auto_reply = 1 ORDER BY COALESCE(posted_at, synced_at) DESC, id DESC"
         )
         .all(accountUsername) as PostRow[];
 

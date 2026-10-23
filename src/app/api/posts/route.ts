@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       query += " AND p.auto_reply = 1";
     }
 
-    query += " ORDER BY p.sort_index ASC, p.id DESC";
+    query += " ORDER BY COALESCE(p.posted_at, p.synced_at) DESC, p.id DESC";
 
     const posts = db.prepare(query).all(targetAccount) as (PostRow & {
       logs_count: number;

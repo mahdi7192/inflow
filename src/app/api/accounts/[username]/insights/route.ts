@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     const posts = db
       .prepare(
-        "SELECT shortcode, media_id, post_type, auto_reply, playbook_id, cheat_sheet, target_url, metrics_json FROM posts WHERE account_username = ? ORDER BY sort_index ASC, id ASC LIMIT 24"
+        "SELECT shortcode, media_id, post_type, auto_reply, playbook_id, cheat_sheet, target_url, metrics_json FROM posts WHERE account_username = ? ORDER BY COALESCE(posted_at, synced_at) DESC, id DESC LIMIT 24"
       )
       .all(cleanUsername) as PostRow[];
 

@@ -42,7 +42,7 @@ export default async function CommentsPage({ params }: CommentsPageProps) {
         (SELECT COUNT(*) FROM comment_logs l WHERE l.shortcode = p.shortcode AND l.comment_reply_status = 'sent') as replies_count
       FROM posts p
       WHERE p.account_username = ?
-      ORDER BY p.sort_index ASC, p.id DESC
+      ORDER BY COALESCE(p.posted_at, p.synced_at) DESC, p.id DESC
     `)
     .all(username) as PostRow[];
 

@@ -1507,7 +1507,7 @@ export async function processIncomingDm(
         FROM posts
         WHERE account_username = ?
           AND (cheat_sheet != '' OR target_url != '' OR auto_reply = 1)
-        ORDER BY sort_index ASC, id ASC
+        ORDER BY COALESCE(posted_at, synced_at) DESC, id DESC
         LIMIT 8
       `)
       .all(account.username) as Array<{

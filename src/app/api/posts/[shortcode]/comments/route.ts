@@ -52,9 +52,17 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const cursor = new URL(req.url).searchParams.get("cursor") || undefined;
 
     const remote = await client.listPostComments(postId, socialAccountId, cursor);
+    const comments = Array.isArray(remote.data)
+      ? [...remote.data].sort((a: { created_at?: string }, b: { created_at?: string }) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return tB - tA; // Newest first
+        })
+      : remote.data;
+
     return NextResponse.json({
       success: true,
-      comments: remote.data,
+      comments,
       pagination: remote.pagination,
     });
   } catch (err: unknown) {

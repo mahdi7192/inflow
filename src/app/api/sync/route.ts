@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getDb,
   updateAccountProfileFromAgent,
+  extractTimestampFromShortcode,
   type AccountRow,
   type PostRow,
 } from "@/lib/db";
@@ -207,6 +208,7 @@ export async function POST(req: NextRequest) {
         post_type: "post" | "reel";
         thumbnail_url: string;
         caption: string;
+        posted_at?: string | null;
       }
 
       function extractShortcodeFromUrl(url?: string): string | null {
@@ -262,6 +264,19 @@ export async function POST(req: NextRequest) {
           permalink ||
           `https://www.instagram.com/${targetAccount}/${postType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
+        const rawCreatedAt = p.created_at;
+        let postedAt: string | null = null;
+        if (rawCreatedAt) {
+          try {
+            postedAt = new Date(rawCreatedAt).toISOString().replace("T", " ").slice(0, 19);
+          } catch {
+            // fallback
+          }
+        }
+        if (!postedAt && shortcode) {
+          postedAt = extractTimestampFromShortcode(shortcode);
+        }
+
         // Key by mediaId or shortcode to deduplicate across /v1/posts and /v1/inbox/comments
         const dedupKey = mediaId || shortcode;
         const existing = combinedMap.get(dedupKey);
@@ -274,10 +289,12 @@ export async function POST(req: NextRequest) {
             post_type: postType,
             thumbnail_url: thumbnailUrl,
             caption: rawCaption,
+            posted_at: postedAt,
           });
         } else {
           if (!existing.caption && rawCaption) existing.caption = rawCaption;
           if (!existing.thumbnail_url && thumbnailUrl) existing.thumbnail_url = thumbnailUrl;
+          if (postedAt && !existing.posted_at) existing.posted_at = postedAt;
           if (extractedSc && existing.shortcode !== extractedSc) {
             existing.shortcode = extractedSc;
           }
@@ -319,15 +336,16 @@ export async function POST(req: NextRequest) {
       const upsertPost = db.prepare(`
         INSERT INTO posts (
           account_username, shortcode, media_id, url, post_type, thumbnail_url, caption,
-          synced_at, updated_at, sort_index
+          synced_at, updated_at, sort_index, posted_at
         ) VALUES (
           @account_username, @shortcode, @media_id, @url, @post_type, @thumbnail_url, @caption,
-          @synced_at, @updated_at, @sort_index
+          @synced_at, @updated_at, @sort_index, @posted_at
         )
         ON CONFLICT(shortcode) DO UPDATE SET
           media_id = COALESCE(NULLIF(excluded.media_id, ''), posts.media_id),
           caption = COALESCE(NULLIF(excluded.caption, ''), posts.caption),
           thumbnail_url = COALESCE(NULLIF(excluded.thumbnail_url, ''), posts.thumbnail_url),
+          posted_at = COALESCE(NULLIF(excluded.posted_at, ''), posts.posted_at),
           synced_at = excluded.synced_at,
           updated_at = excluded.updated_at
       `);
@@ -346,6 +364,7 @@ export async function POST(req: NextRequest) {
             synced_at: now,
             updated_at: now,
             sort_index: idx,
+            posted_at: m.posted_at || null,
           });
           insertedCount++;
         });

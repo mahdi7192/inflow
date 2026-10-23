@@ -13,6 +13,7 @@
 3. **Idempotency**: All comment executions must be locked by unique Instagram `comment_id` in `comment_logs` to avoid duplicate replies and account shadowbans.
 4. **Spec-Driven Development (GitHub Spec-Kit)**: Development is spec-first. Use `.specify/` templates (`constitution.md`, `spec.md`, `plan.md`, `tasks.md`) and slash commands (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`, `/speckit-converge`).
 5. **BiDi / RTL**: The dashboard defaults to Persian (`dir="rtl"`) with Vazirmatn font. When editing UI or typography, maintain clean bidirectional layout support.
+6. **Chronological Post & Comment Ordering**: Posts and comments must always be queried and displayed newest-to-oldest (`ORDER BY COALESCE(p.posted_at, p.synced_at) DESC, p.id DESC`). Post publication timestamps (`posted_at`) are automatically extracted from Instagram shortcodes (64-bit snowflake ID decoding: `(id >> 23) + 1314220021000 ms`) and backfilled upon sync and db init.
 
 ## Key Files & Canonical Design System
 * `DESIGN.md`: Canonical Design System Token Specification (`inFlow Studio` — Alabaster Light Theme, Dual-Persona Accents, Typography & Component Laws).
