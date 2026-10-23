@@ -27,6 +27,7 @@ export interface AgentParams {
   secondaryGoals?: string | null;
   extraInstructions?: string | null;
   hasSiteData?: boolean;
+  isTest?: boolean;
   /** Test hook: replaces the LLM call. Receives messages, returns raw model text. */
   llm?: (messages: Array<{ role: string; content: string }>) => Promise<string | null>;
 }
@@ -35,7 +36,7 @@ export interface AgentResult {
   replyText: string;
   link?: { url: string; title: string };
   handedOff: boolean;
-  steps: Array<{ tool: string; args: unknown; ok: boolean }>;
+  steps: Array<{ tool: string; args: unknown; result?: unknown; ok: boolean }>;
 }
 
 type Json = Record<string, unknown>;
@@ -74,7 +75,7 @@ export function buildSystemPrompt(p: AgentParams): string {
     p.hasSiteData ? "" : "توجه: هنوز صفحه‌ای از سایت ذخیره نشده؛ search_site ممکن است نتیجه ندهد.",
     p.brandCheatSheet?.trim() ? `[اطلاعات تکمیلی برند]:\n${p.brandCheatSheet.trim().slice(0, 2500)}` : "",
     p.extraInstructions?.trim() ? `[دستورالعمل اضافه صاحب پیج]:\n${p.extraInstructions.trim().slice(0, 1500)}` : "",
-    `[زمینه گفتگو]\nنام مشتری: ${p.senderFullName || p.senderUsername}\n${p.isFollowing ? "این کاربر پیج را فالو کرده." : ""}\n${p.contextCaption.slice(0, 5000)}`,
+    `[زمینه گفتگو]\nنام مشتری: ${p.senderFullName || p.senderUsername}\n${p.isFollowing ? "این کاربر پیج را فالو کرده." : ""}\n${p.contextCaption ? p.contextCaption.slice(0, 5000) : ""}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -109,7 +110,22 @@ async function callModel(messages: Array<{ role: string; content: string }>, ove
       signal: ctrl.signal,
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line.slice(6));
+          if (parsed?.choices?.[0]?.message?.content) {
+            data = parsed;
+            break;
+          }
+        } catch { /* continue */ }
+      }
+    }
     const c = data?.choices?.[0]?.message?.content;
     return typeof c === "string" ? c : null;
   } catch {
@@ -163,6 +179,16 @@ function toolSaveCustomerInfo(p: AgentParams, args: Json) {
     const m = digits.match(/(?:\+98|0098|98|0)?(9\d{9})/);
     clean.phone = m ? `0${m[1]}` : digits.replace(/[^\d+]/g, "");
   }
+  if (p.isTest) {
+    const missing = ["phone", "address"].filter((k) => !clean[k]);
+    return {
+      saved: true,
+      current: clean,
+      still_missing: missing,
+      note: "حالت تستی: اطلاعات استخراج شد اما در لیدهای واقعی ذخیره نشد.",
+    };
+  }
+
   const sender = p.senderUsername.toLowerCase();
   const prevRow = db
     .prepare("SELECT customer_info FROM dm_thread_states WHERE account_username = ? AND sender_username = ?")
@@ -196,6 +222,13 @@ function toolSaveCustomerInfo(p: AgentParams, args: Json) {
 
 function toolHandoff(p: AgentParams, args: Json) {
   const reason = String(args.reason || "درخواست مشتری").slice(0, 300);
+  if (p.isTest) {
+    return {
+      paused: true,
+      reason,
+      note: "حالت تستی: درخواست ارجاع شبیه‌سازی شد (اعلان تلگرام ارسال نشد).",
+    };
+  }
   getDb()
     .prepare(
       `INSERT INTO dm_thread_states (account_username, sender_username, bot_paused, paused_by, paused_reason, updated_at)
@@ -222,7 +255,7 @@ function toolHandoff(p: AgentParams, args: Json) {
 export async function runDmAgent(p: AgentParams): Promise<AgentResult | null> {
   const messages: Array<{ role: string; content: string }> = [
     { role: "system", content: buildSystemPrompt(p) },
-    ...p.history.map((m) => ({ role: m.role, content: m.content })),
+    ...(p.history || []).map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: p.incomingText },
   ];
   const steps: AgentResult["steps"] = [];
@@ -277,7 +310,7 @@ export async function runDmAgent(p: AgentParams): Promise<AgentResult | null> {
       ok = false;
       result = { error: e instanceof Error ? e.message : "tool_error" };
     }
-    steps.push({ tool: obj.tool, args, ok });
+    steps.push({ tool: obj.tool, args, result, ok });
     messages.push({ role: "assistant", content: raw });
     messages.push({ role: "user", content: `[نتیجه ابزار ${obj.tool}] ${JSON.stringify(result).slice(0, 3500)}` });
   }

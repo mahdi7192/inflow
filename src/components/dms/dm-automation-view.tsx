@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DmSettingsPanel } from "@/components/dms/dm-settings-panel";
+import { DmTestChatPanel } from "@/components/dms/dm-test-chat-panel";
 import { cn } from "@/lib/utils";
 
 interface CapturedLeadItem {
@@ -69,7 +70,7 @@ export interface DmAutomationViewProps {
   lang?: Lang;
 }
 
-type StudioDmTab = "inbox" | "leads" | "settings";
+type StudioDmTab = "inbox" | "leads" | "settings" | "test";
 type InboxFilter = "all" | "story" | "paused";
 
 export function DmAutomationView({
@@ -612,6 +613,19 @@ export function DmAutomationView({
               }`}
             />
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("test")}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "test"
+                ? "bg-indigo-600 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>تست و شبیه‌ساز چت</span>
+          </button>
         </div>
       </div>
 
@@ -1145,6 +1159,18 @@ export function DmAutomationView({
           setBrandCheatSheet={setBrandCheatSheet}
           saving={saving}
           saveSuccess={saveSuccess}
+          onOpenTestChat={() => setActiveTab("test")}
+        />
+      )}
+
+      {/* =====================================================================
+          TAB 4: LIVE INSTAGRAM DM AGENT TEST SIMULATOR
+         ===================================================================== */}
+      {activeTab === "test" && (
+        <DmTestChatPanel
+          username={accountUsername}
+          config={config}
+          pagesCount={Number(config.crawl_pages_count || 0)}
         />
       )}
     </div>

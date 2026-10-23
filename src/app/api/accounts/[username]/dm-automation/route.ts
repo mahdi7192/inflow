@@ -11,7 +11,7 @@ function buildCrawlPayload(db: ReturnType<typeof getDb>, username: string) {
     .prepare("SELECT website_url, account_persona FROM accounts WHERE username = ?")
     .get(username) as { website_url?: string; account_persona?: string } | undefined;
   const pages = db
-    .prepare("SELECT url, title, kind, score, last_crawled_at FROM site_pages WHERE account_username = ? ORDER BY score DESC, id ASC LIMIT 100")
+    .prepare("SELECT url, title, kind, score, last_crawled_at FROM site_pages WHERE account_username = ? ORDER BY score DESC, id ASC LIMIT 500")
     .all(username);
   return {
     website_url: acc?.website_url || "",

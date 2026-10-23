@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Globe, Loader2, RefreshCw, ChevronDown, UserCheck, Sparkles, CheckCircle2, Bot } from "lucide-react";
+import { Globe, Loader2, RefreshCw, ChevronDown, UserCheck, Sparkles, CheckCircle2, Bot, MessageSquare } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DMAutomationRow } from "@/lib/db";
 import { DM_GOALS, DM_TONES, getRecommendedGoals, parseSecondaryGoals, type DmGoal } from "@/lib/dm-goals";
@@ -34,10 +34,11 @@ interface Props {
   setBrandCheatSheet: (v: string) => void;
   saving: boolean;
   saveSuccess: boolean;
+  onOpenTestChat?: () => void;
 }
 
 export function DmSettingsPanel(p: Props) {
-  const { account, config, setConfig, onSaveConfig, websiteUrl, setWebsiteUrl, brandCheatSheet, setBrandCheatSheet } = p;
+  const { account, config, setConfig, onSaveConfig, websiteUrl, setWebsiteUrl, brandCheatSheet, setBrandCheatSheet, onOpenTestChat } = p;
   const [persona, setPersona] = useState("business");
   const [pages, setPages] = useState<CrawlPage[]>([]);
   const [showPages, setShowPages] = useState(false);
@@ -123,6 +124,29 @@ export function DmSettingsPanel(p: Props) {
 
   return (
     <div dir="rtl" className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100">
+      {/* Test Chat Banner */}
+      {onOpenTestChat && (
+        <div className="p-5 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-slate-900">شبیه‌ساز و تست زنده دایرکت</h3>
+              <p className="text-[11px] text-slate-500">پاسخ‌های ایجنت، جستجو در صفحات سایت و تست لحن را بدون ارسال پیام واقعی امتحان کنید.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenTestChat}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            ورود به محیط تست چت
+          </button>
+        </div>
+      )}
+
       {/* Enabled */}
       <div className="p-6 flex items-center justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -164,10 +188,10 @@ export function DmSettingsPanel(p: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
           <span>وضعیت: <b className="text-slate-700">{STATUS_LABEL[status] ?? status}</b></span>
-          <span>صفحه‌های یافت‌شده: <b className="text-slate-700">{Number(config.crawl_pages_count || pages.length || 0).toLocaleString("fa-IR")}</b></span>
+          <span>صفحه‌های یافت‌شده: <b className="text-slate-700">{Number(config.crawl_pages_count || pages.length || 0).toLocaleString("fa-IR")}</b> <span className="text-slate-400 font-normal">(سقف کرال: ۵۰۰ صفحه)</span></span>
           <span>آخرین کرال: <b className="text-slate-700">{lastAt ? new Date(lastAt.replace(" ", "T") + "Z").toLocaleString("fa-IR") : "—"}</b></span>
         </div>
-        <p className="text-[11px] text-slate-400">فقط صفحات همین دامنه خوانده می‌شود و هر ۱۵ دقیقه خودکار به‌روز می‌شود.</p>
+        <p className="text-[11px] text-slate-400">دستیار برای پاسخ به سوالات دایرکت، تا سقف ۵۰۰ صفحه از این وب‌سایت را کرال و نمایه می‌کند (به‌روزرسانی خودکار هر ۱۵ دقیقه).</p>
         {pages.length > 0 && (
           <div>
             <button type="button" onClick={() => setShowPages(!showPages)} className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 cursor-pointer">

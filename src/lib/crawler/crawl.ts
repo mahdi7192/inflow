@@ -5,8 +5,8 @@ import { safeFetch } from "./safe-fetch";
 import { extractPage, parseRobots, robotsAllows, summarize } from "./extract";
 import { canonicalizeUrl, classifyUrl, isSameSite, isSkippableUrl, normalizeSiteInput } from "./url";
 
-const MAX_PAGES = 60;
-const DELAY_MS = 400;
+export const MAX_PAGES = 500;
+const DELAY_MS = 250;
 const MIN_TEXT = 40;
 
 export interface CrawlResult {
@@ -54,7 +54,7 @@ export async function crawlSite(account: string, websiteUrl: string, opts: { max
   if (!root) return { account, status: "skipped", pages: 0, changed: 0, unchanged: 0, error: "invalid_url" };
   const rootHost = root.hostname.toLowerCase();
   const allowHost = (h: string) => isSameSite(h.toLowerCase(), rootHost);
-  const maxPages = Math.min(opts.maxPages ?? MAX_PAGES, MAX_PAGES);
+  const maxPages = Math.min(opts.maxPages ?? MAX_PAGES, 1000);
   const delay = opts.delayMs ?? DELAY_MS;
   const origin = root.origin;
 
@@ -83,10 +83,12 @@ export async function crawlSite(account: string, websiteUrl: string, opts: { max
 
   const rootCanon = canonicalizeUrl(root.toString()) as string;
   enqueue(rootCanon, rootCanon, 100);
-  const sitemapUrls = robots.sitemaps.length ? robots.sitemaps : [`${origin}/sitemap.xml`];
-  const sitemapQueue = sitemapUrls.slice(0, 3);
+  const sitemapUrls = robots.sitemaps.length
+    ? robots.sitemaps
+    : [`${origin}/sitemap.xml`, `${origin}/wp-sitemap.xml`, `${origin}/sitemap_index.xml`];
+  const sitemapQueue = sitemapUrls.slice(0, 15);
   let sitemapFetches = 0;
-  while (sitemapQueue.length && sitemapFetches < 6) {
+  while (sitemapQueue.length && sitemapFetches < 25) {
     const sm = sitemapQueue.shift()!;
     sitemapFetches++;
     try {
@@ -122,7 +124,7 @@ export async function crawlSite(account: string, websiteUrl: string, opts: { max
   const touch = db.prepare("UPDATE site_pages SET last_crawled_at = datetime('now'), http_status = ? WHERE account_username = ? AND url = ?");
 
   let fetched = 0;
-  const fetchBudget = maxPages + 15;
+  const fetchBudget = maxPages + 100;
   while (queue.length && stored < maxPages && fetched < fetchBudget) {
     queue.sort((a, b) => b.prio - a.prio);
     const { url } = queue.shift()!;
