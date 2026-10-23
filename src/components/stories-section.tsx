@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Flame, RefreshCw } from "lucide-react";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { StoryPlaybookDrawer, type DrawerStoryData } from "@/components/story-playbook-drawer";
 
 type DefaultMode = "auto" | "configured_only" | "ignore";
@@ -86,22 +86,22 @@ export function StoriesSection({ accountUsername }: { accountUsername: string })
   if (!loading && activeStories.length === 0 && mode === "auto" && stories.length === 0) return null;
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3.5 rounded-3xl border border-outline-variant/70 bg-surface-container-low p-4 sm:p-5 shadow-2xs">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-          <Flame className="w-4 h-4 text-rose-500" />
-          استوری‌های فعال (۲۴ ساعت)
-          <span className="text-xs font-normal text-slate-500">
+        <h2 className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-2">
+          <MaterialSymbol name="local_fire_department" size={20} fill={true} className="text-rose-500" />
+          <span>استوری‌های فعال (۲۴ ساعت اخیر)</span>
+          <span className="text-[11px] font-normal text-muted-foreground px-2 py-0.5 rounded-full bg-surface-container-highest">
             {activeStories.length.toLocaleString("fa-IR")} استوری
           </span>
         </h2>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs text-slate-500">پیش‌فرض ریپلای استوری:</label>
+          <label className="text-[11px] text-muted-foreground">پیش‌فرض ریپلای استوری:</label>
           <select
             value={mode}
             onChange={(e) => changeMode(e.target.value as DefaultMode)}
             title={MODES.find((m) => m.id === mode)?.hint}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700"
+            className="rounded-full border border-outline-variant/80 bg-surface-container-lowest px-3 py-1 text-xs text-foreground focus:outline-none focus:border-primary cursor-pointer"
           >
             {MODES.map((m) => (
               <option key={m.id} value={m.id}>
@@ -111,18 +111,18 @@ export function StoriesSection({ accountUsername }: { accountUsername: string })
           </select>
           <button
             onClick={() => load(true)}
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
+            className="p-1.5 rounded-full text-muted-foreground hover:bg-surface-container-high hover:text-foreground transition-colors cursor-pointer"
             aria-label="بروزرسانی"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <MaterialSymbol name="refresh" size={18} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
       {activeStories.length === 0 ? (
-        <p className="text-xs text-slate-500">در حال حاضر استوری فعالی ندارید.</p>
+        <p className="text-xs text-muted-foreground py-2">در حال حاضر استوری فعالی در ۲۴ ساعت گذشته ثبت نشده است.</p>
       ) : (
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-4 pt-1">
           {activeStories.map((st) => {
             const on = st.auto_reply === 1;
             const thumb = st.thumbnail_url || st.media_url;
@@ -130,11 +130,12 @@ export function StoriesSection({ accountUsername }: { accountUsername: string })
               <button
                 key={st.id}
                 onClick={() => setActive(st)}
-                className="w-24 flex flex-col items-center gap-1.5 text-center group"
+                className="w-24 flex flex-col items-center gap-1.5 text-center group cursor-pointer"
               >
-                <span className="p-[2.5px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600">
-                  <span className="block w-16 h-16 rounded-full overflow-hidden bg-slate-100 border-2 border-white">
+                <span className="p-[2.5px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600 transition-transform duration-200 group-hover:scale-105">
+                  <span className="block w-16 h-16 rounded-full overflow-hidden bg-surface-container-high border-2 border-surface-container-lowest">
                     {thumb && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={proxied(thumb)}
                         alt=""
@@ -145,17 +146,17 @@ export function StoriesSection({ accountUsername }: { accountUsername: string })
                     )}
                   </span>
                 </span>
-                <span className="text-[11px] text-slate-500">{timeLeft(st.expires_at, now)}</span>
+                <span className="text-[10px] text-muted-foreground">{timeLeft(st.expires_at, now)}</span>
                 <span
-                  className={`text-[11px] font-semibold ${
+                  className={`text-[10px] font-semibold ${
                     on
                       ? "text-emerald-700"
                       : mode === "auto"
-                      ? "text-indigo-600"
-                      : "text-slate-400"
+                      ? "text-primary"
+                      : "text-muted-foreground"
                   }`}
                 >
-                  {on ? "تنظیم اختصاصی فعال" : mode === "auto" ? "پیش‌فرض: هوشمند" : mode === "ignore" ? "خاموش" : "بدون تنظیم"}
+                  {on ? "تنظیم اختصاصی فعال" : mode === "auto" ? "پیش‌فرض هوشمند" : mode === "ignore" ? "خاموش" : "بدون تنظیم"}
                 </span>
               </button>
             );

@@ -1,23 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  X,
-  Check,
-  Eye,
-  MessageCircle,
-  Send,
-  UserPlus,
-  ShieldCheck,
-  Film,
-  Image as ImageIcon,
-  Save,
-} from "lucide-react";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { type AccountPersona } from "@/lib/playbooks";
 import { formatNumber as formatNumberI18n } from "@/lib/i18n";
 import { useWorkspace } from "@/components/layout/workspace-context";
 import { LinkButtonField, SnippetChips, appendSnippet } from "@/components/playbook-fields";
+import { cn } from "@/lib/utils";
 
 export interface DrawerPostData {
   id: number;
@@ -66,22 +57,22 @@ function getProxiedImageUrl(url: string) {
   return url;
 }
 
-const TRIGGERS: { id: DrawerPostData["trigger_type"]; label: string }[] = [
-  { id: "all", label: "همه کامنت‌ها" },
-  { id: "keywords", label: "کلمات کلیدی" },
-  { id: "ai_context", label: "تشخیص هوشمند" },
+const TRIGGERS: { id: DrawerPostData["trigger_type"]; label: string; icon: string }[] = [
+  { id: "all", label: "همه کامنت‌ها", icon: "select_all" },
+  { id: "keywords", label: "کلمات کلیدی", icon: "match_case" },
+  { id: "ai_context", label: "تشخیص هوشمند", icon: "auto_awesome" },
 ];
 
-const COMMENT_ACTIONS: { id: DrawerPostData["comment_action_type"]; label: string }[] = [
-  { id: "ai", label: "هوش مصنوعی" },
-  { id: "direct", label: "متن ثابت" },
-  { id: "none", label: "بدون پاسخ به کامنت" },
+const COMMENT_ACTIONS: { id: DrawerPostData["comment_action_type"]; label: string; icon: string }[] = [
+  { id: "ai", label: "هوش مصنوعی", icon: "auto_awesome" },
+  { id: "direct", label: "متن ثابت", icon: "chat" },
+  { id: "none", label: "بدون پاسخ", icon: "block" },
 ];
 
-const DM_ACTIONS: { id: DrawerPostData["dm_action_type"]; label: string }[] = [
-  { id: "ai", label: "مشاور هوش مصنوعی" },
-  { id: "direct", label: "متن ثابت" },
-  { id: "none", label: "بدون ارسال دایرکت" },
+const DM_ACTIONS: { id: DrawerPostData["dm_action_type"]; label: string; icon: string }[] = [
+  { id: "ai", label: "مشاور هوش مصنوعی", icon: "smart_toy" },
+  { id: "direct", label: "متن ثابت", icon: "send" },
+  { id: "none", label: "بدون ارسال دایرکت", icon: "block" },
 ];
 
 const COMMENT_AI_CHIPS = [
@@ -96,31 +87,36 @@ const DM_AI_CHIPS = [
   { label: "+ شخصی‌سازی پیشنهاد", snippet: "پیام را با نام کاربر و بر اساس کامنتش شخصی‌سازی کن." },
 ];
 
-function Seg<T extends string>({
+function M3SegmentedControl<T extends string>({
   value,
   options,
   onChange,
 }: {
   value: T;
-  options: { id: T; label: string }[];
+  options: { id: T; label: string; icon?: string }[];
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => onChange(o.id)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-            value === o.id
-              ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-surface-container border border-outline-variant/60">
+      {options.map((o) => {
+        const selected = value === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer",
+              selected
+                ? "bg-primary text-on-primary shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-container-high"
+            )}
+          >
+            {o.icon && <MaterialSymbol name={o.icon} size={16} fill={selected} />}
+            <span>{o.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -242,25 +238,26 @@ export function PostPlaybookDrawer({
   const views = Number(metrics.views || metrics.plays || 0);
   const follows = Number(metrics.follows || 0);
 
-  const field =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
+  const m3Field =
+    "w-full rounded-2xl border border-outline-variant/80 bg-surface-container-lowest px-4 py-2.5 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200";
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
       {/* Backdrop */}
       <div className="flex-1" onClick={onClose} />
 
-      {/* Slide-over panel */}
+      {/* M3 Side Sheet panel */}
       <div
         dir={dir}
-        className="relative w-full max-w-xl bg-white h-[100dvh] max-h-[100dvh] shadow-2xl border-s border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-start duration-200"
+        className="relative w-full max-w-xl bg-surface-container-lowest h-[100dvh] max-h-[100dvh] shadow-2xl border-s border-outline-variant/70 rounded-s-3xl flex flex-col overflow-hidden animate-in slide-in-from-end duration-200"
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center text-slate-400">
-              {isReel ? <Film className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />}
+        <div className="px-6 py-4 border-b border-outline-variant/60 bg-surface-container flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-surface-container-high border border-outline-variant shrink-0 flex items-center justify-center text-muted-foreground shadow-2xs">
+              <MaterialSymbol name={isReel ? "movie" : "image"} size={22} />
               {post.thumbnail_url && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={getProxiedImageUrl(post.thumbnail_url)}
                   alt={post.shortcode}
@@ -274,17 +271,17 @@ export function PostPlaybookDrawer({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-900">
-                  تنظیمات پاسخ این {contentTypeTitle}
+                <span className="text-sm sm:text-base font-bold text-foreground">
+                  تنظیمات هوشمند این {contentTypeTitle}
                 </span>
                 <span
                   dir="ltr"
-                  className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-700"
+                  className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-surface-container-highest text-foreground"
                 >
                   {post.shortcode}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 truncate mt-0.5">
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {post.caption || `${contentTypeTitle} بدون کپشن`}
               </p>
             </div>
@@ -292,56 +289,57 @@ export function PostPlaybookDrawer({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="rounded-full p-2 text-muted-foreground hover:bg-surface-container-high hover:text-foreground transition-colors cursor-pointer"
             aria-label="بستن"
           >
-            <X className="w-5 h-5" />
+            <MaterialSymbol name="close" size={20} />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
           {/* Subtle Compact Metrics Ribbon */}
           {(views > 0 || (post.logs_count && post.logs_count > 0) || (post.dms_count && post.dms_count > 0) || follows > 0) && (
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-600 overflow-x-auto">
+            <div className="flex items-center gap-2 p-2 rounded-2xl bg-surface-container border border-outline-variant/60 text-xs text-muted-foreground overflow-x-auto">
               {views > 0 && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 shrink-0">
-                  <Eye className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-slate-500">بازدید:</span>
-                  <span className="font-bold text-slate-900 tabular-nums">{formatNumber(views)}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/60 shrink-0">
+                  <MaterialSymbol name="visibility" size={16} className="text-muted-foreground" />
+                  <span>بازدید:</span>
+                  <span className="font-bold text-foreground tabular-nums">{formatNumber(views)}</span>
                 </div>
               )}
               {Boolean(post.logs_count && post.logs_count > 0) && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 shrink-0">
-                  <MessageCircle className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="text-slate-500">کامنت:</span>
-                  <span className="font-bold text-slate-900 tabular-nums">{formatNumber(post.logs_count)}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/60 shrink-0">
+                  <MaterialSymbol name="chat_bubble" size={16} className="text-primary" />
+                  <span>کامنت:</span>
+                  <span className="font-bold text-foreground tabular-nums">{formatNumber(post.logs_count)}</span>
                 </div>
               )}
               {Boolean(post.dms_count && post.dms_count > 0) && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 shrink-0">
-                  <Send className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-slate-500">دایرکت:</span>
-                  <span className="font-bold text-slate-900 tabular-nums">{formatNumber(post.dms_count)}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/60 shrink-0">
+                  <MaterialSymbol name="send" size={16} className="text-emerald-600" />
+                  <span>دایرکت:</span>
+                  <span className="font-bold text-emerald-700 tabular-nums">{formatNumber(post.dms_count)}</span>
                 </div>
               )}
               {follows > 0 && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 shrink-0">
-                  <UserPlus className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-slate-500">فالوور:</span>
-                  <span className="font-bold text-slate-900 tabular-nums">+{formatNumber(follows)}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest border border-outline-variant/60 shrink-0">
+                  <MaterialSymbol name="person_add" size={16} className="text-rose-600" />
+                  <span>فالوور:</span>
+                  <span className="font-bold text-rose-600 tabular-nums">+{formatNumber(follows)}</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Master Toggle */}
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-bold text-slate-900">
-                پاسخ خودکار به تعاملات این {contentTypeTitle}
+          {/* Master Toggle Card */}
+          <div className="rounded-3xl border border-outline-variant/80 bg-surface-container-low p-4 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="space-y-0.5">
+              <div className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-2">
+                <MaterialSymbol name="bolt" size={18} className="text-amber-500" fill={true} />
+                <span>پاسخ خودکار به تعاملات این {contentTypeTitle}</span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
                 فقط تعاملات همین {contentTypeTitle} با تنظیمات پایین بررسی می‌شود؛ قوانین عمومی پیج دخالتی ندارند.
               </p>
             </div>
@@ -349,14 +347,17 @@ export function PostPlaybookDrawer({
           </div>
 
           {/* Form Content Controlled by Master Toggle */}
-          <div className={autoReply ? "space-y-6" : "space-y-6 opacity-50 pointer-events-none"}>
+          <div className={autoReply ? "space-y-6" : "space-y-6 opacity-45 pointer-events-none"}>
             {/* 1. Trigger Filtering */}
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700">چه کامنت‌هایی پاسخ داده شود؟</div>
-              <Seg value={triggerType} options={TRIGGERS} onChange={setTriggerType} />
+            <section className="space-y-2.5">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MaterialSymbol name="filter_alt" size={16} />
+                <span>چه کامنت‌هایی پاسخ داده شود؟</span>
+              </label>
+              <M3SegmentedControl value={triggerType} options={TRIGGERS} onChange={setTriggerType} />
               {triggerType === "keywords" && (
                 <input
-                  className={field}
+                  className={m3Field}
                   value={triggerKeywords}
                   onChange={(e) => setTriggerKeywords(e.target.value)}
                   placeholder="قیمت، خرید، لینک (با ویرگول جدا کنید)"
@@ -364,7 +365,7 @@ export function PostPlaybookDrawer({
               )}
               {triggerType === "ai_context" && (
                 <input
-                  className={field}
+                  className={m3Field}
                   value={triggerContext}
                   onChange={(e) => setTriggerContext(e.target.value)}
                   placeholder="مثال: فقط سوالات درباره قیمت، سفارش یا شرایط ارسال"
@@ -373,14 +374,15 @@ export function PostPlaybookDrawer({
             </section>
 
             {/* 2. Public Comment Reply */}
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5" /> پاسخ عمومی به کامنت
-              </div>
-              <Seg value={commentActionType} options={COMMENT_ACTIONS} onChange={setCommentActionType} />
+            <section className="space-y-2.5">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MaterialSymbol name="forum" size={16} />
+                <span>پاسخ عمومی به کامنت</span>
+              </label>
+              <M3SegmentedControl value={commentActionType} options={COMMENT_ACTIONS} onChange={setCommentActionType} />
               {commentActionType === "direct" && (
                 <textarea
-                  className={field}
+                  className={m3Field}
                   rows={2}
                   value={commentActionText}
                   onChange={(e) => setCommentActionText(e.target.value)}
@@ -389,11 +391,11 @@ export function PostPlaybookDrawer({
               )}
               {commentActionType === "ai" && (
                 <>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     هوش مصنوعی متناسب با کامنت و لحن برند، پاسخ عمومی مناسبی زیر کامنت ارسال می‌کند.
                   </p>
                   <textarea
-                    className={field}
+                    className={m3Field}
                     rows={2}
                     value={commentActionText}
                     onChange={(e) => setCommentActionText(e.target.value)}
@@ -408,14 +410,15 @@ export function PostPlaybookDrawer({
             </section>
 
             {/* 3. Direct Message Reply */}
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Send className="w-3.5 h-3.5" /> ارسال پیام در دایرکت
-              </div>
-              <Seg value={dmActionType} options={DM_ACTIONS} onChange={setDmActionType} />
+            <section className="space-y-2.5">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MaterialSymbol name="send" size={16} />
+                <span>ارسال پیام در دایرکت</span>
+              </label>
+              <M3SegmentedControl value={dmActionType} options={DM_ACTIONS} onChange={setDmActionType} />
               {dmActionType === "direct" && (
                 <textarea
-                  className={field}
+                  className={m3Field}
                   rows={3}
                   value={dmActionText}
                   onChange={(e) => setDmActionText(e.target.value)}
@@ -424,11 +427,11 @@ export function PostPlaybookDrawer({
               )}
               {dmActionType === "ai" && (
                 <>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     هوش مصنوعی گفتگوی دایرکت را برای مشاوره، معرفی محصول یا ارسال لینک هدایت می‌کند.
                   </p>
                   <textarea
-                    className={field}
+                    className={m3Field}
                     rows={3}
                     value={dmActionText}
                     onChange={(e) => setDmActionText(e.target.value)}
@@ -453,12 +456,13 @@ export function PostPlaybookDrawer({
             />
 
             {/* 5. Follow Gate */}
-            <section className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <UserPlus className="w-3.5 h-3.5" /> قفل فالو
+            <section className="rounded-3xl border border-outline-variant/70 bg-surface-container-lowest p-4 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <MaterialSymbol name="lock" size={16} className="text-primary" />
+                  <span>قفل فالو (Follow Gate)</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[11px] text-muted-foreground">
                   ارسال پیام در دایرکت یا لینک فقط پس از فالو کردن پیج انجام می‌شود.
                 </p>
               </div>
@@ -466,12 +470,13 @@ export function PostPlaybookDrawer({
             </section>
 
             {/* 6. Spam & Competitor Shield */}
-            <section className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" /> محافظت در برابر اسپم و رقبا
+            <section className="rounded-3xl border border-outline-variant/70 bg-surface-container-lowest p-4 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="space-y-0.5">
+                <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <MaterialSymbol name="security" size={16} className="text-teal-600" />
+                  <span>محافظت در برابر اسپم و رقبا</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[11px] text-muted-foreground">
                   شناسایی و مخفی‌سازی خودکار کامنت‌های تبلیغاتی، توهین‌آمیز و تخریبی رقبا.
                 </p>
               </div>
@@ -481,16 +486,18 @@ export function PostPlaybookDrawer({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-200 bg-white flex items-center justify-between gap-3 shrink-0">
-          <span className="text-xs text-rose-600">{error}</span>
-          <button
+        <div className="px-6 py-4 border-t border-outline-variant/60 bg-surface-container flex items-center justify-between gap-3 shrink-0">
+          <span className="text-xs text-destructive">{error}</span>
+          <Button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold disabled:opacity-60 transition-colors shadow-xs cursor-pointer"
+            variant="filled"
+            size="default"
+            className="rounded-full px-6 gap-2 cursor-pointer"
           >
-            {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-            {saved ? "ذخیره شد" : saving ? "در حال ذخیره…" : "ذخیره"}
-          </button>
+            <MaterialSymbol name={saved ? "check" : "save"} size={18} />
+            <span>{saved ? "ذخیره شد" : saving ? "در حال ذخیره…" : "ذخیره تنظیمات"}</span>
+          </Button>
         </div>
       </div>
     </div>

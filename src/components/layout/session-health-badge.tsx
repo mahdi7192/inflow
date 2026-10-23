@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { cn } from "@/lib/utils";
 import type { SessionStatus } from "@/lib/db";
 
@@ -26,15 +26,15 @@ export function SessionHealthBadge({
         type="button"
         onClick={onReLogin}
         className={cn(
-          "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold",
-          "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer",
+          "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
+          "bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/15 transition-all cursor-pointer shadow-2xs",
           className
         )}
         title={`نشست @${account} غیرفعال است. کلیک برای ورود به حساب`}
       >
-        <AlertCircle className="w-3.5 h-3.5 text-rose-600 animate-bounce" />
-        <span>نیاز به ورود به حساب</span>
-        <RefreshCw className="w-3 h-3 text-rose-500 ms-0.5" />
+        <MaterialSymbol name="error" size={16} fill className="animate-bounce" />
+        <span>نیاز به ورود مجدد</span>
+        <MaterialSymbol name="refresh" size={14} className="ms-0.5" />
       </button>
     );
   }
@@ -42,15 +42,15 @@ export function SessionHealthBadge({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium",
-        "bg-emerald-50 text-emerald-700 border border-emerald-200",
+        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold",
+        "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20",
         className
       )}
       title={`نشست @${account} فعال است`}
     >
       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
       <span>نشست: فعال</span>
-      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 ms-0.5" />
+      <MaterialSymbol name="verified_user" size={16} fill className="ms-0.5" />
     </div>
   );
 }

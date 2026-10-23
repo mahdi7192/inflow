@@ -1,21 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  Clock,
-  X,
-  CheckCircle2,
-  Filter,
-  MessageSquare,
-  Send,
-  UserCheck,
-  Lock,
-  Sparkles,
-  ExternalLink,
-  Plus,
-  Loader2,
-} from "lucide-react";
-import { Button, Badge, Input } from "@/components/ui/primitives";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { I18N, Lang } from "@/lib/i18n";
 import type { PostRow, CommentLogRow } from "@/lib/db";
 
@@ -87,7 +76,6 @@ export function LogsModal({
     setSimSubmitting(true);
 
     try {
-      // Evaluate trigger locally to mimic what Hermes Agent does
       let matched = true;
       if (post.trigger_type === "keywords" && post.trigger_keywords) {
         const kwList = post.trigger_keywords
@@ -152,39 +140,45 @@ export function LogsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 font-sans text-foreground"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-xl border border-border bg-card shadow-lg overflow-hidden"
+        className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-3xl border border-outline-variant bg-surface-container-high shadow-2xl overflow-hidden animate-in fade-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
+        dir="rtl"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-border px-5 py-4 bg-secondary/30">
-          <div className="flex items-center gap-2 min-w-0">
-            <Clock className="w-4 h-4 text-sky-600 shrink-0" />
-            <h3 className="text-sm font-semibold text-foreground truncate">
-              {t("modalLogsTitle")}
-            </h3>
-            <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border truncate max-w-[100px] sm:max-w-none shrink-0">
-              {post.shortcode}
-            </span>
+        <div className="flex items-center justify-between border-b border-outline-variant/60 px-6 py-4 bg-surface-container/60">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-2xl bg-sky-500/15 text-sky-600 dark:text-sky-400">
+              <MaterialSymbol name="history" size={22} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground truncate">
+                {t("modalLogsTitle")}
+              </h3>
+              <span className="font-mono text-xs text-muted-foreground">
+                shortcode: {post.shortcode}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="secondary"
+              variant="tonal"
               size="sm"
               onClick={() => setSimOpen(!simOpen)}
+              className="text-xs h-9 gap-1.5"
             >
-              <Plus className="w-3.5 h-3.5 text-emerald-600" />
+              <MaterialSymbol name="add" size={18} className="text-emerald-600" />
               <span>{t("simulateCommentBtn")}</span>
             </Button>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-surface-container-highest transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <MaterialSymbol name="close" size={20} />
             </button>
           </div>
         </div>
@@ -193,18 +187,18 @@ export function LogsModal({
         {simOpen && (
           <form
             onSubmit={handleSimulateComment}
-            className="border-b border-emerald-200 bg-emerald-50/50 p-4 space-y-3"
+            className="border-b border-emerald-500/30 bg-emerald-500/10 p-5 space-y-3"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                شبیه‌ساز ثبت لاگ و قفل کامنت توسط ایجنت هرمس
+              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                <MaterialSymbol name="sparkles" size={16} fill={true} />
+                <span>شبیه‌ساز ثبت لاگ و قفل کامنت توسط ایجنت هرمس</span>
               </span>
               <span className="text-[11px] text-muted-foreground">
                 تست مستقیم قوانین فعلی پست
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] text-muted-foreground mb-1">
                   یوزرنیم کامنت‌گذار
@@ -213,7 +207,7 @@ export function LogsModal({
                   type="text"
                   value={simUsername}
                   onChange={(e) => setSimUsername(e.target.value)}
-                  className="h-8 text-xs font-mono"
+                  className="h-9 text-xs font-mono"
                   placeholder="username"
                 />
               </div>
@@ -225,26 +219,26 @@ export function LogsModal({
                   type="text"
                   value={simComment}
                   onChange={(e) => setSimComment(e.target.value)}
-                  className="h-8 text-xs"
+                  className="h-9 text-xs"
                   placeholder="متن کامنت..."
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-2">
               <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={simFollows}
                   onChange={(e) => setSimFollows(e.target.checked)}
-                  className="rounded border-border text-emerald-600"
+                  className="rounded border-outline-variant text-emerald-600 focus:ring-emerald-500"
                 />
                 <span>کاربر پیج را فالو دارد (تست شرط فالو)</span>
               </label>
-              <Button type="submit" variant="emerald" size="sm" disabled={simSubmitting}>
+              <Button type="submit" variant="filled" size="sm" disabled={simSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
                 {simSubmitting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <MaterialSymbol name="progress_activity" size={16} className="animate-spin" />
                 ) : (
-                  <Send className="w-3.5 h-3.5" />
+                  <MaterialSymbol name="send" size={16} />
                 )}
                 <span>اجرای شبیه‌سازی و ثبت لاگ</span>
               </Button>
@@ -253,33 +247,33 @@ export function LogsModal({
         )}
 
         {/* Summary KPI Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 border-b border-border bg-secondary/20">
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <div className="text-lg font-bold font-mono text-foreground">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-5 border-b border-outline-variant/60 bg-surface-container-low">
+          <div className="rounded-2xl border border-outline-variant/60 bg-surface p-3.5 text-center">
+            <div className="text-xl font-bold font-mono text-foreground">
               {summary.total_comments}
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statTotalComments")}
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <div className="text-lg font-bold font-mono text-emerald-700">
+          <div className="rounded-2xl border border-outline-variant/60 bg-surface p-3.5 text-center">
+            <div className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-400">
               {summary.trigger_matches}
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statMatched")}
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <div className="text-lg font-bold font-mono text-sky-700">
+          <div className="rounded-lg border border-outline-variant/60 bg-surface p-3.5 text-center rounded-2xl">
+            <div className="text-xl font-bold font-mono text-sky-700 dark:text-sky-400">
               {summary.comments_replied}
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
               {t("statReplies")}
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <div className="text-lg font-bold font-mono text-purple-700">
+          <div className="rounded-lg border border-outline-variant/60 bg-surface p-3.5 text-center rounded-2xl">
+            <div className="text-xl font-bold font-mono text-purple-700 dark:text-purple-400">
               {summary.dms_sent}
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
@@ -289,15 +283,15 @@ export function LogsModal({
         </div>
 
         {/* Logs List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3.5">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <MaterialSymbol name="progress_activity" size={28} className="animate-spin text-primary" />
               <span className="text-xs">{t("syncing")}</span>
             </div>
           ) : logs.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground space-y-2">
-              <Clock className="w-8 h-8 mx-auto opacity-40" />
+              <MaterialSymbol name="history" size={36} className="mx-auto opacity-40" />
               <p className="text-xs">{t("noLogsYet")}</p>
             </div>
           ) : (
@@ -306,7 +300,7 @@ export function LogsModal({
               return (
                 <div
                   key={log.comment_id}
-                  className="rounded-lg border border-border bg-card p-3.5 space-y-2.5 shadow-2xs"
+                  className="rounded-2xl border border-outline-variant/70 bg-surface p-4 space-y-3 shadow-2xs"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -314,18 +308,17 @@ export function LogsModal({
                         href={`https://www.instagram.com/${log.username}/`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-mono font-medium text-foreground bg-secondary hover:bg-secondary/80 px-2 py-0.5 rounded-md border border-border transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-foreground bg-surface-container-high hover:bg-surface-container-highest px-2.5 py-1 rounded-full border border-outline-variant transition-colors"
                       >
                         <span>@{log.username}</span>
-                        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                        <MaterialSymbol name="open_in_new" size={14} className="opacity-70" />
                       </a>
 
-                      <Badge variant={isMatched ? "emerald" : "muted"}>
-                        {isMatched ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : (
-                          <Filter className="w-3 h-3" />
-                        )}
+                      <Badge
+                        variant="outline"
+                        className={isMatched ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] gap-1" : "bg-surface-container-high text-muted-foreground border-outline-variant text-[11px] gap-1"}
+                      >
+                        <MaterialSymbol name={isMatched ? "check_circle" : "filter_alt"} size={14} />
                         <span>
                           {isMatched
                             ? t("logTriggerMatched")
@@ -335,10 +328,10 @@ export function LogsModal({
 
                       <span
                         title="شناسه قفل یکتا برای جلوگیری از اجرای تکراری (Idempotency Lock)"
-                        className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded border border-border"
+                        className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground bg-surface-container px-2.5 py-1 rounded-full border border-outline-variant/60"
                       >
-                        <Lock className="w-2.5 h-2.5 text-amber-600" />
-                        lock:{log.comment_id}
+                        <MaterialSymbol name="lock" size={12} className="text-amber-600" />
+                        <span>lock:{log.comment_id}</span>
                       </span>
                     </div>
                     <span className="text-[11px] font-mono text-muted-foreground">
@@ -347,7 +340,7 @@ export function LogsModal({
                   </div>
 
                   {/* User Comment */}
-                  <div className="rounded-lg bg-secondary/30 border border-border px-3 py-2 text-xs text-foreground">
+                  <div className="rounded-xl bg-surface-container-low border border-outline-variant/60 px-3.5 py-2.5 text-xs text-foreground">
                     <span className="text-muted-foreground font-medium me-1.5">
                       {t("logCommentLabel")}:
                     </span>
@@ -364,9 +357,9 @@ export function LogsModal({
                       {(log.comment_reply_status === "sent" ||
                         log.comment_reply_status === "queued") &&
                         log.comment_reply_text && (
-                          <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs space-y-1">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-700">
-                              <MessageSquare className="w-3.5 h-3.5" />
+                          <div className="rounded-xl border border-sky-300/40 bg-sky-50/60 dark:bg-sky-950/30 px-3.5 py-2.5 text-xs space-y-1">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+                              <MaterialSymbol name="chat" size={16} />
                               <span>{t("logCommentReply")}</span>
                             </div>
                             <p className="text-foreground leading-relaxed whitespace-pre-line">
@@ -377,9 +370,9 @@ export function LogsModal({
 
                       {(log.dm_status === "sent" || log.dm_status === "queued") &&
                         log.dm_text && (
-                        <div className="rounded-lg border border-purple-200 bg-purple-50/60 px-3 py-2 text-xs space-y-1">
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-700">
-                            <Send className="w-3.5 h-3.5" />
+                        <div className="rounded-xl border border-purple-300/40 bg-purple-50/60 dark:bg-purple-950/30 px-3.5 py-2.5 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                            <MaterialSymbol name="send" size={16} />
                             <span>{t("logDmSent")}</span>
                           </div>
                           <p className="text-foreground leading-relaxed whitespace-pre-line">
@@ -389,9 +382,9 @@ export function LogsModal({
                       )}
 
                       {log.dm_status === "pending_follow" && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs space-y-1">
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700">
-                            <UserCheck className="w-3.5 h-3.5" />
+                        <div className="rounded-xl border border-amber-300/40 bg-amber-50/60 dark:bg-amber-950/30 px-3.5 py-2.5 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                            <MaterialSymbol name="person_check" size={16} />
                             <span>{t("logPendingFollow")}</span>
                           </div>
                           <p className="text-foreground leading-relaxed">

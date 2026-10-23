@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AlertCircle, AlertTriangle, Loader2, X } from "lucide-react";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -57,31 +57,31 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
+        className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
         onClick={() => {
           if (!isSpinning) onClose();
         }}
       />
 
-      {/* Dialog */}
-      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 space-y-5">
+      {/* Dialog (M3 Alert Dialog) */}
+      <div className="relative w-full max-w-md bg-surface-container-high border border-outline-variant/80 rounded-3xl p-6 shadow-xl z-10 animate-in fade-in zoom-in-95 duration-150 space-y-5">
         <div className="flex items-start gap-4">
           <div
             className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
+              "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border",
               variant === "destructive"
-                ? "bg-rose-50 text-rose-600 border-rose-200"
-                : "bg-secondary text-foreground border-border"
+                ? "bg-destructive/10 text-destructive border-destructive/20"
+                : "bg-primary/10 text-primary border-primary/20"
             )}
           >
-            {variant === "destructive" ? (
-              <AlertTriangle className="w-5 h-5" />
-            ) : (
-              <AlertCircle className="w-5 h-5" />
-            )}
+            <MaterialSymbol
+              name={variant === "destructive" ? "warning" : "info"}
+              size={24}
+              fill
+            />
           </div>
 
-          <div className="space-y-1 min-w-0 flex-1">
+          <div className="space-y-1 min-w-0 flex-1 pt-0.5">
             <h3 className="text-base font-bold text-foreground">
               {title}
             </h3>
@@ -94,34 +94,34 @@ export function ConfirmDialog({
             type="button"
             disabled={isSpinning}
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-container-highest transition-colors cursor-pointer"
             aria-label="بستن"
           >
-            <X className="w-4 h-4" />
+            <MaterialSymbol name="close" size={18} />
           </button>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/60">
           <Button
             type="button"
-            variant="outline"
+            variant="text"
             size="sm"
             disabled={isSpinning}
             onClick={onClose}
-            className="text-xs cursor-pointer"
+            className="text-xs cursor-pointer rounded-full"
           >
             {cancelText}
           </Button>
 
           <Button
             type="button"
-            variant={variant === "destructive" ? "destructive" : "default"}
+            variant={variant === "destructive" ? "destructive" : "filled"}
             size="sm"
             disabled={isSpinning}
             onClick={handleConfirm}
-            className="text-xs cursor-pointer shadow-xs gap-1.5"
+            className="text-xs cursor-pointer shadow-xs gap-1.5 rounded-full"
           >
-            {isSpinning && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {isSpinning && <MaterialSymbol name="progress_activity" size={16} className="animate-spin" />}
             <span>{confirmText}</span>
           </Button>
         </div>

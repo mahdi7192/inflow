@@ -28,16 +28,20 @@ export function Switch({
         if (!disabled) onCheckedChange(!checked);
       }}
       className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-        checked ? "bg-primary" : "bg-zinc-200",
+        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 select-none",
+        checked
+          ? "bg-primary border-primary"
+          : "bg-surface-container-highest border-outline",
         className
       )}
     >
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-          checked ? "translate-x-4 rtl:-translate-x-4" : "translate-x-0"
+          "pointer-events-none inline-block transform rounded-full shadow-xs transition-all duration-200 ease-in-out",
+          checked
+            ? "h-5 w-5 bg-on-primary translate-x-5 rtl:-translate-x-5"
+            : "h-3.5 w-3.5 bg-outline translate-x-1 rtl:-translate-x-1"
         )}
       />
     </button>

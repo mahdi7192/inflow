@@ -2,37 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import {
-  Search,
-  LayoutGrid,
-  List,
-  Sparkles,
-  MessageSquare,
-  Send,
-  UserCheck,
-  FolderOpen,
-  Menu,
-  AlertTriangle,
-  ExternalLink,
-  Loader2,
-  Trash2,
-  RotateCw,
-  Eye,
-  FileText,
-  ShieldCheck,
-  Zap,
-  Flame,
-  CheckCircle2,
-  CheckCheck,
-  Link2,
-  Film,
-  Image as ImageIcon,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { toast } from "@/components/ui/sonner";
-import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { I18N, Lang, formatNumber as formatNumberI18n } from "@/lib/i18n";
 import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
@@ -584,29 +559,29 @@ export function InflowDashboard({
     <div className="w-full space-y-6 pb-10">
       <div className="space-y-6">
             {/* Studio Account Command Bar, Adaptive Persona Switcher & True ROI Funnel (Spec 018) */}
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-5 space-y-5 shadow-2xs">
+            <div className="rounded-3xl border border-outline-variant bg-surface-container-low p-5 sm:p-6 space-y-6 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
                   {profile?.avatar_url ? (
                     <img
                       src={profile.avatar_url}
                       alt={profile.display_name || currentAccount}
-                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 bg-slate-100 shrink-0"
+                      className="w-13 h-13 rounded-2xl object-cover border border-outline-variant bg-surface-container shrink-0"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = "none";
                       }}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 flex items-center justify-center text-sm font-bold font-mono text-slate-700 shrink-0 shadow-2xs">
+                    <div className="w-13 h-13 rounded-2xl bg-surface-container-high border border-outline-variant flex items-center justify-center text-sm font-bold font-mono text-foreground shrink-0 shadow-2xs">
                       {(currentAccount || "IN").slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-base font-bold text-slate-900 truncate">
+                      <h1 className="text-base font-bold text-foreground truncate">
                         {profile?.display_name || currentAccount}
                       </h1>
-                      <span className="text-xs font-mono text-slate-500 bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/60">
+                      <span className="text-xs font-mono text-muted-foreground bg-surface-container-high px-2 py-0.5 rounded-full border border-outline-variant/60">
                         <bdi>@{currentAccount}</bdi>
                       </span>
                       <span
@@ -619,7 +594,7 @@ export function InflowDashboard({
                         <span>{t(PERSONA_STUDIO_KEY[accountPersona])}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-1 max-w-xl">
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1 max-w-xl">
                       {profile?.bio || "سیستم‌عامل هوشمند تبدیل کامنت و دایرکت به فروش و فالوور"}
                     </p>
                   </div>
@@ -628,17 +603,17 @@ export function InflowDashboard({
                 {/* Adaptive Persona Switcher + Brand Cheat Sheet */}
                 <div className="flex flex-wrap items-center gap-2.5">
                   {/* Triple-Persona Switcher (Spec 019) */}
-                  <div className="inline-flex items-center p-1 rounded-xl bg-slate-100/90 border border-slate-200/80 shadow-2xs">
+                  <div className="inline-flex items-center p-1 rounded-full bg-surface-container-high border border-outline-variant/60 shadow-2xs">
                     {PERSONA_ORDER.map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => handleSwitchPersona(p)}
                         className={cn(
-                          "inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                          "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer",
                           accountPersona === p
                             ? PERSONA_STYLE[p].active
-                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface-container-highest"
                         )}
                       >
                         <span aria-hidden="true">{PERSONA_META[p].emoji}</span>
@@ -652,15 +627,15 @@ export function InflowDashboard({
                     type="button"
                     onClick={() => setBrandSheetOpen(!brandSheetOpen)}
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-2xs",
+                      "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer shadow-2xs",
                       brandSheetOpen
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                        ? "bg-primary text-on-primary border-primary shadow-xs"
                         : brandCheatSheet.trim()
-                        ? "bg-indigo-50/80 text-indigo-700 border-indigo-200 hover:bg-indigo-100/80"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                        : "bg-surface text-foreground border-outline-variant hover:bg-surface-container"
                     )}
                   >
-                    <FileText className="w-3.5 h-3.5" />
+                    <MaterialSymbol name="description" size={16} />
                     <span>تقلب‌نامه کلی پیج</span>
                     {brandCheatSheet.trim() && !brandSheetOpen && (
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
@@ -671,16 +646,16 @@ export function InflowDashboard({
 
               {/* Collapsible Account-Level Brand Cheat Sheet Drawer */}
               {brandSheetOpen && (
-                <div className="pt-4 border-t border-slate-100 space-y-3 animate-in fade-in duration-150">
+                <div className="pt-4 border-t border-outline-variant/60 space-y-3 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <FileText className="w-4 h-4 text-indigo-600" />
+                      <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <MaterialSymbol name="description" size={18} className="text-primary" />
                         <span>
                           {t("brandMemoryTitle")}
                         </span>
                       </h3>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
                         اطلاعات ثابتی که در کپشن‌ها نمی‌نویسید (مثل هزینه و زمان ارسال، شرایط تعویض، آدرس، لینک سایت یا معرفی خودتان) را یک بار اینجا بنویسید تا دستیار هوش مصنوعی همیشه بداند.
                       </p>
                     </div>
@@ -690,75 +665,80 @@ export function InflowDashboard({
                     value={brandCheatSheet}
                     onChange={(e) => setBrandCheatSheet(e.target.value)}
                     placeholder={PERSONA_META[accountPersona].brandSheetPlaceholder}
-                    className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full rounded-2xl border border-outline-variant bg-surface p-3.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 flex-1">
-                      <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
+                      <MaterialSymbol name="link" size={18} className="text-muted-foreground shrink-0" />
                       <input
                         type="text"
                         dir="ltr"
                         value={websiteUrl}
                         onChange={(e) => setWebsiteUrl(e.target.value)}
                         placeholder="https://your-site.ir (وب‌سایت یا لینک اصلی پیج)"
-                        className="w-full rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-1.5 text-xs font-mono text-slate-800 focus:bg-white"
+                        className="w-full rounded-full border border-outline-variant bg-surface px-4 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                     </div>
                     <div className="flex items-center gap-2 justify-end">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setBrandSheetOpen(false)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+                        className="text-xs"
                       >
                         {t("close")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="filled"
+                        size="sm"
                         disabled={savingBrandSheet}
                         onClick={handleSaveBrandCheatSheet}
-                        className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-xs font-bold gap-1.5"
                       >
-                        {savingBrandSheet ? t("savingBrandMemory") : t("saveBrandMemory")}
-                      </button>
+                        {savingBrandSheet && <MaterialSymbol name="progress_activity" size={16} className="animate-spin" />}
+                        <span>{savingBrandSheet ? t("savingBrandMemory") : t("saveBrandMemory")}</span>
+                      </Button>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 4-Stage True Revenue & Engagement Funnel: 4 Standalone Cards */}
+            {/* 4-Stage True Revenue & Engagement Funnel: 4 Standalone M3 Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Card 1: Total Views */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">۱. {t("metricTotalViews")}</span>
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shadow-2xs">
-                    <Eye className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-muted-foreground">۱. {t("metricTotalViews")}</span>
+                  <div className="w-9 h-9 rounded-2xl bg-surface-container-high flex items-center justify-center text-muted-foreground shadow-2xs">
+                    <MaterialSymbol name="visibility" size={18} />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-slate-900 tracking-tight">
+                  <span className="text-2xl font-bold tabular-nums text-foreground tracking-tight">
                     {formatNumber(liveInsights?.funnel?.views || 0)}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
                   <span>{t("metricReach")}</span>
-                  <span className="font-semibold text-slate-700">
+                  <span className="font-semibold text-foreground">
                     {formatNumber(liveInsights?.funnel?.reach || 0)}
                   </span>
                 </div>
               </div>
 
               {/* Card 2: Comments & Replies */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">۲. {t("metricComments")}</span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-2xs">
-                    <MessageSquare className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-muted-foreground">۲. {t("metricComments")}</span>
+                  <div className="w-9 h-9 rounded-2xl bg-sky-500/15 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-2xs">
+                    <MaterialSymbol name="chat_bubble" size={18} />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-slate-900 tracking-tight">
+                  <span className="text-2xl font-bold tabular-nums text-foreground tracking-tight">
                     {formatNumber(
                       liveInsights?.funnel?.total_comments ??
                         posts.reduce(
@@ -769,54 +749,54 @@ export function InflowDashboard({
                     )}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
                   <span>{t("metricPublicReplies")}</span>
-                  <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200/60">
+                  <span className="font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/40">
                     {formatNumber(liveInsights?.funnel?.comment_replies_sent || 0)}
                   </span>
                 </div>
               </div>
 
               {/* Card 3: Smart DMs */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">۳. {t("metricSmartDms")}</span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-2xs">
-                    <Send className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-muted-foreground">۳. {t("metricSmartDms")}</span>
+                  <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs">
+                    <MaterialSymbol name="send" size={18} />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-emerald-700 tracking-tight">
+                  <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400 tracking-tight">
                     {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
                   <span>{t("metricRead")}</span>
-                  <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200/60 inline-flex items-center gap-1">
+                  <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 inline-flex items-center gap-1">
                     <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
-                    <CheckCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <MaterialSymbol name="done_all" size={14} className="text-primary shrink-0" />
                   </span>
                 </div>
               </div>
 
               {/* Card 4: Leads & Followers */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">۴. {t("metricFollowersLeads")}</span>
-                  <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shadow-2xs">
-                    <UserCheck className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-muted-foreground">۴. {t("metricFollowersLeads")}</span>
+                  <div className="w-9 h-9 rounded-2xl bg-rose-500/15 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs">
+                    <MaterialSymbol name="person_check" size={18} />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-rose-600 tracking-tight">
+                  <span className="text-2xl font-bold tabular-nums text-rose-600 dark:text-rose-400 tracking-tight">
                     <bdi>+{formatNumber(liveInsights?.funnel?.follows_gained || 0)}</bdi>
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
                   <span>{t("metricActivePosts")}</span>
-                  <span className="font-semibold text-slate-700">
+                  <span className="font-semibold text-foreground">
                     {formatNumber(activeCount)}{" "}
-                    <span className="text-slate-400 font-normal">
+                    <span className="text-muted-foreground font-normal">
                       ({formatNumber(cheatSheetCount)} {t("metricCheatSheets")})
                     </span>
                   </span>
@@ -837,8 +817,8 @@ export function InflowDashboard({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t("searchPlaceholder")}
-                    icon={<Search className="w-4 h-4 text-muted-foreground" />}
-                    className="h-9 text-xs"
+                    icon={<MaterialSymbol name="search" size={18} className="text-muted-foreground" />}
+                    className="h-10 text-xs rounded-full"
                   />
                 </div>
                 <Button
@@ -846,105 +826,70 @@ export function InflowDashboard({
                   size="sm"
                   onClick={handleSync}
                   disabled={syncing}
-                  className="h-9 px-3 gap-1.5 text-xs font-vazir cursor-pointer bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shrink-0 shadow-2xs"
+                  className="h-10 px-4 gap-2 text-xs font-medium cursor-pointer shrink-0 rounded-full"
                   title="همگام‌سازی آخرین ریلزها و پست‌ها از اینستاگرام"
                 >
-                  <RotateCw className={cn("w-3.5 h-3.5 text-indigo-600", syncing && "animate-spin")} />
+                  <MaterialSymbol name="sync" size={18} className={cn("text-primary", syncing && "animate-spin")} />
                   <span>{syncing ? "در حال دریافت..." : "همگام‌سازی دستی ریلزها"}</span>
                 </Button>
               </div>
 
-              {/* View Mode & Filter Tabs */}
+              {/* View Mode & Filter Tabs (M3 Filter Chips & Segmented Buttons) */}
               <div className="flex items-center gap-2 shrink-0 justify-between lg:justify-end">
-                <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-lg border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setFilterTab("all")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                      filterTab === "all"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t("filterAll")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterTab("active")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                      filterTab === "active"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t("filterActive")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterTab("inactive")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                      filterTab === "inactive"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t("filterInactive")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterTab("reels")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                      filterTab === "reels"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t("filterReels")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterTab("posts")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                      filterTab === "posts"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {t("filterPosts")}
-                  </button>
+                <div className="flex items-center gap-1 bg-surface-container-high p-1 rounded-full border border-outline-variant/60">
+                  {(["all", "active", "inactive", "reels", "posts"] as const).map((tabKey) => {
+                    const isSelected = filterTab === tabKey;
+                    const labels: Record<string, string> = {
+                      all: t("filterAll"),
+                      active: t("filterActive"),
+                      inactive: t("filterInactive"),
+                      reels: t("filterReels"),
+                      posts: t("filterPosts"),
+                    };
+                    return (
+                      <button
+                        key={tabKey}
+                        type="button"
+                        onClick={() => setFilterTab(tabKey)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer",
+                          isSelected
+                            ? "bg-surface text-foreground shadow-2xs font-bold"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface-container-highest"
+                        )}
+                      >
+                        {labels[tabKey]}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-lg border border-border">
+                <div className="flex items-center gap-1 bg-surface-container-high p-1 rounded-full border border-outline-variant/60">
                   <button
                     type="button"
                     onClick={() => setViewMode("cards")}
                     className={cn(
-                      "p-1 rounded-md transition-colors cursor-pointer",
+                      "p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center",
                       viewMode === "cards"
-                        ? "bg-card text-foreground shadow-2xs"
+                        ? "bg-surface text-foreground shadow-2xs"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                     aria-label={t("viewCards")}
                   >
-                    <List className="w-3.5 h-3.5" />
+                    <MaterialSymbol name="view_list" size={18} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setViewMode("grid")}
                     className={cn(
-                      "p-1 rounded-md transition-colors cursor-pointer",
+                      "p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center",
                       viewMode === "grid"
-                        ? "bg-card text-foreground shadow-2xs"
+                        ? "bg-surface text-foreground shadow-2xs"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                     aria-label={t("viewGrid")}
                   >
-                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <MaterialSymbol name="grid_view" size={18} />
                   </button>
                 </div>
               </div>
@@ -952,9 +897,9 @@ export function InflowDashboard({
 
             {/* Post Feed */}
             {posts.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center space-y-4 shadow-2xs">
-                <div className="w-12 h-12 rounded-xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
-                  <RotateCw className="w-6 h-6 text-zinc-500" />
+              <div className="rounded-3xl border border-dashed border-outline-variant bg-surface p-12 text-center space-y-4 shadow-2xs">
+                <div className="w-14 h-14 rounded-2xl bg-surface-container-high border border-outline-variant flex items-center justify-center mx-auto text-muted-foreground shadow-2xs">
+                  <MaterialSymbol name="sync" size={28} className="text-muted-foreground" />
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-bold text-foreground">
@@ -968,16 +913,17 @@ export function InflowDashboard({
                   onClick={handleSync}
                   disabled={syncing}
                   size="sm"
-                  className="gap-2 cursor-pointer"
+                  variant="filled"
+                  className="gap-2 cursor-pointer rounded-full text-xs font-bold"
                 >
-                  <RotateCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+                  <MaterialSymbol name="sync" size={18} className={cn(syncing && "animate-spin")} />
                   <span>{syncing ? t("syncingPostsWithInstagram") : t("syncPostsWithInstagram")}</span>
                 </Button>
               </div>
             ) : filteredPosts.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
-                  <FolderOpen className="w-6 h-6" />
+              <div className="rounded-3xl border border-dashed border-outline-variant bg-surface p-12 text-center space-y-3 shadow-2xs">
+                <div className="w-14 h-14 rounded-2xl bg-surface-container-high border border-outline-variant flex items-center justify-center mx-auto text-muted-foreground shadow-2xs">
+                  <MaterialSymbol name="folder_open" size={28} />
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-foreground">
@@ -989,7 +935,7 @@ export function InflowDashboard({
                 </div>
               </div>
             ) : viewMode === "cards" ? (
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {paginatedPosts.map((post) => {
                   const isActive = post.auto_reply === 1;
                   const pbPreset = getPlaybookById(post.playbook_id);
@@ -1019,18 +965,18 @@ export function InflowDashboard({
                       key={post.id}
                       onClick={() => setDrawerShortcode(post.shortcode)}
                       className={cn(
-                        "group rounded-2xl border p-4 transition-all duration-150 cursor-pointer flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center",
+                        "group rounded-3xl border p-4.5 transition-all duration-150 cursor-pointer flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center",
                         isActive
-                          ? "border-emerald-300/80 bg-white hover:border-emerald-400 shadow-2xs"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-2xs"
+                          ? "border-emerald-500/30 bg-surface shadow-2xs hover:border-emerald-500/50 hover:shadow-xs"
+                          : "border-outline-variant/80 bg-surface hover:border-outline hover:shadow-2xs"
                       )}
                     >
                       <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-                        <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                        <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-surface-container border border-outline-variant/70 flex items-center justify-center text-muted-foreground shrink-0 shadow-2xs">
                           {post.post_type === "reel" ? (
-                            <Film className="w-6 h-6" />
+                            <MaterialSymbol name="movie" size={24} />
                           ) : (
-                            <ImageIcon className="w-6 h-6" />
+                            <MaterialSymbol name="image" size={24} />
                           )}
                           {post.thumbnail_url && (
                             <img
@@ -1046,16 +992,16 @@ export function InflowDashboard({
                         </div>
                         <div className="space-y-1.5 min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-mono font-bold text-slate-900">
+                            <span className="text-xs font-mono font-bold text-foreground">
                               {post.shortcode}
                             </span>
-                            <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                            <Badge variant="outline" className="text-[10px] font-mono">
                               {post.post_type === "reel" ? `🎬 ${t("postTypeReel")}` : `🖼️ ${t("postTypePost")}`}
                             </Badge>
                             {pbPreset && (
                               <span
                                 className={cn(
-                                  "text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1",
+                                  "text-[11px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1",
                                   PERSONA_STYLE[pbPreset.persona].badge
                                 )}
                               >
@@ -1064,47 +1010,47 @@ export function InflowDashboard({
                               </span>
                             )}
                             {hasCheatSheet && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
-                                <FileText className="w-3 h-3" />
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 inline-flex items-center gap-1">
+                                <MaterialSymbol name="description" size={12} />
                                 <span>{t("badgeHasCheatSheet")}</span>
                               </span>
                             )}
                             {hasTargetUrl && (
-                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 inline-flex items-center gap-1">
-                                <Link2 className="w-3 h-3" />
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-container-high text-foreground border border-outline-variant/60 inline-flex items-center gap-1">
+                                <MaterialSymbol name="link" size={12} />
                                 <span>{t("badgeTargetLink")}</span>
                               </span>
                             )}
                             {post.smart_moderation === 1 && (
-                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 inline-flex items-center gap-1">
-                                <ShieldCheck className="w-3 h-3" />
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 inline-flex items-center gap-1">
+                                <MaterialSymbol name="security" size={12} />
                                 <span>{t("badgeSpamShield")}</span>
                               </span>
                             )}
                           </div>
 
-                          <p className="text-xs text-slate-600 line-clamp-1">
+                          <p className="text-xs text-muted-foreground line-clamp-1">
                             {post.caption || t("noCaption")}
                           </p>
 
                           {/* Mini Funnel Metrics Row on Card */}
-                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-0.5">
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground pt-0.5">
                             {pViews > 0 && (
                               <span className="inline-flex items-center gap-1 tabular-nums font-medium">
-                                <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                <MaterialSymbol name="visibility" size={14} className="text-muted-foreground" />
                                 {formatNumber(pViews)} {t("viewsLabel")}
                               </span>
                             )}
                             <span className="inline-flex items-center gap-1 tabular-nums font-medium">
-                              <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
+                              <MaterialSymbol name="chat_bubble" size={14} className="text-primary" />
                               {formatNumber(pLogsCount)} {t("commentReplyLabel")}
                             </span>
-                            <span className="inline-flex items-center gap-1 tabular-nums text-emerald-700 font-semibold">
-                              <Send className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="inline-flex items-center gap-1 tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">
+                              <MaterialSymbol name="send" size={14} className="text-emerald-600 dark:text-emerald-400" />
                               {formatNumber(pDmsCount)} {t("dmLabel")}
                             </span>
                             {pFollows > 0 && (
-                              <span className="inline-flex items-center gap-1 tabular-nums text-rose-600 font-bold">
+                              <span className="inline-flex items-center gap-1 tabular-nums text-rose-600 dark:text-rose-400 font-bold">
                                 +{formatNumber(pFollows)} {t("followersLabel")}
                               </span>
                             )}
@@ -1112,7 +1058,7 @@ export function InflowDashboard({
                         </div>
                       </div>
 
-                      <div className="w-full pt-2.5 mt-2 border-t border-slate-100 flex items-center justify-between gap-2 lg:w-auto lg:pt-0 lg:mt-0 lg:border-0 lg:justify-end shrink-0">
+                      <div className="w-full pt-3 mt-2 border-t border-outline-variant/60 flex items-center justify-between gap-2.5 lg:w-auto lg:pt-0 lg:mt-0 lg:border-0 lg:justify-end shrink-0">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1120,11 +1066,11 @@ export function InflowDashboard({
                             setDrawerShortcode(post.shortcode);
                           }}
                           className={cn(
-                            "text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer",
+                            "text-xs font-bold flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border transition-all cursor-pointer shadow-2xs",
                             PERSONA_STYLE[accountPersona].action
                           )}
                         >
-                          <Zap className="w-3.5 h-3.5" />
+                          <MaterialSymbol name="bolt" size={16} />
                           <span>{t("btnConfigureScenario")}</span>
                         </button>
 
@@ -1132,7 +1078,7 @@ export function InflowDashboard({
                           onClick={(e) => e.stopPropagation()}
                           className="flex items-center gap-2 ps-1"
                         >
-                          <span className="text-[11px] font-bold text-slate-500 lg:hidden">
+                          <span className="text-[11px] font-bold text-muted-foreground lg:hidden">
                             {isActive ? t("drawerStatusActive") : t("drawerStatusInactive")}
                           </span>
                           <Switch
@@ -1164,19 +1110,19 @@ export function InflowDashboard({
                       key={post.id}
                       onClick={() => setDrawerShortcode(post.shortcode)}
                       className={cn(
-                        "group rounded-2xl border bg-white overflow-hidden transition-all cursor-pointer flex flex-col justify-between",
+                        "group rounded-3xl border bg-surface overflow-hidden transition-all cursor-pointer flex flex-col justify-between shadow-2xs hover:shadow-xs",
                         isActive
-                          ? "border-emerald-300/90 shadow-xs"
-                          : "border-slate-200/80 hover:border-slate-300 hover:shadow-xs"
+                          ? "border-emerald-500/40 hover:border-emerald-500/60"
+                          : "border-outline-variant/80 hover:border-outline"
                       )}
                     >
                       {/* Cover Media Area */}
-                      <div className="aspect-[4/5] bg-slate-100 relative overflow-hidden">
-                        <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                      <div className="aspect-[4/5] bg-surface-container relative overflow-hidden">
+                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/60">
                           {post.post_type === "reel" ? (
-                            <Film className="w-8 h-8" />
+                            <MaterialSymbol name="movie" size={36} />
                           ) : (
-                            <ImageIcon className="w-8 h-8" />
+                            <MaterialSymbol name="image" size={36} />
                           )}
                         </div>
                         {post.thumbnail_url && (
@@ -1194,11 +1140,11 @@ export function InflowDashboard({
                         {/* Top Overlay: Media Type & Instant Switch */}
                         <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-900/75 text-white backdrop-blur-md">
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-surface/90 text-foreground backdrop-blur-md shadow-2xs border border-outline-variant/40">
                               {post.post_type === "reel" ? `🎬 ${t("postTypeReel")}` : `📷 ${t("postTypePost")}`}
                             </span>
                             {hasCheatSheet && (
-                              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-600/90 text-white backdrop-blur-md">
+                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-600/90 text-white backdrop-blur-md shadow-2xs">
                                 📝 {t("badgeHasCheatSheet")}
                               </span>
                             )}
@@ -1206,12 +1152,12 @@ export function InflowDashboard({
 
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="bg-white/95 backdrop-blur-md px-2 py-1 rounded-xl shadow-xs flex items-center gap-1.5"
+                            className="bg-surface/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1.5 border border-outline-variant/40"
                           >
                             <span
                               className={cn(
                                 "text-[10px] font-bold",
-                                isActive ? "text-emerald-700" : "text-slate-400"
+                                isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
                               )}
                             >
                               {isActive ? t("drawerStatusActive") : t("drawerStatusInactive")}
@@ -1229,41 +1175,41 @@ export function InflowDashboard({
                       {/* Card Content Body */}
                       <div className="p-4 flex-1 flex flex-col justify-between space-y-3.5">
                         <div className="space-y-2">
-                          <p className="text-xs text-slate-800 font-medium line-clamp-2 leading-relaxed min-h-[2.5rem]">
+                          <p className="text-xs text-foreground font-medium line-clamp-2 leading-relaxed min-h-[2.5rem]">
                             {post.caption || "بدون متن کپشن (برای افزودن تقلب‌نامه و سناریوی فروش کلیک کنید)"}
                           </p>
 
                           {/* Active Playbook Indicator */}
                           {pbPreset ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-bold">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-bold border border-primary/20">
                               <span>{pbPreset.emoji}</span>
                               <span className="truncate">{pbPreset.title}</span>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-medium">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high text-muted-foreground text-[11px] font-medium border border-outline-variant/60">
                               <span>⚡ سناریوی پیش‌فرض هوشمند</span>
                             </div>
                           )}
                         </div>
 
                         {/* Flat 3-Metric Strip + Action Button */}
-                        <div className="pt-3 border-t border-slate-100 space-y-3">
-                          <div className="grid grid-cols-3 text-center divide-x divide-x-reverse divide-slate-100 text-[11px]">
+                        <div className="pt-3 border-t border-outline-variant/60 space-y-3">
+                          <div className="grid grid-cols-3 text-center divide-x divide-x-reverse divide-outline-variant/60 text-[11px]">
                             <div>
-                              <div className="text-slate-400">{t("viewsLabel")}</div>
-                              <div className="font-bold text-slate-800 tabular-nums mt-0.5">
+                              <div className="text-muted-foreground">{t("viewsLabel")}</div>
+                              <div className="font-bold text-foreground tabular-nums mt-0.5">
                                 {viewsCount > 0 ? formatNumber(viewsCount) : "—"}
                               </div>
                             </div>
                             <div>
-                              <div className="text-slate-400">{t("commentReplyLabel")}</div>
-                              <div className="font-bold text-slate-800 tabular-nums mt-0.5">
+                              <div className="text-muted-foreground">{t("commentReplyLabel")}</div>
+                              <div className="font-bold text-foreground tabular-nums mt-0.5">
                                 {formatNumber(logsCount)}
                               </div>
                             </div>
                             <div>
-                              <div className="text-slate-400">{t("dmLabel")}</div>
-                              <div className="font-bold text-emerald-700 tabular-nums mt-0.5">
+                              <div className="text-muted-foreground">{t("dmLabel")}</div>
+                              <div className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
                                 {formatNumber(dmsSentCount)}
                               </div>
                             </div>
@@ -1277,13 +1223,13 @@ export function InflowDashboard({
                                 setDrawerShortcode(post.shortcode);
                               }}
                               className={cn(
-                                "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer",
+                                "flex-1 py-2 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs",
                                 isActive
-                                  ? "bg-slate-900 hover:bg-slate-800 text-white"
-                                  : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700"
+                                  ? "bg-primary text-on-primary hover:opacity-90"
+                                  : "bg-surface-container-high text-foreground hover:bg-surface-container-highest border border-outline-variant/60"
                               )}
                             >
-                              <Sparkles className="w-3.5 h-3.5" />
+                              <MaterialSymbol name="auto_awesome" size={16} />
                               <span>
                                 {isActive ? t("btnConfigureScenario") : t("btnQuickActivate")}
                               </span>
@@ -1297,10 +1243,10 @@ export function InflowDashboard({
               </div>
             )}
 
-            {/* Pagination Controls */}
+            {/* Pagination Controls (M3 Paged Navigation) */}
             {filteredPosts.length > PAGE_SIZE && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border mt-6 bg-card/50 p-4 rounded-xl border">
-                <div className="text-xs text-muted-foreground font-vazir">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-outline-variant/60 mt-6 bg-surface-container-low p-4 rounded-3xl border border-outline-variant/80 shadow-2xs">
+                <div className="text-xs text-muted-foreground">
                   نمایش{" "}
                   <span className="font-semibold text-foreground font-mono">
                     {(currentPage - 1) * PAGE_SIZE + 1}
@@ -1320,14 +1266,14 @@ export function InflowDashboard({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 px-2.5 text-xs font-vazir gap-1 cursor-pointer"
+                    className="h-8 px-3 text-xs gap-1.5 cursor-pointer rounded-full"
                     onClick={() => {
                       setCurrentPage((p) => Math.max(1, p - 1));
                       window.scrollTo({ top: 350, behavior: "smooth" });
                     }}
                     disabled={currentPage <= 1}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <MaterialSymbol name="chevron_right" size={16} rtlMirror />
                     <span className="hidden sm:inline">صفحه قبلی</span>
                   </Button>
 
@@ -1358,9 +1304,9 @@ export function InflowDashboard({
                         ) : (
                           <Button
                             key={`page-${p}`}
-                            variant={currentPage === p ? "default" : "outline"}
+                            variant={currentPage === p ? "filled" : "outline"}
                             size="sm"
-                            className="h-8 min-w-8 p-0 text-xs font-mono cursor-pointer"
+                            className="h-8 min-w-8 p-0 text-xs font-mono cursor-pointer rounded-full"
                             onClick={() => {
                               setCurrentPage(Number(p));
                               window.scrollTo({ top: 350, behavior: "smooth" });
@@ -1375,7 +1321,7 @@ export function InflowDashboard({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 px-2.5 text-xs font-vazir gap-1 cursor-pointer"
+                    className="h-8 px-3 text-xs gap-1.5 cursor-pointer rounded-full"
                     onClick={() => {
                       setCurrentPage((p) => Math.min(totalPages, p + 1));
                       window.scrollTo({ top: 350, behavior: "smooth" });
@@ -1383,7 +1329,7 @@ export function InflowDashboard({
                     disabled={currentPage >= totalPages}
                   >
                     <span className="hidden sm:inline">صفحه بعدی</span>
-                    <ChevronLeft className="w-4 h-4" />
+                    <MaterialSymbol name="chevron_left" size={16} rtlMirror />
                   </Button>
                 </div>
               </div>

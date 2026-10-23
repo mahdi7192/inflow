@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Save, Check, UserPlus, Smile, Film, Image as ImageIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { useWorkspace } from "@/components/layout/workspace-context";
 import { LinkButtonField, SnippetChips, appendSnippet } from "@/components/playbook-fields";
 
@@ -77,10 +77,10 @@ function Seg<T extends string>({
           key={o.id}
           type="button"
           onClick={() => onChange(o.id)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
             value === o.id
-              ? "bg-indigo-600 text-white border-indigo-600"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              ? "bg-primary text-on-primary border-primary shadow-2xs"
+              : "bg-surface-container text-foreground border-outline-variant/60 hover:bg-surface-container-high"
           }`}
         >
           {o.label}
@@ -171,19 +171,25 @@ export function StoryPlaybookDrawer({ story, accountUsername, onClose, onSaved }
     }
   };
 
-  const field = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
+  const field =
+    "w-full rounded-2xl border border-outline-variant/80 bg-surface-container px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all";
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
       <div className="flex-1" onClick={onClose} />
       <div
         dir={dir}
-        className="relative w-full max-w-xl bg-white h-[100dvh] shadow-2xl border-s border-slate-200 flex flex-col overflow-hidden"
+        className="relative w-full max-w-xl bg-surface h-[100dvh] shadow-xl border-s border-outline-variant/80 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
       >
-        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-outline-variant/60 bg-surface-container-low flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center text-slate-400">
-              {story.media_type?.toUpperCase() === "VIDEO" ? <Film className="w-5 h-5" /> : <ImageIcon className="w-5 h-5" />}
+            <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-surface-container-high border border-outline-variant/60 shrink-0 flex items-center justify-center text-muted-foreground">
+              {story.media_type?.toUpperCase() === "VIDEO" ? (
+                <MaterialSymbol name="movie" size={24} />
+              ) : (
+                <MaterialSymbol name="image" size={24} />
+              )}
               {(story.thumbnail_url || story.media_url) && (
                 <img
                   src={proxied(story.thumbnail_url || story.media_url)}
@@ -195,33 +201,34 @@ export function StoryPlaybookDrawer({ story, accountUsername, onClose, onSaved }
               )}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-bold text-slate-900">تنظیمات پاسخ این استوری</div>
-              <p className="text-xs text-slate-500 truncate mt-0.5">{story.caption || "استوری بدون کپشن"}</p>
+              <div className="text-sm font-bold text-foreground">تنظیمات سناریوی این استوری</div>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{story.caption || "استوری بدون کپشن"}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-container-high transition-colors cursor-pointer"
             aria-label="بستن"
           >
-            <X className="w-5 h-5" />
+            <MaterialSymbol name="close" size={20} />
           </button>
         </div>
 
+        {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 p-4 rounded-3xl bg-surface-container-low border border-outline-variant/60">
             <div>
-              <div className="text-sm font-bold text-slate-900">پاسخ خودکار به ریپلای‌های این استوری</div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <div className="text-sm font-bold text-foreground">پاسخ خودکار به ریپلای‌های این استوری</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 فقط ریپلای همین استوری با تنظیمات پایین بررسی می‌شود؛ قوانین دایرکت عمومی دخالتی ندارند.
               </p>
             </div>
             <Switch checked={autoReply} onCheckedChange={setAutoReply} />
           </div>
 
-          <div className={autoReply ? "space-y-6" : "space-y-6 opacity-50 pointer-events-none"}>
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700">چه ریپلای‌هایی پاسخ داده شود؟</div>
+          <div className={autoReply ? "space-y-6" : "space-y-6 opacity-40 pointer-events-none"}>
+            <section className="space-y-2 p-4 rounded-3xl bg-surface-container-low border border-outline-variant/60">
+              <div className="text-xs font-bold text-foreground">چه ریپلای‌هایی پاسخ داده شود؟</div>
               <Seg value={triggerType} options={TRIGGERS} onChange={setTriggerType} />
               {triggerType === "keywords" && (
                 <input
@@ -233,8 +240,8 @@ export function StoryPlaybookDrawer({ story, accountUsername, onClose, onSaved }
               )}
             </section>
 
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700">نوع پاسخ</div>
+            <section className="space-y-2.5 p-4 rounded-3xl bg-surface-container-low border border-outline-variant/60">
+              <div className="text-xs font-bold text-foreground">نوع پاسخ</div>
               <Seg
                 value={replyMode}
                 options={[
@@ -269,43 +276,46 @@ export function StoryPlaybookDrawer({ story, accountUsername, onClose, onSaved }
               )}
             </section>
 
-            <LinkButtonField
-              buttonText={targetButtonText}
-              url={targetUrl}
-              onButtonTextChange={setTargetButtonText}
-              onUrlChange={setTargetUrl}
-              fallbackTitle={lang === "en" ? "Open link 🔗" : "مشاهده لینک 🔗"}
-            />
+            <div className="p-4 rounded-3xl bg-surface-container-low border border-outline-variant/60">
+              <LinkButtonField
+                buttonText={targetButtonText}
+                url={targetUrl}
+                onButtonTextChange={setTargetButtonText}
+                onUrlChange={setTargetUrl}
+                fallbackTitle={lang === "en" ? "Open link 🔗" : "مشاهده لینک 🔗"}
+              />
+            </div>
 
-            <section className="flex items-center justify-between gap-3">
+            <section className="flex items-center justify-between gap-3 p-4 rounded-3xl bg-surface-container-low border border-outline-variant/60">
               <div>
-                <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <UserPlus className="w-3.5 h-3.5" /> قفل فالو
+                <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <MaterialSymbol name="person_add" size={16} /> قفل فالو
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">پاسخ فقط بعد از فالو کردن پیج ارسال می‌شود.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">پاسخ فقط بعد از فالو کردن پیج ارسال می‌شود.</p>
               </div>
               <Switch checked={requireFollow} onCheckedChange={setRequireFollow} />
             </section>
 
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Smile className="w-3.5 h-3.5" /> واکنش ایموجی (بدون متن)
+            <section className="space-y-2 p-4 rounded-3xl bg-surface-container-low border border-outline-variant/60">
+              <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <MaterialSymbol name="sentiment_satisfied" size={16} /> واکنش ایموجی (بدون متن)
               </div>
               <Seg value={emoji} options={EMOJI} onChange={setEmoji} />
-              <p className="text-xs text-slate-500">ریپلای‌های فقط ایموجی هرگز به هوش مصنوعی ارسال نمی‌شوند.</p>
+              <p className="text-xs text-muted-foreground">ریپلای‌های فقط ایموجی هرگز به هوش مصنوعی ارسال نمی‌شوند.</p>
             </section>
           </div>
         </div>
 
-        <div className="px-5 py-3 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
-          <span className="text-xs text-rose-600">{error}</span>
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-outline-variant/60 bg-surface-container-low flex items-center justify-between gap-3">
+          <span className="text-xs text-destructive font-medium">{error}</span>
           <button
             onClick={save}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:opacity-90 text-on-primary text-sm font-bold shadow-xs cursor-pointer transition-all disabled:opacity-50"
           >
-            {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-            {saved ? "ذخیره شد" : saving ? "در حال ذخیره…" : "ذخیره"}
+            <MaterialSymbol name={saved ? "check" : "save"} size={18} />
+            <span>{saved ? "ذخیره شد" : saving ? "در حال ذخیره…" : "ذخیره"}</span>
           </button>
         </div>
       </div>

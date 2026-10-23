@@ -3,20 +3,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors select-none",
+  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors select-none",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground border-transparent",
-        secondary: "bg-secondary text-secondary-foreground border-border",
-        outline: "text-foreground border-border",
-        emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-        amber: "bg-amber-50 text-amber-700 border-amber-200",
-        sky: "bg-sky-50 text-sky-700 border-sky-200",
-        purple: "bg-purple-50 text-purple-700 border-purple-200",
-        fuchsia: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
-        destructive: "bg-red-50 text-red-700 border-red-200",
-        muted: "bg-zinc-100 text-zinc-600 border-zinc-200",
+        default: "bg-primary-container text-on-primary-container border-transparent",
+        secondary: "bg-secondary-container text-on-secondary-container border-transparent",
+        outline: "text-foreground border-outline-variant bg-transparent",
+        emerald: "bg-[#EDF7EE] text-[#146C2E] border-[#B7E1CD]",
+        amber: "bg-[#FFF3E0] text-[#B35F00] border-[#FFE082]",
+        sky: "bg-[#E1F5FE] text-[#0277BD] border-[#B3E5FC]",
+        purple: "bg-[#F3E5F5] text-[#7B1FA2] border-[#E1BEE7]",
+        fuchsia: "bg-[#FCE4EC] text-[#C2185B] border-[#F8BBD0]",
+        destructive: "bg-[#FDE8E8] text-[#BA1A1A] border-[#F8B4B4]",
+        muted: "bg-surface-container-high text-muted-foreground border-outline-variant/40",
       },
     },
     defaultVariants: {

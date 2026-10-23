@@ -2,32 +2,93 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================================
+   Typography: Estedad Font (Persian/Arabic) & Google Material Symbols
+   ============================================================================ */
+@font-face {
+  font-family: 'Estedad';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/Estedad[wght].woff2') format('woff2-variations'),
+       url('/fonts/Estedad-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('/fonts/material-symbols-rounded.woff2') format('woff2');
+}
+
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
+}
+
+[dir="rtl"] .rtl-mirror,
+[dir="rtl"] .m3-icon-mirror {
+  transform: scaleX(-1);
+  display: inline-flex;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-vazirmatn), var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-geist-mono), var(--font-vazirmatn), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+  --font-sans: 'Estedad', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), 'Estedad', ui-monospace, SFMono-Regular, monospace;
+
+  /* M3 Surface Container Tokens */
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+
+  /* Shadcn / Legacy Token Adapters to M3 */
+  --color-sidebar-ring: var(--ring);
+  --color-sidebar-border: var(--outline-variant);
+  --color-sidebar-accent-foreground: var(--foreground);
+  --color-sidebar-accent: var(--surface-container-high);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar: var(--surface-container);
   --color-ring: var(--ring);
-  --color-input: var(--input);
+  --color-input: var(--outline-variant);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
+  --color-accent: var(--surface-container-high);
   --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
+  --color-muted: var(--surface-container-highest);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
@@ -36,107 +97,110 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.65);
-  --radius-md: calc(var(--radius) * 0.85);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.25);
-  --radius-2xl: calc(var(--radius) * 1.6);
-  --radius-3xl: calc(var(--radius) * 2.0);
-  --radius-4xl: calc(var(--radius) * 2.4);
+
+  /* M3 Corner Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+  --radius-full: 9999px;
 }
 
 /* ============================================================================
-   inFlow Studio Design System (Autonomous Social Revenue OS)
-   Canonical Token Specification — See /DESIGN.md & /docs/design-system.md
+   Google Material Design 3 (M3) Canonical System Tokens
    ============================================================================ */
 :root {
-  --background: #F8FAFC;
-  --foreground: #09090B;
+  /* M3 Tonal Surfaces & Canvas */
+  --surface-container-lowest: #FFFFFF;
+  --surface-container-low: #F7F8FC;
+  --surface-container: #EFF2F8;
+  --surface-container-high: #E6ECF4;
+  --surface-container-highest: #DCE3EE;
+  
+  --background: #F7F8FC;
+  --foreground: #191C1E;
   --card: #FFFFFF;
-  --card-foreground: #09090B;
-  --card-hover: #F8FAFC;
+  --card-foreground: #191C1E;
+  --card-hover: #F8FAFD;
   --popover: #FFFFFF;
-  --popover-foreground: #09090B;
-  --primary: #0F172A;
+  --popover-foreground: #191C1E;
+
+  /* Primary Palette (Google Material 3 Blue) */
+  --primary: #005AC1;
   --primary-foreground: #FFFFFF;
-  --secondary: #F1F5F9;
-  --secondary-foreground: #0F172A;
-  --muted: #F1F5F9;
-  --muted-foreground: #64748B;
-  --accent: #F1F5F9;
-  --accent-foreground: #0F172A;
-  --destructive: #DC2626;
-  --border: #E2E8F0;
-  --border-subtle: #F1F5F9;
-  --input: #E2E8F0;
-  --ring: #4F46E5;
+  --primary-container: #D8E2FF;
+  --on-primary-container: #001A41;
 
-  /* Semantic Persona & Autopilot Tokens */
-  --persona-business: #4F46E5;
-  --persona-business-soft: #EEF2FF;
-  --persona-business-border: #C7D2FE;
+  /* Secondary & Tertiary Containers */
+  --secondary: #565F71;
+  --secondary-foreground: #FFFFFF;
+  --secondary-container: #DAE2F9;
+  --on-secondary-container: #131C2B;
 
-  --persona-creator: #E11D48;
-  --persona-creator-soft: #FFF1F2;
-  --persona-creator-border: #FECDD3;
+  --tertiary-container: #FFD8E4;
+  --on-tertiary-container: #3B071E;
 
-  --status-active: #059669;
-  --status-active-soft: #ECFDF5;
-  --status-active-border: #A7F3D0;
+  --muted: #EFF2F8;
+  --muted-foreground: #44474E;
+  --accent: #EFF2F8;
+  --accent-foreground: #191C1E;
+  --destructive: #BA1A1A;
+  --destructive-foreground: #FFFFFF;
 
-  --status-warning: #D97706;
-  --status-warning-soft: #FFFBEB;
-  --status-warning-border: #FDE68A;
+  /* Outline Dividers (Clean Hairline Borders) */
+  --outline: #74777F;
+  --outline-variant: #C4C7C5;
+  --border: #E0E3E8;
+  --border-subtle: #EFF2F8;
+  --input: #C4C7C5;
+  --ring: #005AC1;
 
-  --chart-1: #4F46E5;
-  --chart-2: #059669;
-  --chart-3: #E11D48;
-  --chart-4: #D97706;
-  --chart-5: #0284C7;
-  --radius: 0.75rem;
+  /* Persona Semantics */
+  --persona-business: #005AC1;
+  --persona-business-soft: #EEF4FF;
+  --persona-business-border: #BAD2FF;
 
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #09090B;
-  --sidebar-primary: #0F172A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F1F5F9;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #E2E8F0;
-  --sidebar-ring: #4F46E5;
+  --persona-creator: #B3261E;
+  --persona-creator-soft: #FFF0EE;
+  --persona-creator-border: #F9DEDC;
+
+  --status-active: #146C2E;
+  --status-active-soft: #EDF7EE;
+  --status-active-border: #B7E1CD;
+
+  --status-warning: #B35F00;
+  --status-warning-soft: #FFF3E0;
+  --status-warning-border: #FFE082;
+
+  --radius: 1rem;
 }
 
 .dark {
-  --background: #F8FAFC;
-  --foreground: #09090B;
-  --card: #FFFFFF;
-  --card-foreground: #09090B;
-  --popover: #FFFFFF;
-  --popover-foreground: #09090B;
-  --primary: #0F172A;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F1F5F9;
-  --secondary-foreground: #0F172A;
-  --muted: #F1F5F9;
-  --muted-foreground: #64748B;
-  --accent: #F1F5F9;
-  --accent-foreground: #0F172A;
-  --destructive: #DC2626;
-  --border: #E2E8F0;
-  --input: #E2E8F0;
-  --ring: #4F46E5;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #09090B;
-  --sidebar-primary: #0F172A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F1F5F9;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #E2E8F0;
-  --sidebar-ring: #4F46E5;
+  --background: #101418;
+  --foreground: #E1E2E8;
+  --card: #181C20;
+  --card-foreground: #E1E2E8;
+  --popover: #181C20;
+  --popover-foreground: #E1E2E8;
+  --primary: #A8C7FA;
+  --primary-foreground: #003063;
+  --primary-container: #00458E;
+  --on-primary-container: #D8E2FF;
+  --secondary-container: #3D4758;
+  --on-secondary-container: #DAE2F9;
+  --muted: #1C2024;
+  --muted-foreground: #8E9199;
+  --border: #2D3136;
+  --input: #44474E;
+  --ring: #A8C7FA;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border);
   }
   html,
   body {
@@ -154,25 +218,27 @@
   input,
   textarea,
   select {
-    font-family: var(--font-vazirmatn), var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Estedad', var(--font-sans), sans-serif;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    background-color: var(--background);
+    color: var(--foreground);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     width: 100%;
     max-width: 100vw;
   }
 }
 
-.font-vazir {
-  font-family: var(--font-vazirmatn), var(--font-geist-sans), sans-serif;
-}
-
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom subtle scrollbars for Studio Drawers & Logs */
+/* Material 3 Active Pill Indicator */
+.m3-nav-pill {
+  transition: all 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Custom subtle scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

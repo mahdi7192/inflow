@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Globe, ChevronDown, Check } from "lucide-react";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -78,17 +78,19 @@ export function LanguageDropdown({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-lg border border-border bg-background text-foreground hover:bg-secondary/80 font-medium transition-all cursor-pointer shadow-2xs select-none",
+          "inline-flex items-center gap-1.5 rounded-full border border-outline-variant/80 bg-surface text-foreground hover:bg-surface-container font-medium transition-all cursor-pointer shadow-2xs select-none",
           size === "sm"
-            ? "h-7 px-2 text-[11px]"
-            : "h-8 px-2.5 text-xs"
+            ? "h-8 px-2.5 text-[11px]"
+            : "h-9 px-3.5 text-xs"
         )}
       >
-        <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        <span className="font-medium">{activeOption.nativeLabel}</span>
-        <ChevronDown
+        <MaterialSymbol name="language" size={16} className="text-muted-foreground shrink-0" />
+        <span className="font-semibold">{activeOption.nativeLabel}</span>
+        <MaterialSymbol
+          name="arrow_drop_down"
+          size={18}
           className={cn(
-            "w-3 h-3 text-muted-foreground transition-transform duration-150 shrink-0",
+            "text-muted-foreground transition-transform duration-200 shrink-0",
             open && "rotate-180"
           )}
         />
@@ -97,7 +99,7 @@ export function LanguageDropdown({
       {open && (
         <div
           role="listbox"
-          className="absolute top-full end-0 mt-1.5 w-36 rounded-xl border border-border bg-popover shadow-md p-1 z-50 animate-in fade-in zoom-in-95"
+          className="absolute top-full end-0 mt-1.5 w-36 rounded-2xl border border-outline-variant/80 bg-surface-container-high shadow-lg p-1.5 z-50 animate-in fade-in zoom-in-95"
         >
           {LANGUAGES.map((lang) => {
             const isSelected = lang.code === currentLang;
@@ -109,15 +111,15 @@ export function LanguageDropdown({
                 aria-selected={isSelected}
                 onClick={() => handleSelect(lang.code)}
                 className={cn(
-                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer select-none text-start",
+                  "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer select-none text-start",
                   isSelected
-                    ? "bg-secondary text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    ? "bg-primary/10 text-primary font-bold"
+                    : "text-foreground hover:bg-surface-container-highest"
                 )}
               >
                 <span>{lang.nativeLabel}</span>
                 {isSelected && (
-                  <Check className="w-3.5 h-3.5 text-foreground shrink-0" />
+                  <MaterialSymbol name="check" size={16} className="text-primary shrink-0" />
                 )}
               </button>
             );

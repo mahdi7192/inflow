@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ShieldAlert, LogOut } from "lucide-react";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { I18N, Lang } from "@/lib/i18n";
 import { SafeUser } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -22,9 +22,9 @@ export function EmptyTenancyView({ user, lang, onLogout }: EmptyTenancyViewProps
       dir={isRtl ? "rtl" : "ltr"}
       className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center"
     >
-      <Card className="max-w-md w-full p-8 shadow-sm border border-border bg-card rounded-xl">
-        <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-4">
-          <ShieldAlert className="w-6 h-6" />
+      <Card className="max-w-md w-full p-8 shadow-xs border border-outline-variant/80 bg-surface-container-lowest rounded-3xl">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center mx-auto mb-5">
+          <MaterialSymbol name="gpp_maybe" size={32} fill />
         </div>
 
         <h2 className="text-xl font-bold text-foreground mb-2">
@@ -35,14 +35,14 @@ export function EmptyTenancyView({ user, lang, onLogout }: EmptyTenancyViewProps
           {t("noAccountsAssignedBody")}
         </p>
 
-        <div className="p-3.5 bg-secondary/40 border border-border rounded-lg mb-6 text-xs text-muted-foreground text-start">
-          <div className="flex justify-between items-center mb-1">
+        <div className="p-4 bg-surface-container-low border border-outline-variant/60 rounded-2xl mb-6 text-xs text-muted-foreground text-start space-y-2">
+          <div className="flex justify-between items-center">
             <span className="text-muted-foreground">{t("usernameLabel")}:</span>
-            <span className="font-mono text-foreground">@{user.username}</span>
+            <span className="font-mono font-bold text-foreground">@{user.username}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">{t("roleLabel")}:</span>
-            <span className="text-foreground">
+            <span className="text-foreground font-medium">
               {user.role === "superadmin" ? t("roleSuperadmin") : t("roleTenant")}
             </span>
           </div>
@@ -51,11 +51,11 @@ export function EmptyTenancyView({ user, lang, onLogout }: EmptyTenancyViewProps
         <div className="flex flex-col sm:flex-row items-center gap-3 justify-center">
           <Button
             type="button"
-            variant="secondary"
+            variant="tonal"
             onClick={onLogout}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto rounded-full gap-2 px-6"
           >
-            <LogOut className="w-4 h-4 text-muted-foreground" />
+            <MaterialSymbol name="logout" size={18} rtlMirror />
             <span>{t("logoutButton")}</span>
           </Button>
         </div>
