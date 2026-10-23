@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { DmSettingsPanel } from "@/components/dms/dm-settings-panel";
 import { cn } from "@/lib/utils";
 
 interface CapturedLeadItem {
@@ -1133,132 +1134,18 @@ export function DmAutomationView({
           TAB 3: STORY REPLIES & GENERAL DM AUTOPILOT SETTINGS (Single Surface)
          ===================================================================== */}
       {activeTab === "settings" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100">
-          {/* Row 1: Scope explainer (story replies and post-comment DMs have their own settings) */}
-          <div className="p-6 flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 text-slate-500">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">تنظیمات دایرکت مستقیم</h2>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                این تنظیمات برای پاسخ خودکار به پیام‌های دایرکت پیج است.
-              </p>
-            </div>
-          </div>
-
-          {/* Row 2: Follow gate */}
-          <div className="p-6 grid grid-cols-1 gap-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-start gap-2.5">
-                <UserCheck className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold text-slate-900">
-                    قفل فالو برای دایرکت مستقیم
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    فقط برای دایرکت مستقیم: پاسخ کامل بعد از فالو کردن پیج ارسال می‌شود. قفل فالو پست‌ها و استوری‌ها جداگانه تنظیم می‌شود.
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
-                    config.require_follow === 1
-                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {config.require_follow === 1 ? "روشن 🔒" : "آزاد"}
-                </span>
-                <Switch
-                  checked={config.require_follow === 1}
-                  onCheckedChange={(checked) =>
-                    handleSave({
-                      require_follow: checked ? 1 : 0,
-                    })
-                  }
-                  className="cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Row 3: Brand Cheat Sheet & Tone */}
-          <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <BookOpen className="w-4 h-4 text-indigo-600" />
-                <span>
-                  اطلاعات برند (در همه پاسخ‌ها استفاده می‌شود؛ تقلب‌نامه پست/استوری اولویت دارد)
-                </span>
-              </div>
-              {(cheatSheetSaved || saveSuccess) && (
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  ذخیره شد
-                </span>
-              )}
-            </div>
-
-            <textarea
-              rows={3}
-              value={brandCheatSheet}
-              onChange={(e) => setBrandCheatSheet(e.target.value)}
-              placeholder="مثال: ارسال به سراسر ایران با تیپاکس (۴۵ هزار تومان) | تحویل تهران ۲۴ ساعته | آدرس سایت: myshop.ir"
-              className="w-full rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none leading-relaxed"
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  لینک اصلی سایت یا خرید:
-                </label>
-                <input
-                  type="url"
-                  dir="ltr"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://myshop.ir"
-                  className="w-full rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-2 text-xs font-mono text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  لحن دلخواه دستیار در دایرکت (اختیاری):
-                </label>
-                <input
-                  type="text"
-                  value={config.ai_prompt_instructions || ""}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      ai_prompt_instructions: e.target.value,
-                    })
-                  }
-                  placeholder="مثال: صمیمی، کوتاه و محترمانه؛ در صورت قصد خرید شماره تماس بپرس"
-                  className="w-full rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-2 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-1">
-              <button
-                type="button"
-                onClick={async () => {
-                  await Promise.all([handleSaveBrandCheatSheet(), handleSave()]);
-                }}
-                disabled={savingCheatSheet || saving}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors cursor-pointer"
-              >
-                {savingCheatSheet || saving
-                  ? "در حال ذخیره..."
-                  : "ذخیره تنظیمات دایرکت مستقیم"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DmSettingsPanel
+          account={accountUsername}
+          config={config}
+          setConfig={setConfig}
+          onSaveConfig={handleSave}
+          websiteUrl={websiteUrl}
+          setWebsiteUrl={setWebsiteUrl}
+          brandCheatSheet={brandCheatSheet}
+          setBrandCheatSheet={setBrandCheatSheet}
+          saving={saving}
+          saveSuccess={saveSuccess}
+        />
       )}
     </div>
   );

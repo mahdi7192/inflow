@@ -209,9 +209,30 @@ export interface DMAutomationRow {
   follow_prompt_text: string;
   story_handling_mode: "auto" | "configured_only" | "ignore" | string; // account story default (Spec 021)
   app_language?: "fa" | "en" | "ar";
+  tone?: string;
+  tone_sample?: string;
+  primary_goal?: string;
+  secondary_goals?: string; // JSON array string
+  crawl_last_status?: string;
+  crawl_last_at?: string | null;
+  crawl_pages_count?: number;
   activated_at: string | null;
   updated_at: string;
   created_at: string;
+}
+
+export interface SitePageRow {
+  id: number;
+  account_username: string;
+  url: string;
+  title: string;
+  content_text: string;
+  summary: string;
+  kind: string;
+  score: number;
+  content_hash: string;
+  last_crawled_at: string;
+  http_status: number;
 }
 
 export interface StoryRow {
@@ -503,6 +524,40 @@ function migrateSchema(db: Database.Database) {
     db.exec("ALTER TABLE dm_automations ADD COLUMN app_language TEXT NOT NULL DEFAULT 'fa'");
   }
 
+  // Spec 023: tone & goal columns + agentic DM
+  const spec023Cols: Array<[string, string]> = [
+    ["tone", "TEXT NOT NULL DEFAULT 'friendly'"],
+    ["tone_sample", "TEXT NOT NULL DEFAULT ''"],
+    ["primary_goal", "TEXT NOT NULL DEFAULT ''"],
+    ["secondary_goals", "TEXT NOT NULL DEFAULT '[]'"],
+    ["crawl_last_status", "TEXT NOT NULL DEFAULT 'idle'"],
+    ["crawl_last_at", "TEXT DEFAULT NULL"],
+    ["crawl_pages_count", "INTEGER NOT NULL DEFAULT 0"],
+  ];
+  for (const [col, ddl] of spec023Cols) {
+    if (!dmCols.includes(col)) {
+      db.exec(`ALTER TABLE dm_automations ADD COLUMN ${col} ${ddl}`);
+    }
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS site_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_username TEXT NOT NULL,
+      url TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      content_text TEXT NOT NULL DEFAULT '',
+      summary TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'other',
+      score INTEGER NOT NULL DEFAULT 0,
+      content_hash TEXT NOT NULL DEFAULT '',
+      last_crawled_at TEXT NOT NULL DEFAULT (datetime('now')),
+      http_status INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(account_username, url)
+    );
+    CREATE INDEX IF NOT EXISTS idx_site_pages_acc ON site_pages(account_username, score DESC);
+  `);
+
   // Spec 021: per-story automation config. Rows are kept after expiry so logs can reference the story.
   db.exec(`
     CREATE TABLE IF NOT EXISTS stories (
@@ -735,6 +790,15 @@ function migrateSchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_captured_leads_account ON captured_leads(account_username, updated_at DESC);
   `);
+
+  // Spec 023: handoff reason + agent-collected customer info per thread
+  const threadStateCols = (db.prepare("PRAGMA table_info(dm_thread_states)").all() as { name: string }[]).map(c => c.name);
+  if (!threadStateCols.includes("paused_reason")) {
+    db.exec("ALTER TABLE dm_thread_states ADD COLUMN paused_reason TEXT NOT NULL DEFAULT ''");
+  }
+  if (!threadStateCols.includes("customer_info")) {
+    db.exec("ALTER TABLE dm_thread_states ADD COLUMN customer_info TEXT NOT NULL DEFAULT '{}'");
+  }
 
   // Check if captured_leads has the legacy 3-column unique constraint including phone_number
   try {

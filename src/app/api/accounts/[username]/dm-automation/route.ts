@@ -2,6 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeStoryDefaultMode } from "@/lib/stories";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { getDb, saveAppLanguage, DMAutomationRow } from "@/lib/db";
+import { crawlAccount } from "@/lib/crawler/crawl";
+import { normalizeSiteInput } from "@/lib/crawler/url";
+import { normalizeGoal, normalizeTone, parseSecondaryGoals, getRecommendedGoals } from "@/lib/dm-goals";
+
+function buildCrawlPayload(db: ReturnType<typeof getDb>, username: string) {
+  const acc = db
+    .prepare("SELECT website_url, account_persona FROM accounts WHERE username = ?")
+    .get(username) as { website_url?: string; account_persona?: string } | undefined;
+  const pages = db
+    .prepare("SELECT url, title, kind, score, last_crawled_at FROM site_pages WHERE account_username = ? ORDER BY score DESC, id ASC LIMIT 100")
+    .all(username);
+  return {
+    website_url: acc?.website_url || "",
+    account_persona: acc?.account_persona || "business",
+    recommended_goals: getRecommendedGoals(acc?.account_persona),
+    pages,
+  };
+}
+
+function withDefaults(automation: DMAutomationRow, persona: string) {
+  return {
+    ...automation,
+    tone: normalizeTone(automation.tone),
+    primary_goal: normalizeGoal(automation.primary_goal, persona),
+    secondary_goals: parseSecondaryGoals(automation.secondary_goals, normalizeGoal(automation.primary_goal, persona)),
+  };
+}
 
 interface RouteParams {
   params: Promise<{
@@ -58,9 +85,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         .get(cleanUsername) as DMAutomationRow;
     }
 
+    const crawl = buildCrawlPayload(db, cleanUsername);
     return NextResponse.json({
       success: true,
-      automation,
+      automation: withDefaults(automation, crawl.account_persona),
+      crawl,
     });
   } catch (error) {
     console.error("GET /api/accounts/[username]/dm-automation error:", error);
@@ -101,6 +130,20 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const body = await req.json();
+
+    if (body.action === "crawl_now") {
+      const result = await crawlAccount(cleanUsername);
+      const crawlNow = buildCrawlPayload(db, cleanUsername);
+      const auto = db.prepare("SELECT * FROM dm_automations WHERE account_username = ?").get(cleanUsername) as DMAutomationRow | undefined;
+      return NextResponse.json({
+        success: result.status !== "failed" && result.status !== "skipped",
+        result,
+        crawl: crawlNow,
+        automation: auto ? withDefaults(auto, crawlNow.account_persona) : null,
+        error: result.status === "skipped" ? "ابتدا آدرس وب‌سایت را وارد و ذخیره کنید." : result.status === "failed" ? "کرال انجام نشد؛ آدرس یا دسترسی سایت را بررسی کنید." : undefined,
+      });
+    }
+
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
 
     let current = db
@@ -156,6 +199,33 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       saveAppLanguage(app_language, cleanUsername);
     }
 
+    const personaRow = db.prepare("SELECT account_persona FROM accounts WHERE username = ?").get(cleanUsername) as { account_persona?: string } | undefined;
+    const tone = body.tone !== undefined ? normalizeTone(body.tone) : normalizeTone(current.tone);
+    const tone_sample = body.tone_sample !== undefined ? String(body.tone_sample).slice(0, 600) : current.tone_sample || "";
+    const primary_goal = body.primary_goal !== undefined ? normalizeGoal(body.primary_goal, personaRow?.account_persona) : normalizeGoal(current.primary_goal, personaRow?.account_persona);
+    const secondary_goals = JSON.stringify(
+      parseSecondaryGoals(body.secondary_goals !== undefined ? body.secondary_goals : current.secondary_goals, primary_goal)
+    );
+
+    let websiteChanged = false;
+    if (body.website_url !== undefined) {
+      const raw = String(body.website_url).trim();
+      const norm = raw ? normalizeSiteInput(raw) : null;
+      if (raw && !norm) {
+        return NextResponse.json({ success: false, error: "آدرس وب‌سایت معتبر نیست." }, { status: 400 });
+      }
+      const nextUrl = norm ? norm.origin + (norm.pathname !== "/" ? norm.pathname : "") : "";
+      const prevUrl = (db.prepare("SELECT website_url FROM accounts WHERE username = ?").get(cleanUsername) as { website_url?: string }).website_url || "";
+      if (nextUrl !== prevUrl) {
+        db.prepare("UPDATE accounts SET website_url = ? WHERE username = ?").run(nextUrl, cleanUsername);
+        if (!nextUrl) db.prepare("DELETE FROM site_pages WHERE account_username = ?").run(cleanUsername);
+        websiteChanged = true;
+      }
+    }
+    if (body.brand_cheat_sheet !== undefined) {
+      db.prepare("UPDATE accounts SET brand_cheat_sheet = ? WHERE username = ?").run(String(body.brand_cheat_sheet).slice(0, 8000), cleanUsername);
+    }
+
     let activated_at = current.activated_at;
     if (enabled === 1 && (!current.enabled || !current.activated_at)) {
       activated_at = now;
@@ -178,6 +248,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         follow_prompt_text = ?,
         story_handling_mode = ?,
         app_language = ?,
+        tone = ?,
+        tone_sample = ?,
+        primary_goal = ?,
+        secondary_goals = ?,
         activated_at = ?,
         updated_at = ?
       WHERE account_username = ?
@@ -195,18 +269,29 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       follow_prompt_text,
       story_handling_mode,
       app_language,
+      tone,
+      tone_sample,
+      primary_goal,
+      secondary_goals,
       activated_at,
       now,
       cleanUsername
     );
 
+    if (websiteChanged) {
+      // Kick a background crawl for the new site (non-blocking).
+      void crawlAccount(cleanUsername).catch(() => {});
+    }
+
     const updated = db
       .prepare("SELECT * FROM dm_automations WHERE account_username = ?")
       .get(cleanUsername) as DMAutomationRow;
 
+    const crawlOut = buildCrawlPayload(db, cleanUsername);
     return NextResponse.json({
       success: true,
-      automation: updated,
+      automation: withDefaults(updated, crawlOut.account_persona),
+      crawl: crawlOut,
       message: enabled !== current.enabled
         ? (enabled ? "اتوماسیون دایرکت فعال شد." : "اتوماسیون دایرکت متوقف شد.")
         : "تنظیمات اتوماسیون دایرکت با موفقیت ذخیره شد.",
@@ -219,3 +304,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     );
   }
 }
+
+// The settings UI historically saves with PUT; keep it as an alias of POST.
+export const PUT = POST;

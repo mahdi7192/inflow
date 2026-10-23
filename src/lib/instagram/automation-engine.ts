@@ -18,6 +18,7 @@ import {
   type InstagramButton,
   type InstagramQuickReply,
 } from "@/lib/instagram/provider";
+import { runDmAgent } from "@/lib/agent/dm-agent";
 import { getInstagramProvider } from "@/lib/instagram/social-api-provider";
 import {
   enqueueInstagramAction,
@@ -1772,6 +1773,7 @@ export async function processIncomingDm(
 
   // 8. Generate DM Reply (`direct` | `ai` with Conversation History, User Name & Panel Language)
   let replyText = "";
+  let agentLink: { url: string; title: string } | null = null;
   const effectiveReplyMode = isPostContinuation ? "ai" : dmRule?.reply_mode || "ai";
   if (effectiveReplyMode === "direct" && dmRule) {
     replyText =
@@ -1854,7 +1856,42 @@ export async function processIncomingDm(
     const contextCaption =
       dmContextParts.join("\n\n") || "گفتگوی مستقیم دایرکت اینستاگرام";
 
-    replyText = await generateContextualReplyWithAi({
+    // Spec 023: agentic loop (tools) first; fall back to the legacy single call on any failure.
+    try {
+      const siteCount = (db.prepare("SELECT COUNT(*) AS c FROM site_pages WHERE account_username = ?").get(account.username) as { c: number }).c;
+      const agentRes = await runDmAgent({
+        accountUsername: account.username,
+        accountPersona: account.account_persona,
+        accountBio: account.bio,
+        brandCheatSheet: account.brand_cheat_sheet,
+        websiteUrl: account.website_url,
+        senderUsername: identity.username,
+        senderFullName: identity.fullName,
+        senderId: identity.userId,
+        isFollowing: identity.isFollowing,
+        incomingText: event.incomingText,
+        history: conversationHistory.slice(-6).flatMap((h) => [
+          ...(h.incomingText ? [{ role: "user" as const, content: h.incomingText }] : []),
+          ...(h.replyText ? [{ role: "assistant" as const, content: JSON.stringify({ action: "reply", text: h.replyText }) }] : []),
+        ]),
+        contextCaption,
+        tone: dmRule?.tone,
+        toneSample: dmRule?.tone_sample,
+        primaryGoal: dmRule?.primary_goal,
+        secondaryGoals: dmRule?.secondary_goals,
+        extraInstructions: [recentCommentOrigin?.dm_action_text, dmRule?.ai_prompt_instructions].filter(Boolean).join("\n"),
+        hasSiteData: siteCount > 0,
+      });
+      if (agentRes?.replyText) {
+        replyText = agentRes.replyText;
+        agentLink = agentRes.link || null;
+        logBotActivity(account.username, "dm_agent", `عامل هوشمند به @${identity.username} پاسخ داد`, agentRes.steps.map((x) => x.tool).join(" → ") || "بدون ابزار", { steps: agentRes.steps.length });
+      }
+    } catch (agentErr) {
+      console.warn("[automation-engine] Agent loop failed, using legacy reply:", agentErr instanceof Error ? agentErr.message : agentErr);
+    }
+
+    if (!replyText) replyText = await generateContextualReplyWithAi({
       mode: "dm_chat",
       accountUsername: account.username,
       accountPersona: account.account_persona,
@@ -1954,7 +1991,9 @@ export async function processIncomingDm(
   `).run(replyText, nowTimestamp(), dmLogId);
 
   const dmButtons: InstagramButton[] = [];
-  if (recentCommentOrigin?.target_url && /^https?:\/\//i.test(recentCommentOrigin.target_url)) {
+  if (agentLink) {
+    dmButtons.push({ type: "url", title: agentLink.title, url: agentLink.url });
+  } else if (recentCommentOrigin?.target_url && /^https?:\/\//i.test(recentCommentOrigin.target_url)) {
     dmButtons.push({
       type: "url",
       title: resolveButtonTitle(
