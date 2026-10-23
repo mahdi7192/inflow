@@ -558,21 +558,21 @@ export function InflowDashboard({
   return (
     <div className="w-full space-y-6 pb-10">
       <div className="space-y-6">
-            {/* Studio Account Command Bar, Adaptive Persona Switcher & True ROI Funnel (Spec 018) */}
-            <div className="rounded-3xl border border-outline-variant bg-surface-container-low p-5 sm:p-6 space-y-6 shadow-xs">
+            {/* Studio Account Command Bar, Adaptive Persona Switcher & True ROI Funnel (Google Workspace Clean Style) */}
+            <div className="rounded-2xl bg-[#f8fafd] dark:bg-[#282a2d] p-5 sm:p-6 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
                   {profile?.avatar_url ? (
                     <img
                       src={profile.avatar_url}
                       alt={profile.display_name || currentAccount}
-                      className="w-13 h-13 rounded-2xl object-cover border border-outline-variant bg-surface-container shrink-0"
+                      className="w-12 h-12 rounded-2xl object-cover bg-white dark:bg-neutral-800 shrink-0 shadow-2xs"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = "none";
                       }}
                     />
                   ) : (
-                    <div className="w-13 h-13 rounded-2xl bg-surface-container-high border border-outline-variant flex items-center justify-center text-sm font-bold font-mono text-foreground shrink-0 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center text-sm font-bold font-mono text-foreground shrink-0 shadow-2xs">
                       {(currentAccount || "IN").slice(0, 2).toUpperCase()}
                     </div>
                   )}
@@ -581,7 +581,7 @@ export function InflowDashboard({
                       <h1 className="text-base font-bold text-foreground truncate">
                         {profile?.display_name || currentAccount}
                       </h1>
-                      <span className="text-xs font-mono text-muted-foreground bg-surface-container-high px-2 py-0.5 rounded-full border border-outline-variant/60">
+                      <span className="text-xs font-mono text-muted-foreground bg-white dark:bg-neutral-800 px-2 py-0.5 rounded-full">
                         <bdi>@{currentAccount}</bdi>
                       </span>
                       <span
@@ -706,13 +706,13 @@ export function InflowDashboard({
               )}
             </div>
 
-            {/* Material You 4-Stage Stat Cards */}
+            {/* Clean Workspace 4-Stage Stat Cards (No heavy borders) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Card 1: Total Views */}
-              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
+              <div className="rounded-2xl bg-[#f8fafd] dark:bg-[#282a2d] p-5 hover:bg-[#f1f4f9] dark:hover:bg-[#333538] transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface-variant">۱. {t("metricTotalViews")}</span>
-                  <div className="w-10 h-10 rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface shadow-2xs">
+                  <span className="text-xs font-bold text-[#444746] dark:text-neutral-300">۱. {t("metricTotalViews")}</span>
+                  <div className="w-10 h-10 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center text-on-surface shadow-2xs">
                     <MaterialSymbol name="visibility" size={20} fill />
                   </div>
                 </div>
@@ -721,7 +721,7 @@ export function InflowDashboard({
                     {formatNumber(liveInsights?.funnel?.views || 0)}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
+                <div className="pt-2.5 border-t border-[#e0e3e8]/60 dark:border-neutral-700/60 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricReach")}</span>
                   <span className="font-bold text-on-surface">
                     {formatNumber(liveInsights?.funnel?.reach || 0)}
@@ -730,9 +730,9 @@ export function InflowDashboard({
               </div>
 
               {/* Card 2: Comments & Replies */}
-              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
+              <div className="rounded-2xl bg-[#f8fafd] dark:bg-[#282a2d] p-5 hover:bg-[#f1f4f9] dark:hover:bg-[#333538] transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface-variant">۲. {t("metricComments")}</span>
+                  <span className="text-xs font-bold text-[#444746] dark:text-neutral-300">۲. {t("metricComments")}</span>
                   <div className="w-10 h-10 rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-2xs">
                     <MaterialSymbol name="chat_bubble" size={20} fill />
                   </div>
@@ -749,7 +749,7 @@ export function InflowDashboard({
                     )}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
+                <div className="pt-2.5 border-t border-[#e0e3e8]/60 dark:border-neutral-700/60 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricPublicReplies")}</span>
                   <span className="font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 px-2.5 py-0.5 rounded-full">
                     {formatNumber(liveInsights?.funnel?.comment_replies_sent || 0)}
@@ -758,9 +758,9 @@ export function InflowDashboard({
               </div>
 
               {/* Card 3: Smart DMs */}
-              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
+              <div className="rounded-2xl bg-[#f8fafd] dark:bg-[#282a2d] p-5 hover:bg-[#f1f4f9] dark:hover:bg-[#333538] transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface-variant">۳. {t("metricSmartDms")}</span>
+                  <span className="text-xs font-bold text-[#444746] dark:text-neutral-300">۳. {t("metricSmartDms")}</span>
                   <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs">
                     <MaterialSymbol name="send" size={20} fill />
                   </div>
@@ -770,7 +770,7 @@ export function InflowDashboard({
                     {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
+                <div className="pt-2.5 border-t border-[#e0e3e8]/60 dark:border-neutral-700/60 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricRead")}</span>
                   <span className="font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
                     <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
@@ -780,9 +780,9 @@ export function InflowDashboard({
               </div>
 
               {/* Card 4: Leads & Followers */}
-              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
+              <div className="rounded-2xl bg-[#f8fafd] dark:bg-[#282a2d] p-5 hover:bg-[#f1f4f9] dark:hover:bg-[#333538] transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface-variant">۴. {t("metricFollowersLeads")}</span>
+                  <span className="text-xs font-bold text-[#444746] dark:text-neutral-300">۴. {t("metricFollowersLeads")}</span>
                   <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs">
                     <MaterialSymbol name="person_check" size={20} fill />
                   </div>
@@ -792,7 +792,7 @@ export function InflowDashboard({
                     <bdi>+{formatNumber(liveInsights?.funnel?.follows_gained || 0)}</bdi>
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
+                <div className="pt-2.5 border-t border-[#e0e3e8]/60 dark:border-neutral-700/60 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricActivePosts")}</span>
                   <span className="font-bold text-on-surface">
                     {formatNumber(activeCount)}{" "}

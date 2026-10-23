@@ -79,11 +79,11 @@ export function SidebarNav({
   return (
     <aside
       className={cn(
-        "h-full flex flex-col bg-surface-container-low border-e border-outline-variant/30 select-none transition-all duration-300 ease-in-out shrink-0",
-        isRail ? "w-20" : "w-72"
+        "h-full flex flex-col bg-transparent select-none transition-all duration-300 ease-in-out shrink-0",
+        isRail ? "w-20" : "w-64 xl:w-72"
       )}
     >
-      {/* 1. Header: Logo & Rail Toggle */}
+      {/* 1. Header: Logo & Rail Toggle (Google Drive Clean Style) */}
       <div
         className={cn(
           "h-16 px-4 flex items-center justify-between shrink-0",
@@ -91,16 +91,16 @@ export function SidebarNav({
         )}
       >
         {!isRail ? (
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             {onToggleRail && (
               <button
                 type="button"
                 onClick={onToggleRail}
-                className="hidden lg:inline-flex p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
-                title="تغییر ابعاد سایدبار"
+                className="hidden lg:inline-flex p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                title="تغییر ابعاد منو"
                 aria-label="Toggle rail"
               >
-                <MaterialSymbol name="dock_to_right" size={22} rtlMirror />
+                <MaterialSymbol name="menu" size={22} />
               </button>
             )}
             <Link
@@ -117,11 +117,11 @@ export function SidebarNav({
               <button
                 type="button"
                 onClick={onToggleRail}
-                className="hidden lg:inline-flex p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
-                title="گسترش سایدبار"
+                className="hidden lg:inline-flex p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                title="گسترش منو"
                 aria-label="Expand sidebar"
               >
-                <MaterialSymbol name="dock_to_right" size={22} rtlMirror className="rotate-180" />
+                <MaterialSymbol name="menu" size={22} />
               </button>
             )}
           </div>
@@ -132,47 +132,80 @@ export function SidebarNav({
           <button
             type="button"
             onClick={onCloseMobileDrawer}
-            className="lg:hidden p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+            className="lg:hidden p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
             aria-label={t("closeMenu")}
           >
-            <MaterialSymbol name="close" size={20} />
+            <MaterialSymbol name="close" size={22} />
           </button>
         )}
       </div>
 
-      {/* 2. Account Switcher (Material You Card / Anchor) */}
-      <div className={cn("px-3 py-2 shrink-0", isRail ? "px-2" : "")} ref={dropdownRef}>
+      {/* 2. Google Drive Iconic "+ New" Elevated Action Button */}
+      <div className={cn("px-4 py-2 shrink-0", isRail ? "px-2 flex justify-center" : "")}>
+        {!isRail ? (
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={onSync}
+            className="w-full h-13 px-5 rounded-2xl bg-white dark:bg-[#282a2d] hover:bg-[#f8fafd] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] shadow-[0_1px_3px_0_rgba(60,64,67,0.25),0_3px_8px_2px_rgba(60,64,67,0.12)] hover:shadow-[0_2px_6px_0_rgba(60,64,67,0.25),0_6px_14px_3px_rgba(60,64,67,0.12)] transition-all flex items-center gap-3.5 text-sm font-bold cursor-pointer select-none active:scale-[0.98] disabled:opacity-60"
+          >
+            <MaterialSymbol
+              name="sync"
+              size={22}
+              className={cn("text-[#0b57d0] dark:text-[#a8c7fa] shrink-0", syncing && "animate-spin")}
+            />
+            <span className="truncate">{syncing ? t("syncing") : "همگام‌سازی پیج"}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={onSync}
+            className="w-12 h-12 rounded-2xl bg-white dark:bg-[#282a2d] hover:bg-[#f8fafd] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] shadow-[0_1px_3px_0_rgba(60,64,67,0.25),0_3px_8px_2px_rgba(60,64,67,0.12)] hover:shadow-md transition-all flex items-center justify-center cursor-pointer select-none active:scale-95 disabled:opacity-60"
+            title="همگام‌سازی پیج"
+          >
+            <MaterialSymbol
+              name="sync"
+              size={22}
+              className={cn("text-[#0b57d0] dark:text-[#a8c7fa]", syncing && "animate-spin")}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* 3. Account Switcher (Google Drive Folder Pill Style) */}
+      <div className={cn("px-3 py-1.5 shrink-0", isRail ? "px-2" : "")} ref={dropdownRef}>
         <div className="relative">
           {!isRail ? (
             <button
               type="button"
               onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="w-full flex items-center justify-between p-3 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high border border-outline-variant/40 text-start transition-all cursor-pointer shadow-xs active:scale-[0.99]"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-full hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 text-start transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs">
-                  <MaterialSymbol name="photo_camera" size={18} fill />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-2xs">
+                  <MaterialSymbol name="photo_camera" size={15} fill />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="truncate font-mono font-bold text-xs text-on-surface">
+                  <span className="truncate font-mono font-bold text-xs text-[#1f1f1f] dark:text-[#e2e2e6]">
                     <bdi>@{currentAccount || "---"}</bdi>
                   </span>
-                  <span className="text-[10px] text-on-surface-variant flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-[#444746] dark:text-neutral-400 flex items-center gap-1.5">
                     <span
                       className={cn(
-                        "w-2 h-2 rounded-full shrink-0",
+                        "w-1.5 h-1.5 rounded-full shrink-0",
                         isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
                       )}
                     />
-                    <span>{isCurrentPaused ? "اتوماسیون متوقف" : "اتوماسیون فعال"}</span>
+                    <span>{isCurrentPaused ? "متوقف" : "متصل"}</span>
                   </span>
                 </div>
               </div>
               <MaterialSymbol
-                name="expand_more"
-                size={20}
+                name="arrow_drop_down"
+                size={22}
                 className={cn(
-                  "text-on-surface-variant transition-transform duration-200 shrink-0",
+                  "text-[#444746] dark:text-neutral-400 transition-transform duration-200 shrink-0",
                   accountDropdownOpen && "rotate-180"
                 )}
               />
@@ -181,15 +214,15 @@ export function SidebarNav({
             <button
               type="button"
               onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="w-12 h-12 mx-auto flex items-center justify-center rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high border border-outline-variant/40 transition-all cursor-pointer relative shadow-xs"
+              className="w-10 h-10 mx-auto flex items-center justify-center rounded-full hover:bg-[#e9eef6] dark:hover:bg-neutral-800 transition-colors cursor-pointer relative"
               title={`@${currentAccount}`}
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-2xs">
-                <MaterialSymbol name="photo_camera" size={17} fill />
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white">
+                <MaterialSymbol name="photo_camera" size={15} fill />
               </div>
               <span
                 className={cn(
-                  "absolute bottom-1 end-1 w-2.5 h-2.5 rounded-full ring-2 ring-surface-container-lowest",
+                  "absolute bottom-0 end-0 w-2 h-2 rounded-full ring-2 ring-white dark:ring-neutral-900",
                   isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
                 )}
               />
@@ -200,13 +233,13 @@ export function SidebarNav({
           {accountDropdownOpen && (
             <div
               className={cn(
-                "absolute top-full mt-2 rounded-[24px] border border-outline-variant/50 bg-surface-container-lowest shadow-xl p-2 z-50 animate-in fade-in zoom-in-95",
-                isRail ? "start-14 w-64" : "start-0 w-full"
+                "absolute top-full mt-1.5 rounded-2xl bg-white dark:bg-[#1e1f20] shadow-[0_4px_16px_rgba(0,0,0,0.14)] border border-[#e0e3e8]/70 dark:border-neutral-800 p-2 z-50 animate-in fade-in zoom-in-95",
+                isRail ? "start-12 w-64" : "start-0 w-full"
               )}
             >
-              <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center justify-between">
+              <div className="px-3 py-1.5 text-[11px] font-bold text-[#444746] dark:text-neutral-400 uppercase tracking-wider flex items-center justify-between">
                 <span>پیج‌های متصل</span>
-                <span className="text-[10px] tabular-nums bg-surface-container px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] tabular-nums bg-[#e9eef6] dark:bg-neutral-800 px-2 py-0.5 rounded-full font-bold">
                   {accounts.length}
                 </span>
               </div>
@@ -219,10 +252,10 @@ export function SidebarNav({
                       type="button"
                       onClick={() => handleSelectAccount(acc.username)}
                       className={cn(
-                        "w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs transition-all cursor-pointer text-start",
+                        "w-full flex items-center justify-between px-3 py-2 rounded-full text-xs transition-colors cursor-pointer text-start",
                         isSelected
-                          ? "bg-secondary-container text-on-secondary-container font-bold"
-                          : "text-on-surface hover:bg-surface-container-high"
+                          ? "bg-[#c2e7ff] text-[#001d35] font-bold dark:bg-[#004a77] dark:text-[#c2e7ff]"
+                          : "text-[#1f1f1f] dark:text-neutral-200 hover:bg-[#e9eef6] dark:hover:bg-neutral-800"
                       )}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -235,21 +268,21 @@ export function SidebarNav({
                         <span className="truncate font-mono"><bdi>@{acc.username}</bdi></span>
                       </div>
                       {isSelected && (
-                        <MaterialSymbol name="check" size={18} className="text-secondary shrink-0" />
+                        <MaterialSymbol name="check" size={18} className="text-[#001d35] dark:text-[#c2e7ff] shrink-0" />
                       )}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="h-px bg-outline-variant/30 my-1.5" />
+              <div className="h-px bg-[#e0e3e8]/70 dark:bg-neutral-800 my-1.5" />
 
               <Link
                 href="/"
                 onClick={() => setAccountDropdownOpen(false)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-xs text-[#1f1f1f] dark:text-neutral-200 hover:bg-[#e9eef6] dark:hover:bg-neutral-800 transition-colors cursor-pointer"
               >
-                <MaterialSymbol name="grid_view" size={18} className="text-on-surface-variant" />
+                <MaterialSymbol name="grid_view" size={18} className="text-[#444746] dark:text-neutral-400" />
                 <span>همه پیج‌ها</span>
               </Link>
 
@@ -260,25 +293,25 @@ export function SidebarNav({
                     setAccountDropdownOpen(false);
                     onOpenAddAccount();
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-primary font-bold hover:bg-primary-container/40 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-xs text-[#0b57d0] dark:text-[#a8c7fa] font-bold hover:bg-[#c2e7ff]/40 transition-colors cursor-pointer"
                 >
-                  <MaterialSymbol name="add_circle" size={18} className="text-primary" />
+                  <MaterialSymbol name="add" size={18} />
                   <span>{t("addAccount")}</span>
                 </button>
               )}
 
               {currentAccount && onOpenDeleteAccount && (
                 <>
-                  <div className="h-px bg-outline-variant/30 my-1.5" />
+                  <div className="h-px bg-[#e0e3e8]/70 dark:bg-neutral-800 my-1.5" />
                   <button
                     type="button"
                     onClick={() => {
                       setAccountDropdownOpen(false);
                       onOpenDeleteAccount();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-start font-medium"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-start font-medium"
                   >
-                    <MaterialSymbol name="delete" size={18} className="text-destructive" />
+                    <MaterialSymbol name="delete" size={18} />
                     <span>حذف حساب از سامانه</span>
                   </button>
                 </>
@@ -288,14 +321,8 @@ export function SidebarNav({
         </div>
       </div>
 
-      {/* 3. Primary Navigation Destination Items (M3 Active Indicator Pill) */}
-      <div className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto">
-        {!isRail && (
-          <div className="px-3 pt-2 pb-1 text-[11px] font-bold text-on-surface-variant/80 uppercase tracking-wider">
-            اتوماسیون تعاملات
-          </div>
-        )}
-
+      {/* 4. Google Drive Navigation Links (Rounded-full Horizontal Pills) */}
+      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto" aria-label="سایدبار اصلی">
         {/* Comments Destination */}
         {!isRail ? (
           <Link
@@ -305,20 +332,18 @@ export function SidebarNav({
               if (onCloseMobileDrawer) onCloseMobileDrawer();
             }}
             className={cn(
-              "w-full flex items-center gap-3.5 px-4 py-3 rounded-full text-xs transition-all cursor-pointer text-start group relative",
+              "w-full h-11 px-4 rounded-full flex items-center gap-3.5 text-xs transition-colors cursor-pointer text-start",
               activePlugin === "comments"
-                ? "bg-secondary-container text-on-secondary-container font-bold shadow-xs"
-                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                ? "bg-[#c2e7ff] text-[#001d35] font-bold dark:bg-[#004a77] dark:text-[#c2e7ff]"
+                : "text-[#444746] dark:text-neutral-300 hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 font-medium"
             )}
           >
-            <div
-              className={cn(
-                "w-6 h-6 flex items-center justify-center rounded-full transition-transform group-hover:scale-105 shrink-0",
-                activePlugin === "comments" ? "text-secondary" : "text-on-surface-variant"
-              )}
-            >
-              <MaterialSymbol name="forum" size={20} fill={activePlugin === "comments"} />
-            </div>
+            <MaterialSymbol
+              name="forum"
+              size={20}
+              fill={activePlugin === "comments"}
+              className={activePlugin === "comments" ? "text-[#001d35] dark:text-[#c2e7ff]" : "text-[#444746] dark:text-neutral-400"}
+            />
             <span className="flex-1 truncate">{t("navComments")}</span>
           </Link>
         ) : (
@@ -333,20 +358,15 @@ export function SidebarNav({
           >
             <div
               className={cn(
-                "w-14 h-8 rounded-full flex items-center justify-center transition-all",
+                "w-12 h-8 rounded-full flex items-center justify-center transition-colors",
                 activePlugin === "comments"
-                  ? "bg-secondary-container text-on-secondary-container"
-                  : "text-on-surface-variant group-hover:bg-surface-container-high"
+                  ? "bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff]"
+                  : "text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800"
               )}
             >
               <MaterialSymbol name="forum" size={20} fill={activePlugin === "comments"} />
             </div>
-            <span
-              className={cn(
-                "text-[10px] mt-1 transition-colors truncate max-w-full px-1",
-                activePlugin === "comments" ? "font-bold text-secondary" : "text-on-surface-variant"
-              )}
-            >
+            <span className="text-[10px] mt-1 transition-colors truncate max-w-full px-1">
               کامنت‌ها
             </span>
           </Link>
@@ -360,20 +380,18 @@ export function SidebarNav({
               if (onCloseMobileDrawer) onCloseMobileDrawer();
             }}
             className={cn(
-              "w-full flex items-center gap-3.5 px-4 py-3 rounded-full text-xs transition-all cursor-pointer text-start group relative",
+              "w-full h-11 px-4 rounded-full flex items-center gap-3.5 text-xs transition-colors cursor-pointer text-start",
               activePlugin === "dms"
-                ? "bg-secondary-container text-on-secondary-container font-bold shadow-xs"
-                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                ? "bg-[#c2e7ff] text-[#001d35] font-bold dark:bg-[#004a77] dark:text-[#c2e7ff]"
+                : "text-[#444746] dark:text-neutral-300 hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 font-medium"
             )}
           >
-            <div
-              className={cn(
-                "w-6 h-6 flex items-center justify-center rounded-full transition-transform group-hover:scale-105 shrink-0",
-                activePlugin === "dms" ? "text-secondary" : "text-on-surface-variant"
-              )}
-            >
-              <MaterialSymbol name="chat_bubble" size={20} fill={activePlugin === "dms"} />
-            </div>
+            <MaterialSymbol
+              name="chat_bubble"
+              size={20}
+              fill={activePlugin === "dms"}
+              className={activePlugin === "dms" ? "text-[#001d35] dark:text-[#c2e7ff]" : "text-[#444746] dark:text-neutral-400"}
+            />
             <span className="flex-1 truncate">{t("navDms")}</span>
           </Link>
         ) : (
@@ -387,20 +405,15 @@ export function SidebarNav({
           >
             <div
               className={cn(
-                "w-14 h-8 rounded-full flex items-center justify-center transition-all",
+                "w-12 h-8 rounded-full flex items-center justify-center transition-colors",
                 activePlugin === "dms"
-                  ? "bg-secondary-container text-on-secondary-container"
-                  : "text-on-surface-variant group-hover:bg-surface-container-high"
+                  ? "bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff]"
+                  : "text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800"
               )}
             >
               <MaterialSymbol name="chat_bubble" size={20} fill={activePlugin === "dms"} />
             </div>
-            <span
-              className={cn(
-                "text-[10px] mt-1 transition-colors truncate max-w-full px-1",
-                activePlugin === "dms" ? "font-bold text-secondary" : "text-on-surface-variant"
-              )}
-            >
+            <span className="text-[10px] mt-1 transition-colors truncate max-w-full px-1">
               دایرکت
             </span>
           </Link>
@@ -409,18 +422,16 @@ export function SidebarNav({
         {/* Superadmin Backoffice */}
         {currentUser?.role === "superadmin" && (
           <>
-            <div className="h-px bg-outline-variant/30 my-2 mx-2" />
+            <div className="h-px bg-[#e0e3e8]/70 dark:bg-neutral-800 my-2 mx-2" />
             {!isRail ? (
               <Link
                 href="/backoffice"
                 onClick={() => {
                   if (onCloseMobileDrawer) onCloseMobileDrawer();
                 }}
-                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-full text-xs font-medium text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-start group"
+                className="w-full h-11 px-4 rounded-full flex items-center gap-3.5 text-xs text-[#444746] dark:text-neutral-300 hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 transition-colors text-start"
               >
-                <div className="w-6 h-6 flex items-center justify-center text-on-surface-variant group-hover:text-on-surface shrink-0">
-                  <MaterialSymbol name="admin_panel_settings" size={20} />
-                </div>
+                <MaterialSymbol name="admin_panel_settings" size={20} className="text-[#444746] dark:text-neutral-400" />
                 <span className="flex-1 truncate">{t("navBackoffice")}</span>
               </Link>
             ) : (
@@ -432,70 +443,37 @@ export function SidebarNav({
                 title={t("navBackoffice")}
                 className="flex flex-col items-center py-2 text-center group cursor-pointer"
               >
-                <div className="w-14 h-8 rounded-full flex items-center justify-center text-on-surface-variant group-hover:bg-surface-container-high transition-all">
+                <div className="w-12 h-8 rounded-full flex items-center justify-center text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800">
                   <MaterialSymbol name="admin_panel_settings" size={20} />
                 </div>
-                <span className="text-[10px] mt-1 text-on-surface-variant transition-colors truncate max-w-full px-1">
+                <span className="text-[10px] mt-1 transition-colors truncate max-w-full px-1">
                   مدیریت
                 </span>
               </Link>
             )}
           </>
         )}
-      </div>
+      </nav>
 
-      {/* 4. Action FAB / Sync Control */}
-      <div className={cn("px-3 py-3 shrink-0", isRail ? "px-2" : "")}>
-        {!isRail ? (
-          <button
-            type="button"
-            disabled={syncing}
-            onClick={onSync}
-            className="w-full flex items-center justify-center gap-2.5 h-11 px-4 rounded-full bg-primary text-on-primary hover:opacity-95 active:scale-[0.98] transition-all cursor-pointer font-bold text-xs shadow-sm disabled:opacity-50"
-          >
-            <MaterialSymbol
-              name="sync"
-              size={18}
-              className={cn(syncing && "animate-spin")}
-            />
-            <span>{syncing ? t("syncing") : t("navSync")}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={syncing}
-            onClick={onSync}
-            className="w-12 h-12 mx-auto flex items-center justify-center rounded-2xl bg-primary text-on-primary hover:opacity-95 transition-all cursor-pointer shadow-sm disabled:opacity-50"
-            title={t("navSync")}
-          >
-            <MaterialSymbol
-              name="sync"
-              size={20}
-              className={cn(syncing && "animate-spin")}
-            />
-          </button>
-        )}
-      </div>
-
-      {/* 5. User Profile Footer */}
+      {/* 5. Clean User Profile Footer (No harsh borders) */}
       {currentUser && (
         <div
           className={cn(
-            "p-3 border-t border-outline-variant/30 shrink-0 bg-surface-container/50",
+            "p-3 shrink-0",
             isRail ? "p-2 flex flex-col items-center" : ""
           )}
         >
           {!isRail ? (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-full hover:bg-[#e9eef6]/50 dark:hover:bg-neutral-800/50 transition-colors">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-outline-variant/40">
+                <div className="w-8 h-8 rounded-full bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff] flex items-center justify-center font-bold text-xs shrink-0 uppercase">
                   {(currentUser.display_name || currentUser.username).slice(0, 1)}
                 </div>
                 <div className="flex flex-col min-w-0 text-start leading-tight">
-                  <span className="text-xs font-bold text-on-surface truncate">
+                  <span className="text-xs font-bold text-[#1f1f1f] dark:text-[#e2e2e6] truncate">
                     {currentUser.display_name || currentUser.username}
                   </span>
-                  <span className="text-[10px] text-on-surface-variant truncate">
+                  <span className="text-[10px] text-[#444746] dark:text-neutral-400 truncate">
                     {currentUser.role === "superadmin"
                       ? t("roleSuperadmin")
                       : t("roleTenant")}
@@ -507,7 +485,7 @@ export function SidebarNav({
                 type="button"
                 onClick={onLogout}
                 title={t("logoutButton")}
-                className="p-2 rounded-full text-on-surface-variant hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+                className="p-1.5 rounded-full text-[#444746] hover:text-rose-600 hover:bg-rose-50 dark:text-neutral-400 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0"
               >
                 <MaterialSymbol name="logout" size={18} rtlMirror />
               </button>
@@ -517,7 +495,7 @@ export function SidebarNav({
               type="button"
               onClick={onLogout}
               title={t("logoutButton")}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[#444746] hover:text-rose-600 hover:bg-rose-50 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
             >
               <MaterialSymbol name="logout" size={20} rtlMirror />
             </button>
