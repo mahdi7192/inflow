@@ -83,75 +83,43 @@ export function SidebarNav({
         isRail ? "w-20" : "w-64 xl:w-72"
       )}
     >
-      {/* 1. Header: Logo & Rail Toggle (Google Drive Clean Style) */}
-      <div
-        className={cn(
-          "h-16 px-4 flex items-center justify-between shrink-0",
-          isRail ? "justify-center px-2" : ""
-        )}
-      >
-        {!isRail ? (
-          <div className="flex items-center gap-2 min-w-0">
-            {onToggleRail && (
-              <button
-                type="button"
-                onClick={onToggleRail}
-                className="hidden lg:inline-flex p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                title="تغییر ابعاد منو"
-                aria-label="Toggle rail"
-              >
-                <MaterialSymbol name="menu" size={22} />
-              </button>
-            )}
-            <Link
-              href="/"
-              className="flex items-center gap-2 hover:opacity-90 transition-opacity"
-              title="مرکز پیج‌ها"
-            >
-              <BrandLogo size="default" />
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center">
-            {onToggleRail && (
-              <button
-                type="button"
-                onClick={onToggleRail}
-                className="hidden lg:inline-flex p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                title="گسترش منو"
-                aria-label="Expand sidebar"
-              >
-                <MaterialSymbol name="menu" size={22} />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Mobile Close Button */}
-        {onCloseMobileDrawer && (
+      {/* Mobile Drawer Header (Only visible inside mobile drawer) */}
+      {onCloseMobileDrawer && (
+        <div className="h-16 px-4 flex items-center justify-between shrink-0 border-b border-neutral-200/50 dark:border-neutral-800">
+          <Link
+            href="/"
+            onClick={onCloseMobileDrawer}
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+            title="مرکز پیج‌ها"
+          >
+            <BrandLogo size="default" />
+            <span className="font-bold text-lg tracking-tight text-[#1f1f1f] dark:text-[#e2e2e6]">
+              in<span className="text-[#0b57d0] dark:text-[#a8c7fa]">Flow</span>
+            </span>
+          </Link>
           <button
             type="button"
             onClick={onCloseMobileDrawer}
-            className="lg:hidden p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
             aria-label={t("closeMenu")}
           >
             <MaterialSymbol name="close" size={22} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 2. Google Drive Iconic "+ New" Elevated Action Button */}
-      <div className={cn("px-4 py-2 shrink-0", isRail ? "px-2 flex justify-center" : "")}>
+      <div className={cn("px-4 py-2 shrink-0", isRail ? "px-2 flex justify-center" : "", !onCloseMobileDrawer ? "pt-1" : "")}>
         {!isRail ? (
           <button
             type="button"
             disabled={syncing}
             onClick={onSync}
-            className="w-full h-13 px-5 rounded-2xl bg-white dark:bg-[#282a2d] hover:bg-[#f8fafd] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] shadow-[0_1px_3px_0_rgba(60,64,67,0.25),0_3px_8px_2px_rgba(60,64,67,0.12)] hover:shadow-[0_2px_6px_0_rgba(60,64,67,0.25),0_6px_14px_3px_rgba(60,64,67,0.12)] transition-all flex items-center gap-3.5 text-sm font-bold cursor-pointer select-none active:scale-[0.98] disabled:opacity-60"
+            className="w-full h-12 px-4 rounded-xl bg-white dark:bg-[#282a2d] hover:bg-[#edf2fa] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] border border-neutral-200/70 dark:border-neutral-700/60 shadow-[0_1px_3px_0_rgba(60,64,67,0.08)] hover:shadow-[0_2px_6px_0_rgba(60,64,67,0.12)] transition-all flex items-center gap-3 text-xs font-bold cursor-pointer select-none active:scale-[0.98] disabled:opacity-60"
           >
             <MaterialSymbol
               name="sync"
-              size={22}
+              size={20}
               className={cn("text-[#0b57d0] dark:text-[#a8c7fa] shrink-0", syncing && "animate-spin")}
             />
             <span className="truncate">{syncing ? t("syncing") : "همگام‌سازی پیج"}</span>
@@ -161,12 +129,12 @@ export function SidebarNav({
             type="button"
             disabled={syncing}
             onClick={onSync}
-            className="w-12 h-12 rounded-2xl bg-white dark:bg-[#282a2d] hover:bg-[#f8fafd] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] shadow-[0_1px_3px_0_rgba(60,64,67,0.25),0_3px_8px_2px_rgba(60,64,67,0.12)] hover:shadow-md transition-all flex items-center justify-center cursor-pointer select-none active:scale-95 disabled:opacity-60"
+            className="w-11 h-11 rounded-xl bg-white dark:bg-[#282a2d] hover:bg-[#edf2fa] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] border border-neutral-200/70 dark:border-neutral-700/60 shadow-[0_1px_3px_0_rgba(60,64,67,0.08)] hover:shadow-md transition-all flex items-center justify-center cursor-pointer select-none active:scale-95 disabled:opacity-60"
             title="همگام‌سازی پیج"
           >
             <MaterialSymbol
               name="sync"
-              size={22}
+              size={20}
               className={cn("text-[#0b57d0] dark:text-[#a8c7fa]", syncing && "animate-spin")}
             />
           </button>

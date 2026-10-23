@@ -71,6 +71,7 @@
   /* Primary Tonal Palette */
   --color-primary: var(--primary);
   --color-on-primary: var(--primary-foreground);
+  --color-primary-foreground: var(--primary-foreground);
   --color-primary-container: var(--primary-container);
   --color-on-primary-container: var(--on-primary-container);
 
@@ -89,10 +90,15 @@
   --color-input: var(--outline-variant);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-muted: var(--surface-container-high);
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-accent: var(--secondary-container);
+  --color-accent-foreground: var(--on-secondary-container);
 
   /* M3 Radii */
   --radius-xs: 4px;
@@ -209,12 +215,9 @@
   }
   html,
   body {
-    height: 100%;
-    height: 100dvh;
+    min-height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
   }
   html,

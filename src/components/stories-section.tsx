@@ -86,36 +86,39 @@ export function StoriesSection({ accountUsername }: { accountUsername: string })
   if (!loading && activeStories.length === 0 && mode === "auto" && stories.length === 0) return null;
 
   return (
-    <section className="space-y-3.5 rounded-3xl border border-outline-variant/70 bg-surface-container-low p-4 sm:p-5 shadow-2xs">
+    <section className="space-y-3.5 rounded-2xl bg-[#f8fafd] dark:bg-[#282a2d] p-4 sm:p-5 transition-all">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-2">
           <MaterialSymbol name="local_fire_department" size={20} fill={true} className="text-rose-500" />
           <span>استوری‌های فعال (۲۴ ساعت اخیر)</span>
-          <span className="text-[11px] font-normal text-muted-foreground px-2 py-0.5 rounded-full bg-surface-container-highest">
+          <span className="text-[11px] font-normal text-muted-foreground px-2.5 py-0.5 rounded-full bg-white dark:bg-neutral-800 shadow-2xs">
             {activeStories.length.toLocaleString("fa-IR")} استوری
           </span>
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-[11px] text-muted-foreground">پیش‌فرض ریپلای استوری:</label>
-          <select
-            value={mode}
-            onChange={(e) => changeMode(e.target.value as DefaultMode)}
-            title={MODES.find((m) => m.id === mode)?.hint}
-            className="rounded-full border border-outline-variant/80 bg-surface-container-lowest px-3 py-1 text-xs text-foreground focus:outline-none focus:border-primary cursor-pointer"
-          >
-            {MODES.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => load(true)}
-            className="p-1.5 rounded-full text-muted-foreground hover:bg-surface-container-high hover:text-foreground transition-colors cursor-pointer"
-            aria-label="بروزرسانی"
-          >
-            <MaterialSymbol name="refresh" size={18} className={loading ? "animate-spin" : ""} />
-          </button>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-[#444746] dark:text-neutral-400">پیش‌فرض ریپلای استوری:</label>
+          <div className="inline-flex items-center gap-1.5">
+            <select
+              value={mode}
+              onChange={(e) => changeMode(e.target.value as DefaultMode)}
+              title={MODES.find((m) => m.id === mode)?.hint}
+              className="h-8 rounded-full border border-neutral-200/80 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-xs text-[#1f1f1f] dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-[#0b57d0] cursor-pointer"
+            >
+              {MODES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => load(true)}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-[#444746] hover:bg-[#edf2fa] dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer shrink-0"
+              aria-label="بروزرسانی"
+            >
+              <MaterialSymbol name="refresh" size={18} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
       </div>
 

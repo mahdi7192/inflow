@@ -134,7 +134,9 @@ export function InflowDashboard({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Filters & Views
-  const [searchQuery, setSearchQuery] = useState("");
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const searchQuery = workspace?.searchQuery !== undefined ? workspace.searchQuery : localSearchQuery;
+  const setSearchQuery = workspace?.setSearchQuery || setLocalSearchQuery;
   const [filterTab, setFilterTab] = useState<
     "all" | "active" | "inactive" | "reels" | "posts"
   >("all");
@@ -772,9 +774,9 @@ export function InflowDashboard({
                 </div>
                 <div className="pt-2.5 border-t border-[#e0e3e8]/60 dark:border-neutral-700/60 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricRead")}</span>
-                  <span className="font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                  <span className="font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0">
+                    <MaterialSymbol name="done_all" size={15} className="text-primary shrink-0" />
                     <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
-                    <MaterialSymbol name="done_all" size={14} className="text-primary shrink-0" />
                   </span>
                 </div>
               </div>
@@ -835,8 +837,8 @@ export function InflowDashboard({
               </div>
 
               {/* View Mode & Filter Tabs (M3 Filter Chips & Segmented Buttons) */}
-              <div className="flex items-center gap-2 shrink-0 justify-between lg:justify-end">
-                <div className="flex items-center gap-1 bg-surface-container-high p-1 rounded-full border border-outline-variant/60">
+              <div className="flex items-center gap-2 shrink-0 justify-between lg:justify-end overflow-x-auto max-w-full no-scrollbar">
+                <div className="flex items-center gap-1 bg-surface-container-high p-1 rounded-full border border-outline-variant/60 shrink-0">
                   {(["all", "active", "inactive", "reels", "posts"] as const).map((tabKey) => {
                     const isSelected = filterTab === tabKey;
                     const labels: Record<string, string> = {

@@ -30,7 +30,7 @@ export default function RootLayout({
     <html
       lang="fa"
       dir="rtl"
-      className={`${geistSans.variable} ${geistMono.variable} h-full h-[100dvh] overflow-hidden antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} min-h-full antialiased`}
     >
       <head>
         <link
@@ -48,7 +48,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="h-full h-[100dvh] max-h-[100dvh] w-full overflow-hidden flex flex-col bg-background text-foreground antialiased selection:bg-primary-container selection:text-on-primary-container">
+      <body className="min-h-full w-full flex flex-col bg-background text-foreground antialiased selection:bg-primary-container selection:text-on-primary-container">
         {children}
       </body>
     </html>

@@ -13,6 +13,7 @@ import { Toaster, toast } from "@/components/ui/sonner";
 import { DeleteAccountModal } from "@/components/modals/delete-account-modal";
 import { WorkspaceProvider, useRequiredWorkspace } from "./workspace-context";
 import { MaterialSymbol } from "@/components/ui/material-symbol";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import type { AccountRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 
@@ -37,6 +38,10 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
     setLang,
     t,
     updateAccountStatus,
+    searchQuery,
+    setSearchQuery,
+    theme,
+    toggleTheme,
     isDirty,
     setPendingNavigation,
   } = useRequiredWorkspace();
@@ -45,6 +50,22 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
   const [isRail, setIsRail] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Global shortcut for Search (⌘K / Ctrl+K)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === "Escape" && mobileDrawerOpen) {
+        setMobileDrawerOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileDrawerOpen]);
 
   // Read rail preference from localStorage
   useEffect(() => {
@@ -201,68 +222,85 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex flex-col h-[100dvh] max-h-[100dvh] w-full bg-[#f8fafd] dark:bg-[#131314] text-[#1f1f1f] dark:text-[#e2e2e6] overflow-hidden antialiased select-none"
+      className="flex flex-col h-[100dvh] max-h-[100dvh] w-full bg-[#f8fafd] dark:bg-[#131314] text-[#1f1f1f] dark:text-[#e2e2e6] overflow-hidden antialiased"
       dir={dir}
     >
-      {/* 1. Google Drive Unified Top App Bar (No bottom border, Pill Search, Rounded Chips) */}
-      <header className="h-16 shrink-0 px-4 sm:px-6 flex items-center justify-between gap-4 z-30 select-none">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* 1. Google Drive Unified Top App Bar */}
+      <header className="h-16 shrink-0 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 z-30">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
           <button
             type="button"
-            onClick={() => setMobileDrawerOpen(true)}
-            className="lg:hidden p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                toggleRail();
+              } else {
+                setMobileDrawerOpen(true);
+              }
+            }}
+            className="p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
             aria-label={t("openMenu")}
           >
             <MaterialSymbol name="menu" size={24} />
           </button>
 
-          {/* Breadcrumb Context Pill */}
-          <nav className="flex items-center gap-2 text-xs truncate" aria-label="Breadcrumb">
-            <Link
-              href="/"
-              className="text-[#444746] hover:text-[#1f1f1f] dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors font-medium truncate"
-            >
-              {t("allAccounts")}
-            </Link>
-            <MaterialSymbol name="chevron_left" size={16} className="text-[#74777f] dark:text-neutral-500 shrink-0" />
-            <span className="font-mono font-bold text-[#1f1f1f] dark:text-[#e2e2e6] bg-[#e9eef6] dark:bg-neutral-800 px-3 py-1 rounded-full text-xs">
-              <bdi>@{account}</bdi>
+          <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+            <BrandLogo size="default" showText={false} />
+            <span className="font-bold text-lg tracking-tight text-[#1f1f1f] dark:text-[#e2e2e6]">
+              in<span className="text-[#0b57d0] dark:text-[#a8c7fa]">Flow</span>
             </span>
-            <MaterialSymbol name="chevron_left" size={16} className="text-[#74777f] dark:text-neutral-500 shrink-0" />
-            <span className="text-[#444746] dark:text-neutral-400 font-medium truncate">
-              {activePlugin === "dms" ? t("navDms") : t("navComments")}
-            </span>
-          </nav>
+          </Link>
         </div>
 
         {/* Google Drive Central Search Bar (Pill shaped, soft gray background, seamless focus) */}
-        <div className="hidden md:flex items-center flex-1 max-w-2xl mx-4">
-          <div className="w-full h-12 px-4 rounded-full bg-[#edf2fa] dark:bg-[#282a2d] hover:bg-[#e9eef6] dark:hover:bg-[#333538] focus-within:bg-white dark:focus-within:bg-[#1e1f20] focus-within:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-all flex items-center gap-3 text-xs">
-            <MaterialSymbol name="search" size={22} className="text-[#444746] dark:text-neutral-400 shrink-0" />
+        <div className="flex items-center flex-1 max-w-xl mx-2 sm:mx-4">
+          <div className="w-full h-10 sm:h-11 px-4 rounded-full bg-[#edf2fa] dark:bg-[#282a2d] hover:bg-[#e9eef6] dark:hover:bg-[#333538] focus-within:bg-white dark:focus-within:bg-[#1e1f20] focus-within:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-all flex items-center gap-3 text-xs">
+            <MaterialSymbol name="search" size={20} className="text-[#444746] dark:text-neutral-400 shrink-0" />
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="جستجو در سناریوها، کلمات کلیدی، نام پست‌ها یا دایرکت..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="جستجو در سناریوها، کلمات کلیدی، نام پست‌ها..."
               className="w-full bg-transparent border-none outline-none text-[#1f1f1f] dark:text-white placeholder:text-[#444746]/70 dark:placeholder:text-neutral-400 text-xs font-sans"
             />
-            <span dir="ltr" className="text-[11px] font-mono text-[#74777f] px-2 py-0.5 rounded-md bg-[#e0e3e8]/50 dark:bg-neutral-800 shrink-0">
-              ⌘K
-            </span>
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="p-1 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer shrink-0"
+              >
+                <MaterialSymbol name="close" size={16} />
+              </button>
+            ) : (
+              <span dir="ltr" className="hidden sm:inline text-[11px] font-mono text-[#74777f] px-2 py-0.5 rounded-md bg-[#e0e3e8]/50 dark:bg-neutral-800 shrink-0">
+                ⌘K
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Top Actions & Status Pill */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Top Actions: Theme Switcher, Status Pill, Language */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-[#edf2fa] dark:bg-neutral-800 text-[#444746] hover:bg-[#e3e8f0] dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer shrink-0"
+            title={theme === "dark" ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
+          >
+            <MaterialSymbol name={theme === "dark" ? "light_mode" : "dark_mode"} size={18} />
+          </button>
+
           <button
             type="button"
             onClick={() => setUnifiedModalOpen(true)}
             className={cn(
-              "inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-xs font-bold transition-all cursor-pointer select-none active:scale-[0.98]",
+              "inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-[0.98]",
               sessionStatus !== "active"
                 ? "bg-rose-100 text-rose-900 hover:bg-rose-200"
                 : profile?.status === "paused"
                 ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
                 : !dmAutomationEnabled
-                ? "bg-teal-100 text-teal-900 hover:bg-teal-200"
+                ? "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300"
                 : "bg-[#edf2fa] dark:bg-neutral-800 text-[#1f1f1f] dark:text-[#e2e2e6] hover:bg-[#e3e8f0]"
             )}
             title="مشاهده وضعیت پیج، نشست اینستاگرام و تفکیک ماژول‌ها"
@@ -279,7 +317,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
               </>
             ) : !dmAutomationEnabled ? (
               <>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-neutral-400 shrink-0" />
                 <span className="hidden sm:inline">دایرکت آفلاین</span>
                 <MaterialSymbol name="tune" size={16} className="text-[#444746] dark:text-neutral-400 shrink-0" />
               </>
@@ -356,7 +394,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         )}
 
         {/* 3. Google Drive Iconic Floating White Main Container (rounded-[24px] floating pane on all 4 sides) */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 sm:m-3 lg:m-4 mt-0 sm:mt-1 rounded-[20px] sm:rounded-[24px] bg-white dark:bg-[#1e1f20] shadow-[0_1px_3px_0_rgba(60,64,67,0.1),0_1px_2px_0_rgba(60,64,67,0.06)] dark:shadow-none transition-all">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 sm:m-3 lg:m-4 mb-18 sm:mb-3 lg:mb-4 mt-0 sm:mt-1 rounded-[20px] sm:rounded-[24px] bg-white dark:bg-[#1e1f20] shadow-[0_1px_3px_0_rgba(60,64,67,0.1),0_1px_2px_0_rgba(60,64,67,0.06)] dark:shadow-none transition-all">
           {/* Banner if session requires re-login */}
           {sessionStatus === "reauth_required" && (
             <SessionExpiryBanner
@@ -366,7 +404,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           )}
 
           {/* Inner Scrollable Workspace Canvas */}
-          <main className="flex-1 overflow-y-auto overscroll-contain min-w-0 p-4 sm:p-6 lg:p-7 pb-20 sm:pb-6">
+          <main className="flex-1 overflow-y-auto overscroll-contain min-w-0 p-4 sm:p-6 lg:p-7 pb-8 sm:pb-6">
             <div className="w-full max-w-[1500px] mx-auto space-y-6">
               {profile?.status === "paused" && (
                 <div className="rounded-2xl border border-amber-300/60 bg-amber-50/90 dark:bg-amber-950/40 p-4 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">

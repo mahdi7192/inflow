@@ -22,6 +22,14 @@ export interface WorkspaceContextType {
   // Tenancy & Account Status
   updateAccountStatus: (status: "active" | "paused") => Promise<boolean>;
 
+  // Search state across workspace
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+
+  // Theme state
+  theme: "light" | "dark";
+  toggleTheme: () => void;
+
   // Form Dirty Tracking & Navigation Guard
   isDirty: boolean;
   setIsDirty: (dirty: boolean) => void;
@@ -94,6 +102,48 @@ export function WorkspaceProvider({
   const [lang, setLangState] = useState<Lang>("fa");
   const dir: "rtl" | "ltr" = isRTL(lang) ? "rtl" : "ltr";
 
+  // Search state across workspace
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Theme state
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem("inflow_theme") as "light" | "dark" | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+        if (savedTheme === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      } else if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        setTheme("dark");
+        document.documentElement.classList.add("dark");
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === "light" ? "dark" : "light";
+      try {
+        localStorage.setItem("inflow_theme", next);
+        if (next === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }, []);
+
   // Form dirty states
   const [isDirty, setIsDirty] = useState(false);
   const [dirtyCount, setDirtyCount] = useState(0);
@@ -160,6 +210,10 @@ export function WorkspaceProvider({
         t,
         formatNumber: formatNumberFn,
         updateAccountStatus,
+        searchQuery,
+        setSearchQuery,
+        theme,
+        toggleTheme,
         isDirty,
         setIsDirty,
         dirtyCount,
