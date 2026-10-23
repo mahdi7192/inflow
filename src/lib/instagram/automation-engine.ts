@@ -349,6 +349,7 @@ export async function processIncomingComment(
   trigger_matched?: boolean;
   comment_reply_status?: string;
   dm_status?: string;
+  reason?: string;
 }> {
   const db = getDb();
   const provider = customProvider || getInstagramProvider();
@@ -387,6 +388,10 @@ export async function processIncomingComment(
 
   if (!post || !account) {
     return { processed: false };
+  }
+
+  if (account.status === "paused") {
+    return { processed: false, reason: "account_paused" };
   }
 
   if (post.auto_reply !== 1) {
@@ -707,6 +712,15 @@ export async function processIncomingComment(
         });
       } else {
         dmStatus = "queued";
+        const productButtons: InstagramButton[] = [];
+        if (attributedTargetUrl && /^https?:\/\//i.test(attributedTargetUrl)) {
+          productButtons.push({
+            type: "url",
+            title: appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️",
+            url: attributedTargetUrl,
+          });
+        }
+
         enqueueInstagramAction({
           dedupeKey: `cmt_dm:${commentId}`,
           accountUsername: account.username,
@@ -723,6 +737,8 @@ export async function processIncomingComment(
           priority: 1,
           metadata: {
             commentLogId,
+            buttons: productButtons.length > 0 ? productButtons : undefined,
+            fallbackText: dmText,
             finalDmStatus: "sent",
             activityLogType: "dm_sent",
             activityLogTitle: `پاسخ دایرکت پست به @${identity.username} ارسال شد`,
@@ -791,6 +807,7 @@ export async function processIncomingDm(
   already_processed?: boolean;
   trigger_matched?: boolean;
   reply_status?: string;
+  reason?: string;
 }> {
   const db = getDb();
   const provider = customProvider || getInstagramProvider();
@@ -814,6 +831,10 @@ export async function processIncomingDm(
 
   if (!account) {
     return { processed: false };
+  }
+
+  if (account.status === "paused") {
+    return { processed: false, reason: "account_paused" };
   }
 
   const socialAccountId =
@@ -895,6 +916,8 @@ export async function processIncomingDm(
   const dmRule = db
     .prepare("SELECT * FROM dm_automations WHERE account_username = ?")
     .get(account.username) as DMAutomationRow | undefined;
+
+  const globalDmEnabled = Boolean(dmRule && dmRule.enabled === 1);
 
   const appLanguage =
     dmRule?.app_language || getAppLanguage(account.username);
@@ -986,6 +1009,33 @@ export async function processIncomingDm(
             nowTimestamp(),
             pc.id
           );
+
+          let postTargetUrl = "";
+          try {
+            const relatedPost = db
+              .prepare("SELECT target_url FROM posts WHERE shortcode = ? AND account_username = ?")
+              .get(pc.shortcode, account.username) as { target_url?: string } | undefined;
+            postTargetUrl = (relatedPost?.target_url || "").trim();
+          } catch {
+            // ignore
+          }
+
+          const releaseButtons: InstagramButton[] = [];
+          if (postTargetUrl && /^https?:\/\//i.test(postTargetUrl)) {
+            releaseButtons.push({
+              type: "url",
+              title: appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️",
+              url: postTargetUrl,
+            });
+          }
+
+          const releaseQuickReplies: InstagramQuickReply[] = [
+            {
+              title: appLanguage === "en" ? "Talk to Admin 💬" : "ارتباط با ادمین 💬",
+              payload: "TALK_TO_ADMIN",
+            },
+          ];
+
           enqueueInstagramAction({
             dedupeKey: `release_cmt_dm:${pc.comment_id}`,
             accountUsername: account.username,
@@ -1002,6 +1052,9 @@ export async function processIncomingDm(
             priority: 1,
             metadata: {
               commentLogId: pc.id,
+              buttons: releaseButtons.length > 0 ? releaseButtons : undefined,
+              quickReplies: releaseQuickReplies,
+              fallbackText: textToSend,
               finalDmStatus: "sent",
               activityLogType: "dm_sent",
               activityLogTitle: `تایید فالو @${identity.username} در اینستاگرام احراز شد و دایرکت پست ${pc.shortcode} ارسال شد ✅`,
@@ -1043,8 +1096,8 @@ export async function processIncomingDm(
       }
 
       // If this incoming message was a follow-confirmation click/phrase OR we just released a pending DM,
-      // consume this event so it does NOT also trigger a duplicate DM chat response!
-      if (isFollowClaim || pendingDms.length > 0) {
+      // OR if global DM automation is disabled, consume this event so it does NOT trigger a DM chat response!
+      if (isFollowClaim || pendingDms.length > 0 || !globalDmEnabled) {
         db.prepare(`
           UPDATE dm_logs
           SET trigger_matched = 1,
@@ -1228,7 +1281,88 @@ export async function processIncomingDm(
     console.warn("[automation-engine] Lead extraction warning:", leadErr);
   }
 
-  // Check Human Takeover (Bot Pause per User)
+  // 4.5. Direct Message Automation Pause Gate
+  // When DM automation is disabled (dmRule.enabled === 0), do not respond to regular DMs or post-continuation queries.
+  // Pending comment follow verification and reward release have already been completely handled above.
+  if (!globalDmEnabled) {
+    db.prepare(`
+      UPDATE dm_logs
+      SET trigger_matched = 0, reply_status = 'skipped', processed_at = ?
+      WHERE id = ?
+    `).run(nowTimestamp(), dmLogId);
+    return {
+      processed: true,
+      trigger_matched: false,
+      reply_status: "skipped",
+    };
+  }
+
+  // Check Human Takeover / Talk to Admin Request
+  const isTalkToAdmin =
+    event.payload === "TALK_TO_ADMIN" ||
+    /(ارتباط با ادمین|صحبت با ادمین|وصل کن به ادمین|ادمین لطفا)/i.test(
+      event.incomingText || ""
+    );
+
+  if (isTalkToAdmin) {
+    db.prepare(`
+      INSERT INTO dm_thread_states (account_username, sender_username, bot_paused, updated_at)
+      VALUES (?, ?, 1, ?)
+      ON CONFLICT(account_username, sender_username) DO UPDATE SET
+        bot_paused = 1,
+        updated_at = excluded.updated_at
+    `).run(account.username, identity.username.toLowerCase(), nowTimestamp());
+
+    const adminNoticeText =
+      appLanguage === "en"
+        ? "Your request has been forwarded to our team. A team member will reply to you shortly! 🙏"
+        : "درخواست شما برای ادمین پیج ارسال شد. همکاران ما به زودی در همین دایرکت پاسخگوی شما خواهند بود 🙏";
+
+    db.prepare(`
+      UPDATE dm_logs
+      SET trigger_matched = 1,
+          reply_status = 'queued',
+          reply_text = ?,
+          processed_at = ?
+      WHERE id = ?
+    `).run(adminNoticeText, nowTimestamp(), dmLogId);
+
+    enqueueInstagramAction({
+      dedupeKey: `admin_req:${messageId}`,
+      accountUsername: account.username,
+      socialAccountId,
+      eventId: `dm:${messageId}`,
+      actionType: "DM_SEND",
+      targetUsername: identity.username,
+      targetUserId: identity.userId,
+      targetConversationId: conversationId,
+      payloadText: adminNoticeText,
+      priority: 1,
+      metadata: {
+        dmLogId,
+        fallbackText: adminNoticeText,
+        finalDmStatus: "sent",
+        activityLogType: "dm_sent",
+        activityLogTitle: `درخواست ارتباط با ادمین توسط @${identity.username} ثبت شد 💬`,
+        activityLogDescription: adminNoticeText,
+      },
+    });
+
+    if (!event.skipImmediateDrain) {
+      await processActionQueue({
+        accountUsername: account.username,
+        maxActions: 5,
+        provider,
+      });
+    }
+
+    return {
+      processed: true,
+      trigger_matched: true,
+      reply_status: "sent",
+    };
+  }
+
   const threadState = db
     .prepare(
       "SELECT bot_paused FROM dm_thread_states WHERE account_username = ? AND LOWER(sender_username) = ?"
@@ -1258,10 +1392,8 @@ export async function processIncomingDm(
       recentCommentOrigin.auto_reply === 1 &&
       recentCommentOrigin.dm_action_type === "ai"
   );
-  const globalDmEnabled = Boolean(dmRule && dmRule.enabled === 1);
-
   // 5. Standard DM Automation Module Evaluation (or Seamless Post-to-DM Continuation)
-  if (!globalDmEnabled && !isPostContinuation) {
+  if (!globalDmEnabled) {
     db.prepare(`
       UPDATE dm_logs
       SET trigger_matched = 0, reply_status = 'skipped', processed_at = ?
@@ -1541,6 +1673,22 @@ export async function processIncomingDm(
     WHERE id = ?
   `).run(replyText, nowTimestamp(), dmLogId);
 
+  const dmButtons: InstagramButton[] = [];
+  if (recentCommentOrigin?.target_url && /^https?:\/\//i.test(recentCommentOrigin.target_url)) {
+    dmButtons.push({
+      type: "url",
+      title: appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️",
+      url: recentCommentOrigin.target_url,
+    });
+  }
+
+  const dmQuickReplies: InstagramQuickReply[] = [
+    {
+      title: appLanguage === "en" ? "Talk to Admin 💬" : "ارتباط با ادمین 💬",
+      payload: "TALK_TO_ADMIN",
+    },
+  ];
+
   enqueueInstagramAction({
     dedupeKey: `dm_reply:${messageId}`,
     accountUsername: account.username,
@@ -1554,6 +1702,9 @@ export async function processIncomingDm(
     priority: 1,
     metadata: {
       dmLogId,
+      buttons: dmButtons.length > 0 ? dmButtons : undefined,
+      quickReplies: dmQuickReplies,
+      fallbackText: replyText,
       finalDmStatus: "sent",
       activityLogType: "dm_sent",
       activityLogTitle: `پاسخ دایرکت هوشمند به @${identity.username} ارسال شد`,

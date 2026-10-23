@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, Pause, Play, PauseCircle, AlertCircle, SlidersHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { LanguageDropdown } from "@/components/ui/language-dropdown";
 import { SessionHealthBadge } from "@/components/layout/session-health-badge";
+import { UnifiedStatusModal } from "@/components/layout/unified-status-modal";
 import { SessionExpiryBanner } from "@/components/layout/session-expiry-banner";
 import { AccountLoginDialog } from "@/components/auth/account-login-dialog";
 import { Toaster, toast } from "@/components/ui/sonner";
@@ -35,6 +37,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
     dir,
     setLang,
     t,
+    updateAccountStatus,
     isDirty,
     pendingNavigation,
     setPendingNavigation,
@@ -43,13 +46,67 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   // Auxiliary modals
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [unifiedModalOpen, setUnifiedModalOpen] = useState(false);
+
+  // Granular DM Automation status
+  const [dmAutomationEnabled, setDmAutomationEnabled] = useState(true);
+  const [loadingDm, setLoadingDm] = useState(false);
 
   // Session status from active profile
   const sessionStatus = profile?.session_status || "unauthenticated";
+
+  // Fetch DM automation status on account change
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDmAutomation() {
+      try {
+        const res = await fetch(`/api/accounts/${encodeURIComponent(account)}/dm-automation`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.automation) {
+            setDmAutomationEnabled(data.automation.enabled === 1);
+          }
+        }
+      } catch {
+        // ignore fetch error
+      }
+    }
+    loadDmAutomation();
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
+
+  const handleToggleDmAutomation = async (nextEnabled: boolean) => {
+    setLoadingDm(true);
+    try {
+      const res = await fetch(`/api/accounts/${encodeURIComponent(account)}/dm-automation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDmAutomationEnabled(nextEnabled);
+        if (nextEnabled) {
+          toast.success("پاسخگوی خودکار دایرکت فعال شد");
+        } else {
+          toast.warning("پاسخگوی خودکار دایرکت متوقف شد (تایید فالو کامنت‌ها فعال است)");
+        }
+      } else {
+        toast.error(data.error || "خطا در تغییر وضعیت دایرکت");
+      }
+    } catch {
+      toast.error("خطای شبکه در بروزرسانی تنظیمات دایرکت");
+    } finally {
+      setLoadingDm(false);
+    }
+  };
 
   // Derive active plugin from pathname
   const activePlugin = pathname.includes("/dms") ? "dms" : "comments";
@@ -94,6 +151,31 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
     } finally {
       router.push("/login");
       router.refresh();
+    }
+  };
+
+  const handleTogglePause = async () => {
+    if (updatingStatus) return;
+    const currentStatus = profile?.status || "active";
+    const nextStatus = currentStatus === "paused" ? "active" : "paused";
+
+    setUpdatingStatus(true);
+    try {
+      const ok = await updateAccountStatus(nextStatus);
+      if (ok) {
+        if (nextStatus === "paused") {
+          toast.warning(t("pauseAutomationSuccess"));
+        } else {
+          toast.success(t("resumeAutomationSuccess"));
+        }
+        router.refresh();
+      } else {
+        toast.error(t("updateStatusError"));
+      }
+    } catch {
+      toast.error(t("updateStatusError"));
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -197,12 +279,46 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Zero-Bot Standard: Session Health Badge */}
-            <SessionHealthBadge
-              account={account}
-              status={sessionStatus}
-              onReLogin={() => setLoginModalOpen(true)}
-            />
+            {/* Unified Page Status & Automation Trigger Pill */}
+            <button
+              type="button"
+              onClick={() => setUnifiedModalOpen(true)}
+              className={cn(
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer select-none shadow-2xs hover:opacity-90",
+                sessionStatus !== "active"
+                  ? "bg-rose-500/10 text-rose-700 border-rose-300 hover:bg-rose-500/20 font-semibold dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                  : profile?.status === "paused"
+                  ? "bg-amber-500/10 text-amber-700 border-amber-300 hover:bg-amber-500/20 font-semibold dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                  : !dmAutomationEnabled
+                  ? "bg-teal-500/10 text-teal-800 border-teal-300 hover:bg-teal-500/20 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800"
+                  : "bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+              )}
+              title="مشاهده وضعیت پیج، نشست اینستاگرام و تفکیک ماژول‌ها"
+            >
+              {sessionStatus !== "active" ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>وضعیت پیج (نیاز به ورود)</span>
+                </>
+              ) : profile?.status === "paused" ? (
+                <>
+                  <PauseCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>اتوماسیون پیج (متوقف)</span>
+                </>
+              ) : !dmAutomationEnabled ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <span>اتوماسیون فعال (دایرکت متوقف)</span>
+                  <SlidersHorizontal className="w-3 h-3 text-teal-600 shrink-0 opacity-70" />
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <span>وضعیت و اتوماسیون پیج</span>
+                  <SlidersHorizontal className="w-3 h-3 text-emerald-600 shrink-0 opacity-70" />
+                </>
+              )}
+            </button>
 
             <LanguageDropdown
               currentLang={lang}
@@ -214,6 +330,37 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         {/* 4. Single Unified Vertical Scroll Container */}
         <main className="flex-1 overflow-y-auto overscroll-contain min-w-0 bg-[#F8FAFC] p-3 sm:p-5 lg:p-6">
           <div className="w-full max-w-6xl mx-auto">
+            {profile?.status === "paused" && (
+              <div className="mb-4 sm:mb-6 rounded-xl border border-amber-300 bg-amber-50/95 p-3.5 sm:p-4 text-amber-900 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 text-amber-600">
+                    <PauseCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs sm:text-sm font-semibold text-amber-900">
+                        {t("automationPausedBannerTitle")}
+                      </p>
+                      <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                        PAUSED
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-amber-800/90 mt-0.5">
+                      {t("automationPausedBannerDesc")}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTogglePause}
+                  disabled={updatingStatus}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition cursor-pointer shadow-xs shrink-0 self-start sm:self-auto"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>{t("resumeAutomationBtn")}</span>
+                </button>
+              </div>
+            )}
             {children}
           </div>
         </main>
@@ -221,6 +368,25 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
       {/* Global Toast Provider */}
       <Toaster />
+
+      {/* Unified Page Status & Automation Modal */}
+      <UnifiedStatusModal
+        isOpen={unifiedModalOpen}
+        onClose={() => setUnifiedModalOpen(false)}
+        account={account}
+        profile={profile}
+        sessionStatus={sessionStatus}
+        masterStatus={profile?.status || "active"}
+        dmAutomationEnabled={dmAutomationEnabled}
+        onToggleMasterStatus={handleTogglePause}
+        onToggleDmAutomation={handleToggleDmAutomation}
+        onOpenLoginModal={() => {
+          setUnifiedModalOpen(false);
+          setLoginModalOpen(true);
+        }}
+        loadingMaster={updatingStatus}
+        loadingDm={loadingDm}
+      />
 
       {/* Direct In-App Login Modal (Zero Password Storage) */}
       <AccountLoginDialog
