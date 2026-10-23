@@ -36,6 +36,14 @@ import {
   storyHasConfig,
 } from "@/lib/stories";
 
+export function stripUrlsFromText(text: string): string {
+  if (!text) return "";
+  let cleaned = text.replace(/https?:\/\/[^\s\)\>\]]+/gi, "").trim();
+  cleaned = cleaned.replace(/(از طریق لینک زیر|از لینک زیر|روی لینک زیر|لینک زیر|لینک:)\s*[:：]?/gi, "از طریق دکمه زیر").trim();
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned;
+}
+
 export interface IncomingCommentEvent {
   commentId: string;
   postId?: string;
@@ -496,6 +504,9 @@ export async function processIncomingComment(
 
   const appLanguage = post.app_language || getAppLanguage(account.username);
   const playbook = getPlaybookById(post.playbook_id);
+  const hasInteractiveButton = Boolean(
+    post.target_url && /^https?:\/\//i.test(post.target_url)
+  );
   const augmentedPostContext = buildAugmentedPostContext({
     caption: post.caption,
     cheatSheet: post.cheat_sheet,
@@ -505,6 +516,8 @@ export async function processIncomingComment(
     accountPersona: account.account_persona,
     recipientUsername: identity.username,
     shortcode: post.shortcode,
+    hasInteractiveButton,
+    targetButtonText: post.target_button_text,
   });
 
   // 4.5. Smart Competitor & Spam Comment Shield (Spec 018 — 0 credit hide via SocialAPI)
@@ -683,8 +696,10 @@ export async function processIncomingComment(
       attributedTargetUrl && /^https?:\/\//i.test(attributedTargetUrl)
     );
 
-    // Only append raw link to dmText if no interactive button is configured
-    if (!hasProductButton && attributedTargetUrl && !dmText.includes("http")) {
+    // If button is active, clean raw URLs from AI text; otherwise append fallback link
+    if (hasProductButton) {
+      dmText = stripUrlsFromText(dmText);
+    } else if (attributedTargetUrl && !dmText.includes("http")) {
       dmText = `${dmText}\n\n🔗 ${attributedTargetUrl}`.trim();
     }
 
@@ -1420,7 +1435,16 @@ export async function processIncomingDm(
         if (storyCfg?.cheat_sheet.trim()) {
           ctx.push(`[🔥 تقلب‌نامه این استوری (اولویت بالاتر از اطلاعات کلی پیج)]:\n${storyCfg.cheat_sheet.trim()}`);
         }
-        if (storyLink) ctx.push(`[🔗 لینک مرتبط با این استوری]: ${storyLink}`);
+        const hasStoryButton = Boolean(storyLink && /^https?:\/\//i.test(storyLink));
+        if (storyLink) {
+          if (hasStoryButton) {
+            ctx.push(
+              `[دکمه تعاملی پیوست به پیام]: این پیام به همراه یک دکمه تعاملی مجزا با عنوان «${storyCfg?.target_button_text || "مشاهده لینک 🔗"}» ارسال می‌شود.\n⛔ قانون: به هیچ وجه لینک یا URL در متن ننویس؛ فقط کاربر را به کلیک روی دکمه زیر پیام راهنمایی کن.`
+            );
+          } else {
+            ctx.push(`[🔗 لینک مرتبط با این استوری]: ${storyLink}`);
+          }
+        }
         if (account.bio) ctx.push(`[بیوگرافی پیج]: ${account.bio}`);
         if (account.brand_cheat_sheet?.trim()) {
           ctx.push(`[تقلب‌نامه و اطلاعات کلی پیج/برند]:\n${account.brand_cheat_sheet.trim()}`);
@@ -1450,6 +1474,10 @@ export async function processIncomingDm(
           conversationHistory: storyHistory,
           fallbackText: "سلام! ممنون از پیامتان 🙏 چطور می‌توانم کمکتان کنم؟",
         });
+      }
+
+      if (storyLink && /^https?:\/\//i.test(storyLink)) {
+        storyReplyText = stripUrlsFromText(storyReplyText);
       }
     }
 

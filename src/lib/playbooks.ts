@@ -765,6 +765,8 @@ export function buildAugmentedPostContext(params: {
   accountPersona?: string | null;
   recipientUsername?: string;
   shortcode?: string;
+  hasInteractiveButton?: boolean;
+  targetButtonText?: string | null;
 }): string {
   const sections: string[] = [];
 
@@ -777,7 +779,7 @@ export function buildAugmentedPostContext(params: {
 
   if (params.cheatSheet?.trim()) {
     sections.push(
-      `[🔥 تقلب‌نامه و اطلاعات تکمیلی بسیار مهم این پست (خارج از کپشن — اولویت اول پاسخگویی)]:\n${params.cheatSheet.trim()}`
+      `[اطلاعات تکمیلی این پست]:\n${params.cheatSheet.trim()}`
     );
   }
 
@@ -786,9 +788,15 @@ export function buildAugmentedPostContext(params: {
       username: params.recipientUsername,
       shortcode: params.shortcode,
     });
-    sections.push(
-      `[🔗 لینک مستقیم این پست (در صورت مرتبط بودن در دایرکت دقیقاً همین لینک را برای کاربر بفرست)]:\n${attributedLink}`
-    );
+    if (params.hasInteractiveButton) {
+      sections.push(
+        `[دکمه تعاملی پیوست به پیام]: این پیام به صورت دکمه‌دار ارسال می‌شود که دکمه‌ای با عنوان «${params.targetButtonText || "مشاهده و خرید 🛍️"}» همراه با لینک اختصاصی زیر پیام قرار می‌گیرد.\n⛔ قانون اکید: به هیچ عنوان هیچ‌گونه لینک اینترنتی، آدرس سایت یا URL (مانند http یا https) در متن پیام ننویس. لینک مستقیماً درون دکمه قرار دارد. در پایان پیامت فقط کاربر را تشویق کن که روی دکمه زیر پیام کلیک کند.`
+      );
+    } else {
+      sections.push(
+        `[🔗 لینک مستقیم این پست (در صورت مرتبط بودن در دایرکت دقیقاً همین لینک را برای کاربر بفرست)]:\n${attributedLink}`
+      );
+    }
   }
 
   if (params.brandCheatSheet?.trim()) {

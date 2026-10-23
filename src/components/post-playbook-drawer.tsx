@@ -9,7 +9,6 @@ import {
   Send,
   UserPlus,
   ShieldCheck,
-  FileText,
   Film,
   Image as ImageIcon,
   Save,
@@ -83,13 +82,6 @@ const DM_ACTIONS: { id: DrawerPostData["dm_action_type"]; label: string }[] = [
   { id: "ai", label: "مشاور هوش مصنوعی" },
   { id: "direct", label: "متن ثابت" },
   { id: "none", label: "بدون ارسال دایرکت" },
-];
-
-const CHEAT_SHEET_CHIPS = [
-  { label: "+ قیمت", snippet: "قیمت: " },
-  { label: "+ موجودی", snippet: "وضعیت موجودی: " },
-  { label: "+ شرایط ارسال", snippet: "شرایط ارسال: " },
-  { label: "+ تخفیف ویژه", snippet: "کد تخفیف: " },
 ];
 
 const COMMENT_AI_CHIPS = [
@@ -484,26 +476,6 @@ export function PostPlaybookDrawer({
                 </p>
               </div>
               <Switch checked={smartModeration} onCheckedChange={setSmartModeration} />
-            </section>
-
-            {/* 7. Cheat Sheet (supplemental knowledge, always last) */}
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> تقلب‌نامه این {contentTypeTitle}
-                </div>
-                <SnippetChips
-                  chips={CHEAT_SHEET_CHIPS}
-                  onPick={(snippet) => setCheatSheet((prev) => appendSnippet(prev, snippet))}
-                />
-              </div>
-              <textarea
-                className={field}
-                rows={4}
-                value={cheatSheet}
-                onChange={(e) => setCheatSheet(e.target.value)}
-                placeholder={`اطلاعاتی که فقط درباره همین ${contentTypeTitle} است (قیمت، سایزبندی، شرایط تخفیف یا ارسال…). بر اطلاعات کلی پیج اولویت دارد.`}
-              />
             </section>
           </div>
         </div>

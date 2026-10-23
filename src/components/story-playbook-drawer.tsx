@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Save, Check, FileText, UserPlus, Smile, Film, Image as ImageIcon } from "lucide-react";
+import { X, Save, Check, UserPlus, Smile, Film, Image as ImageIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useWorkspace } from "@/components/layout/workspace-context";
 import { LinkButtonField, SnippetChips, appendSnippet } from "@/components/playbook-fields";
@@ -293,19 +293,6 @@ export function StoryPlaybookDrawer({ story, accountUsername, onClose, onSaved }
               </div>
               <Seg value={emoji} options={EMOJI} onChange={setEmoji} />
               <p className="text-xs text-slate-500">ریپلای‌های فقط ایموجی هرگز به هوش مصنوعی ارسال نمی‌شوند.</p>
-            </section>
-
-            <section className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> تقلب‌نامه این استوری
-              </div>
-              <textarea
-                className={field}
-                rows={4}
-                value={cheatSheet}
-                onChange={(e) => setCheatSheet(e.target.value)}
-                placeholder="اطلاعاتی که فقط درباره همین استوری است (قیمت، موجودی، شرایط…). بر اطلاعات کلی پیج اولویت دارد."
-              />
             </section>
           </div>
         </div>
