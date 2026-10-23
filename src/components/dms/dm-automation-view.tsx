@@ -699,43 +699,49 @@ export function DmAutomationView({
                         setSelectedSender(conv.sender_username);
                         setShowMobileChat(true);
                       }}
-                      className={`w-full text-right px-4 py-3.5 flex items-start gap-3 transition-colors cursor-pointer ${
+                      className={cn(
+                        "w-full text-right px-4 py-3.5 flex items-start gap-3 transition-all cursor-pointer border-r-4",
                         isSelected
-                          ? "bg-indigo-50/60"
-                          : "hover:bg-slate-50/80 bg-white"
-                      }`}
+                          ? "bg-primary/10 border-r-primary text-on-surface"
+                          : "border-r-transparent hover:bg-surface-container-high/50 bg-transparent text-on-surface-variant"
+                      )}
                     >
                       <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center font-mono text-xs font-bold shrink-0 ${
+                        className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center font-mono text-xs font-bold shrink-0 shadow-2xs",
                           conv.bot_paused
-                            ? "bg-amber-100 text-amber-800"
+                            ? "bg-amber-100 text-amber-900 border border-amber-300"
                             : isSelected
-                              ? "bg-indigo-600 text-white"
-                              : "bg-slate-100 text-slate-700"
-                        }`}
+                            ? "bg-primary text-on-primary"
+                            : "bg-surface-container-high text-on-surface"
+                        )}
                       >
                         {conv.sender_username.slice(0, 1).toUpperCase()}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="font-mono text-xs font-bold text-slate-900 truncate">
+                          <span className={cn(
+                            "font-mono text-xs truncate",
+                            isSelected ? "font-bold text-on-surface" : "font-medium text-on-surface"
+                          )}>
                             <bdi>@{conv.sender_username}</bdi>
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
                             {conv.bot_paused && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200">
                                 ⏸️ ادمین
                               </span>
                             )}
                             <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                              className={cn(
+                                "text-[10px] px-2 py-0.5 rounded-full font-medium",
                                 conv.is_story_reply
-                                  ? "bg-rose-50 text-rose-700"
+                                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
                                   : conv.source_shortcode
-                                  ? "bg-indigo-50 text-indigo-700"
-                                  : "bg-slate-100 text-slate-600"
-                              }`}
+                                  ? "bg-primary/10 text-primary"
+                                  : "bg-surface-container text-on-surface-variant"
+                              )}
                             >
                               {conv.is_story_reply
                                 ? "ریپلای استوری"
@@ -746,13 +752,13 @@ export function DmAutomationView({
                           </div>
                         </div>
 
-                        <p className="text-xs text-slate-600 truncate mt-1">
+                        <p className="text-xs text-on-surface-variant truncate mt-1">
                           {conv.last_incoming || "—"}
                         </p>
 
                         {conv.last_reply && (
-                          <p className="text-[11px] text-emerald-700 truncate mt-0.5 flex items-center gap-1">
-                            <CheckCheck className="w-3 h-3 shrink-0" />
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 truncate mt-0.5 flex items-center gap-1">
+                            <CheckCheck className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">{conv.last_reply}</span>
                           </p>
                         )}
@@ -897,8 +903,8 @@ export function DmAutomationView({
                         {/* Customer Incoming Bubble */}
                         {msg.incoming_text && (
                           <div className="flex justify-start">
-                            <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-white border border-slate-200/80 px-4 py-2.5 text-xs text-slate-800 shadow-2xs">
-                              <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
+                            <div className="max-w-[78%] rounded-[20px] rounded-tr-xs bg-surface-container-high border border-outline-variant/30 px-4 py-2.5 text-xs text-on-surface shadow-2xs">
+                              <div className="flex items-center gap-2 text-[10px] text-on-surface-variant mb-1">
                                 <span>مشتری</span>
                                 {msg.is_story_reply === 1 && (
                                   <span className="text-rose-600 font-semibold">
@@ -917,24 +923,25 @@ export function DmAutomationView({
                         {msg.reply_text ? (
                           <div className="flex justify-end">
                             <div
-                              className={`max-w-[78%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-xs shadow-2xs ${
+                              className={cn(
+                                "max-w-[78%] rounded-[20px] rounded-tl-xs px-4.5 py-3 text-xs shadow-2xs",
                                 msg.reply_status === "pending_follow"
-                                  ? "bg-amber-500 text-white"
-                                  : "bg-indigo-600 text-white"
-                              }`}
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-primary text-on-primary"
+                              )}
                             >
-                              <div className="flex items-center justify-between gap-3 text-[10px] text-indigo-100 mb-1">
+                              <div className="flex items-center justify-between gap-3 text-[10px] opacity-85 mb-1">
                                 <span>
                                   {msg.reply_status === "pending_follow"
                                     ? "🔒 پیام دعوت به فالو"
                                     : "🤖 پاسخ خودکار استودیو"}
                                 </span>
                                 <span className="inline-flex items-center gap-1 font-medium">
-                                  <Check className="w-3 h-3 text-emerald-300" />
+                                  <Check className="w-3.5 h-3.5" />
                                   <span>ارسال شد</span>
                                 </span>
                               </div>
-                              <p className="leading-relaxed whitespace-pre-wrap">
+                              <p className="leading-relaxed whitespace-pre-wrap font-medium">
                                 {msg.reply_text}
                               </p>
                             </div>
@@ -942,7 +949,7 @@ export function DmAutomationView({
                         ) : (
                           msg.reply_status === "skipped" && (
                             <div className="flex justify-end">
-                              <div className="rounded-xl bg-slate-100 text-slate-500 px-3 py-1.5 text-[11px]">
+                              <div className="rounded-full bg-surface-container-high text-on-surface-variant px-3 py-1.5 text-[11px]">
                                 بدون پاسخ خودکار (رد شده طبق قوانین)
                               </div>
                             </div>
@@ -953,13 +960,13 @@ export function DmAutomationView({
                   )}
                 </div>
 
-                {/* Manual Direct Reply Input Bar */}
+                {/* Manual Direct Reply Input Bar (M3 Tonal Surface) */}
                 <form
                   onSubmit={handleSendManualReply}
-                  className="bg-white border-t border-slate-100 p-3.5 space-y-2"
+                  className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 space-y-2 shrink-0"
                 >
                   {manualNotice && (
-                    <div className="text-[11px] font-medium text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                    <div className="text-[11px] font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">
                       {manualNotice}
                     </div>
                   )}
@@ -969,19 +976,19 @@ export function DmAutomationView({
                       value={manualReplyText}
                       onChange={(e) => setManualReplyText(e.target.value)}
                       placeholder={`ارسال پیام مستقیم به @${activeConversation.sender_username} (با ارسال پیام، ربات برای این کاربر متوقف می‌شود)...`}
-                      className="flex-1 rounded-xl bg-slate-100/80 px-4 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                      className="flex-1 rounded-full bg-surface-container-high px-4 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary outline-none transition-all"
                     />
                     <button
                       type="submit"
                       disabled={sendingManual || !manualReplyText.trim()}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+                      className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full bg-primary hover:opacity-95 disabled:opacity-40 text-on-primary text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs"
                     >
                       {sendingManual ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Send className="w-3.5 h-3.5" />
+                        <Send className="w-4 h-4" />
                       )}
-                      <span>ارسال پیام</span>
+                      <span>ارسال</span>
                     </button>
                   </div>
                 </form>

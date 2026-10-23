@@ -288,11 +288,11 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
               >
                 {t("allAccounts")}
               </Link>
-              <MaterialSymbol name="chevron_left" size={16} rtlMirror className="text-outline shrink-0" />
+              <MaterialSymbol name="chevron_left" size={16} className="text-outline shrink-0" />
               <span className="font-mono font-bold text-on-surface bg-surface-container-high px-3 py-1 rounded-full text-xs">
                 <bdi>@{account}</bdi>
               </span>
-              <MaterialSymbol name="chevron_left" size={16} rtlMirror className="text-outline shrink-0" />
+              <MaterialSymbol name="chevron_left" size={16} className="text-outline shrink-0" />
               <span className="text-on-surface-variant font-medium truncate">
                 {activePlugin === "dms" ? t("navDms") : t("navComments")}
               </span>
@@ -308,7 +308,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
                 placeholder="جستجو در سناریوها، کلمات کلیدی، نام پست‌ها یا دایرکت..."
                 className="w-full bg-transparent border-none outline-none text-on-surface placeholder:text-on-surface-variant/70 text-xs"
               />
-              <span className="text-[10px] text-outline px-2 py-0.5 rounded-md bg-surface-container shrink-0">
+              <span dir="ltr" className="text-[11px] font-mono text-outline px-2 py-0.5 rounded-md bg-surface-container shrink-0">
                 ⌘K
               </span>
             </div>
