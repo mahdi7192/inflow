@@ -66,7 +66,18 @@ export async function GET(
           phone_number, source_shortcode, intent_summary, last_message,
           status, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, 'شماره تماس استخراج‌شده از دایرکت', ?, 'new', ?, ?)
-        ON CONFLICT(account_username, sender_username, phone_number) DO NOTHING`
+        ON CONFLICT(account_username, sender_username) DO UPDATE SET
+          phone_number = CASE
+            WHEN excluded.phone_number != '' AND excluded.phone_number NOT LIKE '%بدون شماره%'
+              THEN excluded.phone_number
+            WHEN captured_leads.phone_number != '' AND captured_leads.phone_number NOT LIKE '%بدون شماره%'
+              THEN captured_leads.phone_number
+            ELSE excluded.phone_number
+          END,
+          sender_full_name = CASE WHEN excluded.sender_full_name != '' THEN excluded.sender_full_name ELSE captured_leads.sender_full_name END,
+          source_shortcode = CASE WHEN excluded.source_shortcode != '' THEN excluded.source_shortcode ELSE captured_leads.source_shortcode END,
+          last_message = excluded.last_message,
+          updated_at = excluded.updated_at`
       ).run(
         username,
         log.sender_username,

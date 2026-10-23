@@ -29,6 +29,12 @@ import {
   getPlaybookById,
 } from "@/lib/playbooks";
 import { SocialApiClient } from "@/lib/social-api";
+import {
+  findStoryById,
+  isEmojiOnlyText,
+  normalizeStoryDefaultMode,
+  storyHasConfig,
+} from "@/lib/stories";
 
 export interface IncomingCommentEvent {
   commentId: string;
@@ -195,6 +201,15 @@ function interpolateStaticText(
     .replace(/\{username\}/gi, safeUsername ? `@${safeUsername}` : safeName)
     .replace(/@user\b/gi, safeUsername ? `@${safeUsername}` : safeName)
     .trim();
+}
+
+/**
+ * Spec 022: Resolve a link button title — the user's custom text when set, otherwise the
+ * localized fallback. Capped at 20 characters (Instagram button title limit).
+ */
+function resolveButtonTitle(custom: string | null | undefined, fallback: string): string {
+  const title = (custom || "").trim();
+  return title ? Array.from(title).slice(0, 20).join("") : fallback;
 }
 
 function getLocalizedFollowTexts(
@@ -716,7 +731,10 @@ export async function processIncomingComment(
         if (attributedTargetUrl && /^https?:\/\//i.test(attributedTargetUrl)) {
           productButtons.push({
             type: "url",
-            title: appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️",
+            title: resolveButtonTitle(
+              post.target_button_text,
+              appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️"
+            ),
             url: attributedTargetUrl,
           });
         }
@@ -1011,11 +1029,15 @@ export async function processIncomingDm(
           );
 
           let postTargetUrl = "";
+          let postButtonText = "";
           try {
             const relatedPost = db
-              .prepare("SELECT target_url FROM posts WHERE shortcode = ? AND account_username = ?")
-              .get(pc.shortcode, account.username) as { target_url?: string } | undefined;
+              .prepare("SELECT target_url, target_button_text FROM posts WHERE shortcode = ? AND account_username = ?")
+              .get(pc.shortcode, account.username) as
+              | { target_url?: string; target_button_text?: string }
+              | undefined;
             postTargetUrl = (relatedPost?.target_url || "").trim();
+            postButtonText = relatedPost?.target_button_text || "";
           } catch {
             // ignore
           }
@@ -1024,7 +1046,10 @@ export async function processIncomingDm(
           if (postTargetUrl && /^https?:\/\//i.test(postTargetUrl)) {
             releaseButtons.push({
               type: "url",
-              title: appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️",
+              title: resolveButtonTitle(
+                postButtonText,
+                appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️"
+              ),
               url: postTargetUrl,
             });
           }
@@ -1199,7 +1224,7 @@ export async function processIncomingDm(
   // 4.8. Spec 018 Step 2 & 3: Cross-Channel Origin Lookup, Lead Capture & Human Takeover Check
   const recentCommentOrigin = db
     .prepare(`
-      SELECT c.shortcode, c.comment_text, c.dm_text, p.caption, p.cheat_sheet, p.target_url, p.auto_reply, p.dm_action_type, p.dm_action_text
+      SELECT c.shortcode, c.comment_text, c.dm_text, p.caption, p.cheat_sheet, p.target_url, p.target_button_text, p.auto_reply, p.dm_action_type, p.dm_action_text
       FROM comment_logs c
       LEFT JOIN posts p ON p.shortcode = c.shortcode
       WHERE c.account_username = ?
@@ -1219,6 +1244,7 @@ export async function processIncomingDm(
         caption?: string;
         cheat_sheet?: string;
         target_url?: string;
+        target_button_text?: string;
         auto_reply?: number;
         dm_action_type?: string;
         dm_action_text?: string;
@@ -1279,6 +1305,237 @@ export async function processIncomingDm(
     }
   } catch (leadErr) {
     console.warn("[automation-engine] Lead extraction warning:", leadErr);
+  }
+
+  // 4.4. Spec 021: Story replies are fully separated from generic DM rules.
+  // Only the story's own config (stories table) or the account story default is used.
+  // NEVER falls through to dm_automations trigger/reply rules.
+  if (event.isStoryReply) {
+    const skipStory = (note: string) => {
+      db.prepare(`
+        UPDATE dm_logs
+        SET trigger_matched = 0, reply_status = 'skipped', reply_text = ?, processed_at = ?
+        WHERE id = ?
+      `).run(note, nowTimestamp(), dmLogId);
+      return { processed: true, trigger_matched: false, reply_status: "skipped" as const };
+    };
+
+    const storyMode = normalizeStoryDefaultMode(dmRule?.story_handling_mode);
+    const storyRow = findStoryById(account.username, event.storyId);
+    const hasStoryConfig = storyHasConfig(storyRow);
+    // Fresh stories are kept in `stories` even when only the default applies, so logs can show them.
+    const emojiOnly = isEmojiOnlyText(event.incomingText);
+
+    if (!hasStoryConfig && storyMode !== "auto") {
+      return skipStory(
+        storyMode === "ignore"
+          ? "[استوری: پاسخ خودکار استوری‌ها خاموش است]"
+          : "[استوری: این استوری تنظیمات اختصاصی ندارد]"
+      );
+    }
+
+    const threadStateStory = db
+      .prepare(
+        "SELECT bot_paused FROM dm_thread_states WHERE account_username = ? AND LOWER(sender_username) = ?"
+      )
+      .get(account.username, identity.username.toLowerCase()) as { bot_paused: number } | undefined;
+    if (threadStateStory?.bot_paused === 1) {
+      return skipStory("[⏸️ ربات برای این کاربر متوقف است — مکالمه در اختیار ادمین انسانی]");
+    }
+
+    const storyCfg = hasStoryConfig ? storyRow! : null;
+    const storyLabel = storyRow?.id || event.storyId || "";
+    let storyReplyText = "";
+    let storyLink = "";
+    if (storyCfg) {
+      storyLink = buildAttributedUrl(storyCfg.target_url, {
+        username: identity.username,
+        shortcode: `story_${storyCfg.id}`,
+      });
+    }
+
+    if (emojiOnly) {
+      // Pure emoji / reaction replies never reach the LLM.
+      const action = storyCfg?.emoji_reaction_action || "ignore";
+      if (action !== "quick_reply") {
+        return skipStory(
+          action === "like" ? "[❤️ واکنش ایموجی — بدون پاسخ متنی]" : "[واکنش ایموجی نادیده گرفته شد]"
+        );
+      }
+      storyReplyText =
+        (storyCfg?.reply_mode === "direct" && storyCfg.reply_text.trim()
+          ? interpolateStaticText(storyCfg.reply_text, {
+              username: identity.username,
+              fullName: identity.fullName,
+            })
+          : "") ||
+        (appLanguage === "en" ? "Thank you so much! 🙏❤️" : "ممنون از لطفت 🙏❤️");
+    } else {
+      if (storyCfg) {
+        let storyMatched = false;
+        if (storyCfg.trigger_type === "keywords") {
+          storyMatched = matchesKeywords(event.incomingText, storyCfg.trigger_keywords);
+        } else if (storyCfg.trigger_type === "ai_context") {
+          storyMatched = await evaluateTriggerWithAi({
+            postCaption: storyCfg.caption || event.storyContent || "Instagram Story",
+            commentText: event.incomingText,
+            triggerCondition:
+              storyCfg.cheat_sheet.trim() || "پیام مرتبط با موضوع این استوری یا پرسش درباره محصول/خدمات است",
+            username: identity.username,
+            userFullName: identity.fullName,
+            appLanguage,
+          });
+        } else {
+          storyMatched = true;
+        }
+        if (!storyMatched) return skipStory("[استوری: پیام با شرط این استوری مطابقت نداشت]");
+      }
+
+      if (storyCfg?.reply_mode === "direct" && storyCfg.reply_text.trim()) {
+        storyReplyText = interpolateStaticText(storyCfg.reply_text, {
+          username: identity.username,
+          fullName: identity.fullName,
+        });
+      } else {
+        const storyHistory = getRecentDmConversationHistory({
+          accountUsername: account.username,
+          threadId: conversationId,
+          senderId: identity.userId,
+          senderUsername: identity.username,
+          excludeMessageId: messageId,
+          limit: 8,
+        });
+        const ctx: string[] = [
+          `ریپلای استوری: ${storyCfg?.caption || storyRow?.caption || event.storyContent || "استوری اینستاگرام"}`,
+        ];
+        // Priority: story cheat sheet first, then brand info (always injected).
+        if (storyCfg?.cheat_sheet.trim()) {
+          ctx.push(`[🔥 تقلب‌نامه این استوری (اولویت بالاتر از اطلاعات کلی پیج)]:\n${storyCfg.cheat_sheet.trim()}`);
+        }
+        if (storyLink) ctx.push(`[🔗 لینک مرتبط با این استوری]: ${storyLink}`);
+        if (account.bio) ctx.push(`[بیوگرافی پیج]: ${account.bio}`);
+        if (account.brand_cheat_sheet?.trim()) {
+          ctx.push(`[تقلب‌نامه و اطلاعات کلی پیج/برند]:\n${account.brand_cheat_sheet.trim()}`);
+        }
+        if (account.website_url?.trim()) ctx.push(`[سایت/لینک اصلی پیج]: ${account.website_url.trim()}`);
+
+        storyReplyText = await generateContextualReplyWithAi({
+          mode: "dm_chat",
+          accountUsername: account.username,
+          accountPersona: account.account_persona,
+          postCaption: ctx.join("\n\n"),
+          username: identity.username,
+          userFullName: identity.fullName,
+          followerCount: identity.followerCount,
+          isFollowing: identity.isFollowing,
+          appLanguage,
+          incomingText: event.incomingText,
+          instructions: [
+            "کاربر به یک استوری پاسخ داده است. فقط بر اساس اطلاعات همین استوری و تقلب‌نامه‌ها با لحن محترمانه و کوتاه پاسخ بده و چیزی از خودت نساز.",
+            // Spec 022: in AI mode, the story's reply_text holds custom prompt instructions.
+            storyCfg?.reply_mode === "ai" && storyCfg.reply_text.trim()
+              ? `[دستورالعمل اختصاصی این استوری]: ${storyCfg.reply_text.trim()}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          conversationHistory: storyHistory,
+          fallbackText: "سلام! ممنون از پیامتان 🙏 چطور می‌توانم کمکتان کنم؟",
+        });
+      }
+    }
+
+    // Story follow lock (story's own setting only)
+    if (storyCfg?.require_follow === 1 && !identity.isFollowing) {
+      const followTexts = getLocalizedFollowTexts(appLanguage, account.username, dmRule?.follow_prompt_text);
+      db.prepare(`
+        UPDATE dm_logs
+        SET trigger_matched = 1, reply_status = 'pending_follow', reply_text = ?, processed_at = ?
+        WHERE id = ?
+      `).run(storyReplyText, nowTimestamp(), dmLogId);
+      enqueueInstagramAction({
+        dedupeKey: `dm_follow_gate:${messageId}`,
+        accountUsername: account.username,
+        socialAccountId,
+        eventId: `dm:${messageId}`,
+        actionType: "FOLLOW_GATE_PROMPT",
+        targetUsername: identity.username,
+        targetUserId: identity.userId,
+        targetConversationId: conversationId,
+        payloadText: followTexts.gatePrompt,
+        priority: 1,
+        metadata: {
+          buttons: [{ type: "postback", title: followTexts.buttonTitle, payload: "FOLLOW_CONFIRMED" }],
+          quickReplies: [{ title: followTexts.buttonTitle, payload: "FOLLOW_CONFIRMED" }],
+          fallbackText: `${followTexts.gatePrompt}${followTexts.fallbackSuffix}`,
+          dmLogId,
+          finalDmStatus: "pending_follow",
+          activityLogType: "dm_sent",
+          activityLogTitle: `پیام شرط فالو (ریپلای استوری ${storyLabel}) برای @${identity.username} ارسال شد`,
+          activityLogDescription: followTexts.gatePrompt,
+        },
+      });
+      if (!event.skipImmediateDrain) {
+        await processActionQueue({ accountUsername: account.username, maxActions: 5, provider });
+      }
+      return { processed: true, trigger_matched: true, reply_status: "pending_follow" as const };
+    }
+
+    db.prepare(`
+      UPDATE dm_logs
+      SET trigger_matched = 1, reply_status = 'queued', reply_text = ?, processed_at = ?
+      WHERE id = ?
+    `).run(storyReplyText, nowTimestamp(), dmLogId);
+
+    enqueueInstagramAction({
+      dedupeKey: `dm_reply:${messageId}`,
+      accountUsername: account.username,
+      socialAccountId,
+      eventId: `dm:${messageId}`,
+      actionType: "DM_SEND",
+      targetUsername: identity.username,
+      targetUserId: identity.userId,
+      targetConversationId: conversationId,
+      payloadText: storyReplyText,
+      priority: 1,
+      metadata: {
+        dmLogId,
+        buttons: storyLink
+          ? [
+              {
+                type: "url",
+                title: resolveButtonTitle(
+                  storyCfg?.target_button_text,
+                  appLanguage === "en" ? "Open link 🔗" : "مشاهده لینک 🔗"
+                ),
+                url: storyLink,
+              },
+            ]
+          : undefined,
+        quickReplies: [
+          {
+            title: appLanguage === "en" ? "Talk to Admin 💬" : "ارتباط با ادمین 💬",
+            payload: "TALK_TO_ADMIN",
+          },
+        ],
+        fallbackText: storyLink ? `${storyReplyText}\n${storyLink}` : storyReplyText,
+        finalDmStatus: "sent",
+        activityLogType: "dm_sent",
+        activityLogTitle: `پاسخ ریپلای استوری به @${identity.username} ارسال شد`,
+        activityLogDescription: storyReplyText,
+      },
+    });
+    if (!event.skipImmediateDrain) {
+      await processActionQueue({ accountUsername: account.username, maxActions: 5, provider });
+    }
+    const refreshedStoryDm = db
+      .prepare("SELECT reply_status FROM dm_logs WHERE id = ?")
+      .get(dmLogId) as { reply_status: string } | undefined;
+    return {
+      processed: true,
+      trigger_matched: true,
+      reply_status: (refreshedStoryDm?.reply_status || "queued") as "queued",
+    };
   }
 
   // 4.5. Direct Message Automation Pause Gate
@@ -1428,19 +1685,6 @@ export async function processIncomingDm(
         };
       }
     }
-  }
-
-  if (event.isStoryReply && dmRule?.story_handling_mode === "ignore") {
-    db.prepare(`
-      UPDATE dm_logs
-      SET trigger_matched = 0, reply_status = 'skipped', processed_at = ?
-      WHERE id = ?
-    `).run(nowTimestamp(), dmLogId);
-    return {
-      processed: true,
-      trigger_matched: false,
-      reply_status: "skipped",
-    };
   }
 
   // 6. Fetch Multi-Turn Conversation History for this DM thread/user
@@ -1677,7 +1921,10 @@ export async function processIncomingDm(
   if (recentCommentOrigin?.target_url && /^https?:\/\//i.test(recentCommentOrigin.target_url)) {
     dmButtons.push({
       type: "url",
-      title: appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️",
+      title: resolveButtonTitle(
+        recentCommentOrigin.target_button_text,
+        appLanguage === "en" ? "View & Buy 🛍️" : "مشاهده و خرید 🛍️"
+      ),
       url: recentCommentOrigin.target_url,
     });
   }

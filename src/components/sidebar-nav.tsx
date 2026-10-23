@@ -86,6 +86,9 @@ export function SidebarNav({
     setAccountDropdownOpen(false);
   };
 
+  const currentAccObj = accounts.find((a) => a.username === currentAccount);
+  const isCurrentPaused = currentAccObj?.status === "paused";
+
   return (
     <aside className="w-64 h-full flex flex-col bg-card border-e border-border select-none">
       {/* Top Header: Brand Logo & Mobile Close */}
@@ -118,7 +121,13 @@ export function SidebarNav({
               <span className="truncate font-mono"><bdi>@{currentAccount || "---"}</bdi></span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full",
+                  isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
+                )}
+                title={isCurrentPaused ? "اتوماسیون متوقف (پاز)" : "اتوماسیون فعال"}
+              />
               <ChevronDown
                 className={cn(
                   "w-3 h-3 text-muted-foreground transition-transform duration-150",
@@ -150,8 +159,18 @@ export function SidebarNav({
                       )}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0",
+                            acc.status === "paused" ? "bg-amber-500" : "bg-emerald-500"
+                          )}
+                        />
                         <span className="truncate font-mono"><bdi>@{acc.username}</bdi></span>
+                        {acc.status === "paused" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
+                            متوقف
+                          </span>
+                        )}
                       </div>
                       {isSelected && (
                         <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />

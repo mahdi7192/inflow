@@ -1,4 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+
+const execFileAsync = promisify(execFile);
+const CACHE_DIR = path.join(process.cwd(), "data", "media_cache");
+
+if (!fs.existsSync(CACHE_DIR)) {
+  try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  } catch {
+    // ignore
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +65,67 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Invalid protocol", { status: 400 });
     }
 
+    const urlHash = crypto.createHash("md5").update(targetUrl).digest("hex");
+    const cachePath = path.join(CACHE_DIR, `${urlHash}.jpg`);
+
+    if (fs.existsSync(cachePath)) {
+      const cachedBuf = fs.readFileSync(cachePath);
+      return new NextResponse(cachedBuf, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000",
+        },
+      });
+    }
+
+    // Check if URL looks like an MP4/video upfront
+    const isVideoUrl =
+      parsed.pathname.endsWith(".mp4") ||
+      targetUrl.includes(".mp4?") ||
+      targetUrl.includes("/o1/v/t2/f2/m86/");
+
+    if (isVideoUrl) {
+      try {
+        const { stdout } = await execFileAsync(
+          "ffmpeg",
+          [
+            "-ss",
+            "00:00:01",
+            "-i",
+            targetUrl,
+            "-vframes",
+            "1",
+            "-q:v",
+            "2",
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "mjpeg",
+            "pipe:1",
+          ],
+          { encoding: "buffer", maxBuffer: 15 * 1024 * 1024 }
+        );
+
+        if (stdout && stdout.length > 0) {
+          try {
+            fs.writeFileSync(cachePath, stdout);
+          } catch {
+            // cache write failure is non-fatal
+          }
+          return new NextResponse(stdout, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/jpeg",
+              "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000",
+            },
+          });
+        }
+      } catch (ffmpegErr) {
+        console.warn("FFmpeg frame extraction failed, falling back to fetch:", ffmpegErr);
+      }
+    }
+
     const response = await fetch(targetUrl, {
       headers: {
         "User-Agent":
@@ -65,8 +142,48 @@ export async function GET(req: NextRequest) {
 
     const contentType = response.headers.get("content-type") || "image/jpeg";
     const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    return new NextResponse(Buffer.from(arrayBuffer), {
+    if (contentType.startsWith("video/")) {
+      try {
+        const { stdout } = await execFileAsync(
+          "ffmpeg",
+          [
+            "-ss",
+            "00:00:01",
+            "-i",
+            targetUrl,
+            "-vframes",
+            "1",
+            "-q:v",
+            "2",
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "mjpeg",
+            "pipe:1",
+          ],
+          { encoding: "buffer", maxBuffer: 15 * 1024 * 1024 }
+        );
+
+        if (stdout && stdout.length > 0) {
+          try {
+            fs.writeFileSync(cachePath, stdout);
+          } catch {}
+          return new NextResponse(stdout, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/jpeg",
+              "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000",
+            },
+          });
+        }
+      } catch {
+        // ignore and fallback to buffer
+      }
+    }
+
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         "Content-Type": contentType,

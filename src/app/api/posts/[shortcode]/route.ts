@@ -109,6 +109,10 @@ async function handleUpdate(
       typeof body.target_url === "string"
         ? body.target_url.trim()
         : existing.target_url || "";
+    const targetButtonText =
+      typeof body.target_button_text === "string"
+        ? body.target_button_text.trim().slice(0, 80)
+        : existing.target_button_text || "";
     const smartModeration =
       body.smart_moderation !== undefined
         ? body.smart_moderation
@@ -174,6 +178,7 @@ async function handleUpdate(
         playbook_id = @playbook_id,
         cheat_sheet = @cheat_sheet,
         target_url = @target_url,
+        target_button_text = @target_button_text,
         smart_moderation = @smart_moderation,
         automation_enabled_at = @automation_enabled_at,
         app_language = @app_language,
@@ -193,6 +198,7 @@ async function handleUpdate(
       playbook_id: playbookId,
       cheat_sheet: cheatSheet,
       target_url: targetUrl,
+      target_button_text: targetButtonText,
       smart_moderation: smartModeration,
       automation_enabled_at: automationEnabledAt,
       app_language: appLanguage,

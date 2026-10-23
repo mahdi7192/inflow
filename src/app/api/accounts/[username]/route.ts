@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       success: true,
       account: {
         username: account.username,
+        status: account.status || "active",
         display_name: account.display_name,
         bio: account.bio,
         account_persona: normalizePersona(account.account_persona),
@@ -95,14 +96,22 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
         ? body.website_url.trim()
         : existing.website_url || "";
 
+    const nextStatus =
+      body.status === "paused"
+        ? "paused"
+        : body.status === "active"
+        ? "active"
+        : existing.status || "active";
+
     db.prepare(`
       UPDATE accounts
       SET account_persona = ?,
           brand_cheat_sheet = ?,
           website_url = ?,
+          status = ?,
           updated_at = datetime('now')
       WHERE username = ?
-    `).run(nextPersona, nextBrandCheatSheet, nextWebsiteUrl, cleanUsername);
+    `).run(nextPersona, nextBrandCheatSheet, nextWebsiteUrl, nextStatus, cleanUsername);
 
     const updated = db
       .prepare("SELECT * FROM accounts WHERE username = ?")
@@ -112,6 +121,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       success: true,
       account: {
         username: updated.username,
+        status: updated.status || "active",
         account_persona: normalizePersona(updated.account_persona),
         brand_cheat_sheet: updated.brand_cheat_sheet || "",
         website_url: updated.website_url || "",

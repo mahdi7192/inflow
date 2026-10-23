@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeStoryDefaultMode } from "@/lib/stories";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { getDb, saveAppLanguage, DMAutomationRow } from "@/lib/db";
 
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     const require_follow = body.require_follow !== undefined ? (body.require_follow ? 1 : 0) : current.require_follow;
     const follow_prompt_text = body.follow_prompt_text !== undefined ? String(body.follow_prompt_text) : current.follow_prompt_text;
-    const story_handling_mode = body.story_handling_mode !== undefined ? String(body.story_handling_mode) : current.story_handling_mode;
+    const story_handling_mode = body.story_handling_mode !== undefined ? normalizeStoryDefaultMode(body.story_handling_mode) : current.story_handling_mode;
     const app_language =
       body.app_language && ["fa", "en", "ar"].includes(String(body.app_language))
         ? String(body.app_language)

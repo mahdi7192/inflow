@@ -211,8 +211,23 @@ export function AccountSelectorHub({ user, accounts }: AccountSelectorHubProps) 
                       </div>
                     </div>
 
-                    <div className="text-end">
+                    <div className="flex flex-col items-end gap-1.5">
                       {getBotStatusBadge(acc.bot_status || "unprovisioned")}
+                      {acc.status === "paused" ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-amber-50 text-amber-800 border-amber-300 text-[10px] px-1.5 py-0 font-medium"
+                        >
+                          اتوماسیون متوقف
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px] px-1.5 py-0 font-medium"
+                        >
+                          اتوماسیون فعال
+                        </Badge>
+                      )}
                     </div>
                   </div>
 

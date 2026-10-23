@@ -285,8 +285,11 @@
   "passwordLabel": "رمز عبور",
   "passwordPlaceholder": "رمز عبور خود را وارد کنید",
   "personaCreator": "کریتور و مدیا",
+  "personaCreatorStudio": "استودیو کریتور",
   "personaEcommerce": "فروشگاه و کالا",
+  "personaEcommerceStudio": "استودیو فروشگاه",
   "personaServiceB2b": "خدمات و مشاوره",
+  "personaServiceB2bStudio": "استودیو خدمات",
   "platformName": "inFlow",
   "postDetailTitle": "تنظیمات اتوماسیون پست",
   "postTypePost": "پست",
@@ -405,5 +408,15 @@
   "vncModalSecurityNotice": "این نشست مجهز به گارد امنیتی یک‌بارمصرف بوده و پس از ۱۰ دقیقه یا اتمام کار به‌صورت خودکار بسته می‌شود.",
   "vncModalTitle": "مانیتور زنده مرورگر ربات (VNC Guard)",
   "vncSessionExpired": "نشست موقت مانیتور به پایان رسید. در صورت نیاز مجدداً روی دکمه باز کردن کلیک کنید.",
-  "vncSessionExpiresIn": "زمان باقی‌مانده از نشست امن:"
+  "vncSessionExpiresIn": "زمان باقی‌مانده از نشست امن:",
+  "automationActive": "اتوماسیون فعال",
+  "automationPaused": "اتوماسیون متوقف (پاز)",
+  "pauseAutomationTooltip": "اتوماسیون فعال است — برای توقف کامل (پاز) کلیک کنید",
+  "resumeAutomationTooltip": "اتوماسیون متوقف است — برای فعال‌سازی مجدد کلیک کنید",
+  "automationPausedBannerTitle": "اتوماسیون این پیج کاملاً متوقف (پاز) است",
+  "automationPausedBannerDesc": "هیچ پاسخی به کامنت‌ها و دایرکت‌ها ارسال نمی‌شود و پیام‌های ورودی رد (skip) می‌شوند.",
+  "resumeAutomationBtn": "راه‌اندازی و فعال‌سازی مجدد",
+  "pauseAutomationSuccess": "اتوماسیون پیج متوقف شد (پاز). نه دایرکت و نه کامنت ارسال نخواهد شد و رویدادها رد (skip) می‌شوند.",
+  "resumeAutomationSuccess": "اتوماسیون پیج با موفقیت مجدداً فعال شد.",
+  "updateStatusError": "خطا در تغییر وضعیت اتوماسیون پیج."
 }

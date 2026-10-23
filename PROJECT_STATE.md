@@ -41,3 +41,23 @@
 - منطق اتصال اینستاگرام در SocialAPI بازنویسی شد: تطابق سخت‌گیرانه بر اساس نام کاربری، جستجو و ساخت خودکار برند اختصاصی (`getOrCreateBrand`)، اتصال OAuth مستقیم با `brand_id`، و حذف فالبک اشتباه تک‌اکانتی.
 - رابط کاربری دیالوگ ورود ساده‌سازی شد و کلیه گزینه‌های فنی/اکانت‌های دیگر حذف شدند.
 - بیلد پروداکشن پایدار و سرویس `inflow.service` روی پورت `3005` فعال است.
+
+## Spec 021 — Per-story automation (2026-10-23)
+- Added `stories` table, `src/lib/stories.ts`, story API routes, `StoriesSection` + `StoryPlaybookDrawer`, engine branch isolating story replies from DM rules, DM settings tab renamed «تنظیمات دایرکت مستقیم» with source badges.
+- Unverified: real story-reply webhook payload (none exist in incoming_events); story_id matching against SocialAPI story ids; not deployed.
+
+## اصلاح ساختار سینک و نمایش کامل ریلزها و پست‌ها (2026-10-23)
+- **علت باگ قبلی:** عدم استخراج `thumbnail_url` از آرایه `platform_media` در SocialAPI و ذخیره شدن URL فایل ویدیویی `.mp4` داخل تگ `<img>` فرانت‌اند، به همراه تک‌صفحه‌ای بودن متد `listPosts` که تنها ۲۵ پست اول را واکشی می‌کرد.
+- **اصلاح دائمی:**
+  - پشتیبانی از صفحه‌بندی مبتنی بر نشانگر (`cursor-based pagination`) با متد `listAllPosts` در `src/lib/social-api.ts`.
+  - استخراج اولویت‌دار کاور تصویر (`thumbnail_url` فرمت JPG) برای تمامی ویدیوها و ریلزها در اندپوینت سینک و سرویس پرووایدر.
+  - به‌روزرسانی و سینک کامل ۵۲۲ پست و ریلز پیج مغزوک در پایگاه داده SQLite و پاکسازی هرگونه لینک ویدیو از کاورها.
+  - تصحیح فیلد `posted_at` با تاریخ واقعی انتشار از Instagram (`published_at` و دکود مستقیم Snowflake از روی `shortcode`)؛ ترتیب نمایش از جدید به قدیم تثبیت شد.
+  - پیاده‌سازی Pagination استاندارد (۲۴ پست در هر صفحه) به همراه نویگیشن RTL فارسی در کامپوننت `InflowDashboard` برای جلوگیری از بار سنگین رندر DOM مرورگر.
+  - افزودن دکمه «همگام‌سازی دستی ریلزها» در نوار ابزار بالای داشبورد برای فراخوانی بلادرنگ SocialAPI.
+  - اصلاح چیدمان کارت‌ها به صورت عمودی (نسبت تصویر ۴:۵ مطابق با استاندارد ریلز اینستاگرام) و ۴ تایی در هر سطر دسکتاپ (`xl:grid-cols-4`).
+  - رفع خطای `RangeError: Invalid time value` در همگام‌سازی: محدودسازی ورودی `extractTimestampFromShortcode` به شورت‌کدهای استاندارد اینستاگرام (۹ الی ۱۳ کاراکتر) و قرار دادن اعتبارسنجی بازه زمانی و بلوک `try / catch` در `src/lib/db.ts` و `src/app/api/sync/route.ts`.
+  - غنی‌سازی اطلاعات ریلزها و رفع باگ کارت‌های خالی (`SocialAPI Post Enrichment & Video Frame Transcoding`):
+    - رفع ریشه ثبت کارت‌های خام با شناسه عددی با ادغام واکشی همزمان `/v1/inbox/comments` و استخراج پرمالینک، شورت‌کد اصلی (`De1gaG7Rd8Q`) و متن کپشن.
+    - ارتقای پروکسی رسانه (`/api/media/proxy`): استخراج خودکار فریم بندانگشتی JPEG از ویدیوهای MP4 اینستاگرام با `ffmpeg` و کش محلی دیسک جهت نمایش صحیح و بدون نقص تصویر در مرورگر.
+  - سرویس `inflow.service` مجدداً بیلد و ریلود شد.

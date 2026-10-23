@@ -78,7 +78,7 @@ export class SocialApiInstagramProvider implements IInstagramProvider {
     try {
       const [commentedRes, publishedRes] = await Promise.allSettled([
         this.client.listCommentedPosts(accountId),
-        this.client.listPosts(accountId),
+        this.client.listAllPosts(accountId),
       ]);
 
       const rawPosts = [
@@ -108,11 +108,14 @@ export class SocialApiInstagramProvider implements IInstagramProvider {
             ? "reel"
             : "post";
 
+        const mediaItem = target?.platform_media?.[0];
         const thumb =
-          p.thumbnail ||
           p.thumbnail_url ||
+          p.thumbnail ||
+          mediaItem?.thumbnail_url ||
+          (mediaItem?.type !== "video" ? mediaItem?.url : "") ||
           p.media_url ||
-          target?.platform_media?.[0]?.url ||
+          mediaItem?.url ||
           "";
 
         normalized.push({

@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
 
       // 2.2 Fetch posts from `/v1/posts` and `/v1/inbox/comments`
       const [publishedRes, commentedRes] = await Promise.allSettled([
-        client.listPosts(socialAccountId),
+        client.listAllPosts(socialAccountId),
         client.listCommentedPosts(socialAccountId),
       ]);
 
@@ -237,11 +237,14 @@ export async function POST(req: NextRequest) {
 
         const mediaId = String(platformId || nonUuidId || p.post_id || shortcode);
 
+        const rawMedia = p.targets?.[0]?.platform_media?.[0];
         const rawThumb =
-          p.thumbnail ||
           p.thumbnail_url ||
+          p.thumbnail ||
+          rawMedia?.thumbnail_url ||
+          (rawMedia?.type !== "video" ? rawMedia?.url : "") ||
           p.media_url ||
-          p.targets?.[0]?.platform_media?.[0]?.url ||
+          rawMedia?.url ||
           "";
 
         let thumbnailUrl = "";
@@ -264,17 +267,34 @@ export async function POST(req: NextRequest) {
           permalink ||
           `https://www.instagram.com/${targetAccount}/${postType === "reel" ? "reel" : "p"}/${shortcode}/`;
 
-        const rawCreatedAt = p.created_at;
+        const rawPublishedAt = p.published_at || p.targets?.[0]?.published_at;
         let postedAt: string | null = null;
-        if (rawCreatedAt) {
+        if (rawPublishedAt) {
           try {
-            postedAt = new Date(rawCreatedAt).toISOString().replace("T", " ").slice(0, 19);
+            const d = new Date(rawPublishedAt);
+            if (!isNaN(d.getTime())) {
+              postedAt = d.toISOString().replace("T", " ").slice(0, 19);
+            }
           } catch {
             // fallback
           }
         }
         if (!postedAt && shortcode) {
-          postedAt = extractTimestampFromShortcode(shortcode);
+          try {
+            postedAt = extractTimestampFromShortcode(shortcode);
+          } catch {
+            // fallback
+          }
+        }
+        if (!postedAt && p.created_at) {
+          try {
+            const d = new Date(p.created_at);
+            if (!isNaN(d.getTime())) {
+              postedAt = d.toISOString().replace("T", " ").slice(0, 19);
+            }
+          } catch {
+            // fallback
+          }
         }
 
         // Key by mediaId or shortcode to deduplicate across /v1/posts and /v1/inbox/comments
@@ -344,7 +364,8 @@ export async function POST(req: NextRequest) {
         ON CONFLICT(shortcode) DO UPDATE SET
           media_id = COALESCE(NULLIF(excluded.media_id, ''), posts.media_id),
           caption = COALESCE(NULLIF(excluded.caption, ''), posts.caption),
-          thumbnail_url = COALESCE(NULLIF(excluded.thumbnail_url, ''), posts.thumbnail_url),
+          thumbnail_url = CASE WHEN excluded.thumbnail_url != '' THEN excluded.thumbnail_url ELSE posts.thumbnail_url END,
+          post_type = excluded.post_type,
           posted_at = COALESCE(NULLIF(excluded.posted_at, ''), posts.posted_at),
           synced_at = excluded.synced_at,
           updated_at = excluded.updated_at

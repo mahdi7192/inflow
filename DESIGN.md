@@ -116,3 +116,7 @@ A unified natural-language textarea accompanied by 1-click prompt chips (`+ قی
   - **Posts & Reels Catalog (`/@[account]/comments`)**: MUST default to the **3-Column Instagram Visual Grid (`viewMode = "grid"`)** with cover thumbnails, Persian captions, 3 flat metrics, and a 1-click button opening `PostPlaybookDrawer`. Never display raw technical shortcodes (`DVf8k2...`) on visual grid cards or duplicate sidebar actions (`همگام‌سازی` / `حذف حساب`) inside the top content card.
 - **Keep `shadcn/ui` + Radix Headless Primitives, Purge Legacy Form Wrappers**: Retain `src/components/ui/` headless primitives (`Dialog`, `Switch`, `Button`, `Sonner`), but NEVER re-introduce legacy form wrappers (`PostDetailView`, `StickySaveBar`, `ActivationCard`, `DmLogsTable`, `DmLiveInboxModal`).
 - **Persian Numerals & Typography**: Never apply `font-mono` to Persian text or metric numbers (`tabular-nums` with `Vazirmatn` + `.toLocaleString("fa-IR")` is mandatory). Reserve `font-mono` strictly for `@username` handles and URLs wrapped in `<bdi>`.
+
+## Stories Section (Spec 021)
+- "استوری‌های فعال (۲۴ ساعت)" is its own section ABOVE the posts toolbar (not tabs, not inside the ROI card). Items use `flex-wrap` (never horizontal scroll), Instagram-gradient ring, expiry timer, real DB status. Account story default (3 modes) lives in the section header. Click opens `StoryPlaybookDrawer`.
+- DM page badges per conversation: «از کامنت پست X» | «ریپلای استوری» | «دایرکت مستقیم».

@@ -453,6 +453,13 @@ async function executeSingleAction(
     .prepare("SELECT * FROM accounts WHERE username = ?")
     .get(row.account_username) as AccountRow | undefined;
 
+  if (account?.status === "paused") {
+    console.warn(
+      `[ActionExecutor] Dropping action #${row.id} because account @${row.account_username} is paused.`
+    );
+    return;
+  }
+
   const socialAccountId =
     row.social_account_id || account?.social_account_id || row.account_username;
 
@@ -478,6 +485,20 @@ async function executeSingleAction(
     const commentId = row.target_comment_id || "";
     const fallbackText = meta.fallbackText || row.payload_text;
 
+    const sanitizedButtons = meta.buttons
+      ?.filter((b) => b && (b.type === "postback" ? Boolean(b.payload) : Boolean(b.url && /^https?:\/\//i.test(b.url))))
+      .map((b) => ({
+        ...b,
+        title: (b.title || "").slice(0, 20),
+      }));
+
+    const sanitizedQuickReplies = meta.quickReplies
+      ?.filter((q) => q && Boolean(q.title))
+      .map((q) => ({
+        ...q,
+        title: (q.title || "").slice(0, 20),
+      }));
+
     if (postId && commentId) {
       try {
         await provider.sendPrivateReply({
@@ -485,12 +506,12 @@ async function executeSingleAction(
           postId,
           commentId,
           text: row.payload_text,
-          buttons: meta.buttons,
+          buttons: sanitizedButtons && sanitizedButtons.length > 0 ? sanitizedButtons : undefined,
         });
         return;
       } catch (firstErr) {
         // If button template failed on Private Reply, retry plain Private Reply first
-        if (meta.buttons && meta.buttons.length > 0) {
+        if (sanitizedButtons && sanitizedButtons.length > 0) {
           try {
             await provider.sendPrivateReply({
               accountId: socialAccountId,
@@ -524,7 +545,8 @@ async function executeSingleAction(
             conversationId: convId,
             recipientId: row.target_user_id || row.target_username,
             text: row.payload_text,
-            buttons: meta.buttons,
+            buttons: sanitizedButtons && sanitizedButtons.length > 0 ? sanitizedButtons : undefined,
+            quickReplies: sanitizedQuickReplies && sanitizedQuickReplies.length > 0 ? sanitizedQuickReplies : undefined,
           });
           return;
         } catch {
@@ -560,31 +582,66 @@ async function executeSingleAction(
 
   const fallbackText = meta.fallbackText || row.payload_text;
 
-  if (meta.buttons && meta.buttons.length > 0) {
+  const sanitizedButtons = meta.buttons
+    ?.filter((b) => b && (b.type === "postback" ? Boolean(b.payload) : Boolean(b.url && /^https?:\/\//i.test(b.url))))
+    .map((b) => ({
+      ...b,
+      title: (b.title || "").slice(0, 20),
+    }));
+
+  const sanitizedQuickReplies = meta.quickReplies
+    ?.filter((q) => q && Boolean(q.title))
+    .map((q) => ({
+      ...q,
+      title: (q.title || "").slice(0, 20),
+    }));
+
+  if (sanitizedButtons && sanitizedButtons.length > 0) {
     try {
       await provider.sendDirectMessage({
         accountId: socialAccountId,
         conversationId,
         recipientId: row.target_user_id || row.target_username,
         text: row.payload_text,
-        buttons: meta.buttons,
+        buttons: sanitizedButtons,
       });
       return;
     } catch {
-      if (meta.quickReplies && meta.quickReplies.length > 0) {
+      if (sanitizedQuickReplies && sanitizedQuickReplies.length > 0) {
         try {
           await provider.sendDirectMessage({
             accountId: socialAccountId,
             conversationId,
             recipientId: row.target_user_id || row.target_username,
             text: row.payload_text,
-            quickReplies: meta.quickReplies,
+            quickReplies: sanitizedQuickReplies,
           });
           return;
         } catch {
           // Fall through to plain text
         }
       }
+      await provider.sendDirectMessage({
+        accountId: socialAccountId,
+        conversationId,
+        recipientId: row.target_user_id || row.target_username,
+        text: fallbackText,
+      });
+      return;
+    }
+  }
+
+  if (sanitizedQuickReplies && sanitizedQuickReplies.length > 0) {
+    try {
+      await provider.sendDirectMessage({
+        accountId: socialAccountId,
+        conversationId,
+        recipientId: row.target_user_id || row.target_username,
+        text: row.payload_text,
+        quickReplies: sanitizedQuickReplies,
+      });
+      return;
+    } catch {
       await provider.sendDirectMessage({
         accountId: socialAccountId,
         conversationId,

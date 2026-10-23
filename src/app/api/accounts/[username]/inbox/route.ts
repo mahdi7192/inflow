@@ -217,9 +217,51 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       recipientId: target || undefined,
     });
 
+    const messageId = res.id || res.message_id || `manual_${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // 1. Record manual message into dm_logs so conversation history and AI context stay intact
+    try {
+      db.prepare(`
+        INSERT INTO dm_logs (
+          message_id, thread_id, account_username, sender_username, sender_full_name, sender_id,
+          incoming_text, trigger_matched, reply_status, reply_text, processed_at, created_at
+        ) VALUES (?, ?, ?, ?, '', ?, '[پاسخ دستی ادمین]', 0, 'sent', ?, ?, ?)
+        ON CONFLICT(message_id) DO UPDATE SET
+          reply_text = excluded.reply_text,
+          processed_at = excluded.processed_at
+      `).run(
+        messageId,
+        conversationId,
+        cleanUsername,
+        target || "user",
+        target || "",
+        text,
+        now,
+        now
+      );
+    } catch (logErr) {
+      console.error("[inbox] Failed to log manual message to dm_logs:", logErr);
+    }
+
+    // 2. Pause bot for this thread so it doesn't interrupt the admin's manual conversation
+    try {
+      db.prepare(`
+        INSERT INTO dm_thread_states (account_username, sender_username, thread_id, bot_paused, paused_reason, updated_at)
+        VALUES (?, ?, ?, 1, 'admin_manual_reply', ?)
+        ON CONFLICT(account_username, sender_username) DO UPDATE SET
+          bot_paused = 1,
+          paused_reason = 'admin_manual_reply',
+          thread_id = CASE WHEN excluded.thread_id != '' THEN excluded.thread_id ELSE dm_thread_states.thread_id END,
+          updated_at = excluded.updated_at
+      `).run(cleanUsername, target || "user", conversationId, now);
+    } catch (pauseErr) {
+      console.error("[inbox] Failed to pause bot thread on manual reply:", pauseErr);
+    }
+
     return NextResponse.json({
       success: true,
-      message_id: res.id || res.message_id || `msg_${Date.now()}`,
+      message_id: messageId,
       status: res.status || "sent",
     });
   } catch (err: unknown) {

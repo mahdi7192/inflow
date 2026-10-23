@@ -285,8 +285,11 @@
   "passwordLabel": "Password",
   "passwordPlaceholder": "Enter your password",
   "personaCreator": "Creator & Media",
+  "personaCreatorStudio": "Creator Studio",
   "personaEcommerce": "Store & E-commerce",
+  "personaEcommerceStudio": "Shop Studio",
   "personaServiceB2b": "Services & B2B",
+  "personaServiceB2bStudio": "Services Studio",
   "platformName": "inFlow",
   "postDetailTitle": "Post Automation Rules",
   "postTypePost": "Post",
@@ -405,5 +408,15 @@
   "vncModalSecurityNotice": "This session is protected by an ephemeral one-time token and auto-terminates after 10 minutes.",
   "vncModalTitle": "Live Browser Monitor (VNC Guard)",
   "vncSessionExpired": "VNC session expired. Click open again if you need to reconnect.",
-  "vncSessionExpiresIn": "Time remaining in secure session:"
+  "vncSessionExpiresIn": "Time remaining in secure session:",
+  "automationActive": "Automation Active",
+  "automationPaused": "Automation Paused",
+  "pauseAutomationTooltip": "Automation is active — click to pause completely",
+  "resumeAutomationTooltip": "Automation is paused — click to resume",
+  "automationPausedBannerTitle": "Automation is completely paused for this account",
+  "automationPausedBannerDesc": "No responses will be sent to comments or DMs, and incoming events are skipped.",
+  "resumeAutomationBtn": "Resume Automation",
+  "pauseAutomationSuccess": "Account automation is now paused. No DMs or comments will be replied to and events will be skipped.",
+  "resumeAutomationSuccess": "Account automation has been successfully resumed.",
+  "updateStatusError": "Failed to update account automation status."
 }

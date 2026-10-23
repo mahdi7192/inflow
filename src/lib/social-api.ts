@@ -4,6 +4,7 @@ import { getSocialApiConfig } from "@/lib/db";
 export interface SocialApiAccount {
   id: string;
   platform: string;
+  brand_id?: string;
   username?: string;
   handle?: string;
   name?: string;
@@ -13,6 +14,14 @@ export interface SocialApiAccount {
   bio?: string;
   followers_count?: number;
   status?: string;
+}
+
+export interface SocialApiBrand {
+  id: string;
+  name: string;
+  accounts_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SocialApiPost {
@@ -37,11 +46,15 @@ export interface SocialApiPost {
     platform?: string;
     platform_post_id?: string;
     permalink?: string;
+    published_at?: string;
+    created_at?: string;
     platform_media?: Array<{
       type?: string;
       url?: string;
+      thumbnail_url?: string;
     }>;
   }>;
+  published_at?: string;
   created_at?: string;
 }
 
@@ -248,6 +261,8 @@ export class SocialApiClient {
    */
   async connectAccount(params: {
     platform?: "instagram";
+    brand_id?: string;
+    redirect_uri?: string;
     redirect_url?: string;
     metadata?: Record<string, unknown>;
   } = {}): Promise<{
@@ -257,14 +272,70 @@ export class SocialApiClient {
     account_id?: string;
     status?: string;
   }> {
+    const redirect = params.redirect_uri || params.redirect_url;
     return this.request("/v1/accounts/connect", {
       method: "POST",
       body: JSON.stringify({
         platform: params.platform || "instagram",
-        ...(params.redirect_url ? { redirect_url: params.redirect_url } : {}),
+        ...(params.brand_id ? { brand_id: params.brand_id } : {}),
+        ...(redirect ? { redirect_uri: redirect } : {}),
         ...(params.metadata ? { metadata: params.metadata } : {}),
       }),
     });
+  }
+
+  /**
+   * List all brands (`GET /v1/brands`)
+   */
+  async listBrands(): Promise<{
+    data: SocialApiBrand[];
+    count: number;
+  }> {
+    const res = await this.request<{
+      data?: SocialApiBrand[];
+      brands?: SocialApiBrand[];
+      count?: number;
+    }>("/v1/brands");
+
+    const list = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.brands)
+      ? res.brands
+      : [];
+
+    return {
+      data: list,
+      count: res.count ?? list.length,
+    };
+  }
+
+  /**
+   * Create a new brand (`POST /v1/brands`)
+   */
+  async createBrand(name: string): Promise<SocialApiBrand> {
+    return this.request<SocialApiBrand>("/v1/brands", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim() }),
+    });
+  }
+
+  /**
+   * Get or create a brand matching target name
+   */
+  async getOrCreateBrand(name: string): Promise<SocialApiBrand> {
+    const cleanName = name.trim().toLowerCase();
+    try {
+      const res = await this.listBrands();
+      const existing = res.data.find(
+        (b) => b.name?.trim().toLowerCase() === cleanName
+      );
+      if (existing) {
+        return existing;
+      }
+    } catch {
+      // Continue to create if list fails or not found
+    }
+    return this.createBrand(name.trim());
   }
 
   /**
@@ -304,17 +375,50 @@ export class SocialApiClient {
   /**
    * List published/synced posts (`GET /v1/posts`)
    */
-  async listPosts(accountId?: string): Promise<{ data: SocialApiPost[] }> {
-    const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : "";
-    const res = await this.request<{ data?: SocialApiPost[]; posts?: SocialApiPost[] }>(
-      `/v1/posts${query}`
-    );
+  async listPosts(
+    accountId?: string,
+    options?: { limit?: number; cursor?: string }
+  ): Promise<{
+    data: SocialApiPost[];
+    pagination?: { limit?: number; has_more?: boolean; next_cursor?: string };
+  }> {
+    const params = new URLSearchParams();
+    if (accountId) params.set("account_id", accountId);
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.cursor) params.set("cursor", options.cursor);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const res = await this.request<{
+      data?: SocialApiPost[];
+      posts?: SocialApiPost[];
+      pagination?: { limit?: number; has_more?: boolean; next_cursor?: string };
+    }>(`/v1/posts${query}`);
     const list = Array.isArray(res.data)
       ? res.data
       : Array.isArray(res.posts)
       ? res.posts
       : [];
-    return { data: list };
+    return { data: list, pagination: res.pagination };
+  }
+
+  /**
+   * List all published/synced posts across all pagination pages
+   */
+  async listAllPosts(
+    accountId?: string,
+    maxPosts = 2000
+  ): Promise<{ data: SocialApiPost[] }> {
+    const allPosts: SocialApiPost[] = [];
+    let cursor: string | undefined = undefined;
+
+    while (allPosts.length < maxPosts) {
+      const res = await this.listPosts(accountId, { limit: 50, cursor });
+      if (!res.data || res.data.length === 0) break;
+      allPosts.push(...res.data);
+      if (!res.pagination?.has_more || !res.pagination?.next_cursor) break;
+      cursor = res.pagination.next_cursor;
+    }
+
+    return { data: allPosts };
   }
 
   /**

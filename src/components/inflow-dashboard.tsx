@@ -27,6 +27,8 @@ import {
   Link2,
   Film,
   Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
@@ -34,6 +36,7 @@ import { Badge, Switch, Input } from "@/components/ui/primitives";
 import { I18N, Lang, formatNumber as formatNumberI18n } from "@/lib/i18n";
 import type { AccountRow, PostRow, BotStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
+import { StoriesSection } from "./stories-section";
 import { PostPlaybookDrawer, type DrawerPostData } from "./post-playbook-drawer";
 import {
   getPlaybookById,
@@ -161,6 +164,8 @@ export function InflowDashboard({
     "all" | "active" | "inactive" | "reels" | "posts"
   >("all");
   const [viewMode, setViewMode] = useState<"cards" | "grid">("grid");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 24;
 
   // Selected post for detail configuration screen
   const [selectedShortcode, setSelectedShortcode] = useState<string | null>(
@@ -452,6 +457,17 @@ export function InflowDashboard({
     });
   }, [posts, filterTab, searchQuery]);
 
+  // Reset pagination on filter or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterTab, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredPosts.slice(start, start + PAGE_SIZE);
+  }, [filteredPosts, currentPage, PAGE_SIZE]);
+
   // Selected post for detail view
   const activeDetailPost = useMemo(() => {
     return posts.find((p) => p.shortcode === selectedShortcode) || null;
@@ -575,56 +591,58 @@ export function InflowDashboard({
                     <img
                       src={profile.avatar_url}
                       alt={profile.display_name || currentAccount}
-                      className="w-13 h-13 rounded-2xl object-cover border border-slate-200 bg-slate-100"
+                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 bg-slate-100 shrink-0"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = "none";
                       }}
                     />
                   ) : (
-                    <div className="w-13 h-13 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-sm font-bold font-mono text-slate-600 shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 flex items-center justify-center text-sm font-bold font-mono text-slate-700 shrink-0 shadow-2xs">
                       {(currentAccount || "IN").slice(0, 2).toUpperCase()}
                     </div>
                   )}
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-base font-bold text-slate-900">
+                      <h1 className="text-base font-bold text-slate-900 truncate">
                         {profile?.display_name || currentAccount}
                       </h1>
-                      <span className="text-xs font-mono text-slate-500">
+                      <span className="text-xs font-mono text-slate-500 bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/60">
                         <bdi>@{currentAccount}</bdi>
                       </span>
                       <span
                         className={cn(
-                          "text-[11px] font-bold px-2.5 py-0.5 rounded-full",
+                          "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full transition-colors",
                           PERSONA_STYLE[accountPersona].badge
                         )}
                       >
-                        {PERSONA_META[accountPersona].emoji} {t(PERSONA_STUDIO_KEY[accountPersona])}
+                        <span aria-hidden="true">{PERSONA_META[accountPersona].emoji}</span>
+                        <span>{t(PERSONA_STUDIO_KEY[accountPersona])}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-1">
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-1 max-w-xl">
                       {profile?.bio || "سیستم‌عامل هوشمند تبدیل کامنت و دایرکت به فروش و فالوور"}
                     </p>
                   </div>
                 </div>
 
-                {/* Adaptive Persona Switcher + Brand Cheat Sheet + Sync */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Adaptive Persona Switcher + Brand Cheat Sheet */}
+                <div className="flex flex-wrap items-center gap-2.5">
                   {/* Triple-Persona Switcher (Spec 019) */}
-                  <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200">
+                  <div className="inline-flex items-center p-1 rounded-xl bg-slate-100/90 border border-slate-200/80 shadow-2xs">
                     {PERSONA_ORDER.map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => handleSwitchPersona(p)}
                         className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                          "inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
                           accountPersona === p
                             ? PERSONA_STYLE[p].active
-                            : "text-slate-600 hover:text-slate-900"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
                         )}
                       >
-                        {PERSONA_META[p].emoji} {t(PERSONA_TAB_KEY[p])}
+                        <span aria-hidden="true">{PERSONA_META[p].emoji}</span>
+                        <span>{t(PERSONA_TAB_KEY[p])}</span>
                       </button>
                     ))}
                   </div>
@@ -634,16 +652,18 @@ export function InflowDashboard({
                     type="button"
                     onClick={() => setBrandSheetOpen(!brandSheetOpen)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
-                      brandCheatSheet.trim()
-                        ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100/80"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200/70"
+                      "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-2xs",
+                      brandSheetOpen
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                        : brandCheatSheet.trim()
+                        ? "bg-indigo-50/80 text-indigo-700 border-indigo-200 hover:bg-indigo-100/80"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                     )}
                   >
                     <FileText className="w-3.5 h-3.5" />
                     <span>تقلب‌نامه کلی پیج</span>
-                    {brandCheatSheet.trim() && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    {brandCheatSheet.trim() && !brandSheetOpen && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
                     )}
                   </button>
                 </div>
@@ -704,129 +724,138 @@ export function InflowDashboard({
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* 4-Stage True Revenue & Engagement Funnel Strip (Flat Borderless Ribbon — Zero Card-in-Card) */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0 pt-4 border-t border-slate-100 lg:divide-x lg:divide-x-reverse lg:divide-slate-100">
-                <div className="lg:ps-5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">1. {t("metricTotalViews")}</span>
-                    <Eye className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <div className="mt-1.5 flex items-baseline justify-between">
-                    <span className="text-xl font-bold tabular-nums text-slate-900">
-                      {formatNumber(liveInsights?.funnel?.views || 0)}
-                    </span>
-                    <span className="text-[11px] text-slate-500 tabular-nums">
-                      {t("metricReach")}: {formatNumber(liveInsights?.funnel?.reach || 0)}
-                    </span>
+            {/* 4-Stage True Revenue & Engagement Funnel: 4 Standalone Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Total Views */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">۱. {t("metricTotalViews")}</span>
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shadow-2xs">
+                    <Eye className="w-4 h-4" />
                   </div>
                 </div>
-
-                <div className="lg:px-5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">2. {t("metricComments")}</span>
-                    <MessageSquare className="w-4 h-4 text-indigo-500" />
-                  </div>
-                  <div className="mt-1.5 flex items-baseline justify-between">
-                    <span className="text-xl font-bold tabular-nums text-slate-900">
-                      {formatNumber(
-                        liveInsights?.funnel?.total_comments ??
-                          posts.reduce(
-                            (acc, p) =>
-                              acc + Number((p as unknown as { logs_count: number }).logs_count || 0),
-                            0
-                          )
-                      )}
-                    </span>
-                    <span className="text-[11px] text-emerald-700 font-medium tabular-nums">
-                      {formatNumber(liveInsights?.funnel?.comment_replies_sent || 0)} {t("metricPublicReplies")}
-                    </span>
-                  </div>
+                <div>
+                  <span className="text-2xl font-bold tabular-nums text-slate-900 tracking-tight">
+                    {formatNumber(liveInsights?.funnel?.views || 0)}
+                  </span>
                 </div>
-
-                <div className="lg:px-5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">3. {t("metricSmartDms")}</span>
-                    <Send className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="mt-1.5 flex items-baseline justify-between">
-                    <span className="text-xl font-bold tabular-nums text-emerald-700">
-                      {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
-                    </span>
-                    <span className="text-[11px] text-slate-600 font-medium tabular-nums inline-flex items-center gap-1">
-                      <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
-                      <span>{t("metricRead")}</span>
-                      <CheckCheck className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    </span>
-                  </div>
-                </div>
-
-                <div className="lg:pe-5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium">4. {t("metricFollowersLeads")}</span>
-                    <UserCheck className="w-4 h-4 text-rose-500" />
-                  </div>
-                  <div className="mt-1.5 flex items-baseline justify-between">
-                    <span className="text-xl font-bold tabular-nums text-rose-600">
-                      +{formatNumber(liveInsights?.funnel?.follows_gained || 0)}
-                    </span>
-                    <span className="text-[11px] text-slate-600 font-medium tabular-nums">
-                      {formatNumber(activeCount)} {t("metricActivePosts")} ({formatNumber(cheatSheetCount)} {t("metricCheatSheets")})
-                    </span>
-                  </div>
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                  <span>{t("metricReach")}</span>
+                  <span className="font-semibold text-slate-700">
+                    {formatNumber(liveInsights?.funnel?.reach || 0)}
+                  </span>
                 </div>
               </div>
 
-              {/* Active 24h Stories Strip (if account has live stories) */}
-              {liveInsights?.stories && liveInsights.stories.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-3 overflow-x-auto">
-                  <span className="text-[11px] font-bold text-rose-600 shrink-0 flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5" />
-                    استوری‌های زنده ۲۴ ساعت اخیر ({liveInsights.stories.length}):
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {liveInsights.stories.slice(0, 8).map((st, idx) => {
-                      const thumb = String(st.thumbnail_url || st.media_url || "");
-                      return (
-                        <div
-                          key={String(st.id || idx)}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50/70 border border-rose-200 text-[11px] text-rose-900 shrink-0"
-                        >
-                          {thumb && (
-                            <img
-                              src={thumb}
-                              alt=""
-                              className="w-4 h-4 rounded-full object-cover"
-                            />
-                          )}
-                          <span>استوری #{idx + 1}</span>
-                          <span className="text-[10px] text-emerald-700 font-semibold">
-                            پاسخگوی خودکار فعال
-                          </span>
-                        </div>
-                      );
-                    })}
+              {/* Card 2: Comments & Replies */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">۲. {t("metricComments")}</span>
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-2xs">
+                    <MessageSquare className="w-4 h-4" />
                   </div>
                 </div>
-              )}
+                <div>
+                  <span className="text-2xl font-bold tabular-nums text-slate-900 tracking-tight">
+                    {formatNumber(
+                      liveInsights?.funnel?.total_comments ??
+                        posts.reduce(
+                          (acc, p) =>
+                            acc + Number((p as unknown as { logs_count: number }).logs_count || 0),
+                          0
+                        )
+                    )}
+                  </span>
+                </div>
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                  <span>{t("metricPublicReplies")}</span>
+                  <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200/60">
+                    {formatNumber(liveInsights?.funnel?.comment_replies_sent || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 3: Smart DMs */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">۳. {t("metricSmartDms")}</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-2xs">
+                    <Send className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-2xl font-bold tabular-nums text-emerald-700 tracking-tight">
+                    {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
+                  </span>
+                </div>
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                  <span>{t("metricRead")}</span>
+                  <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200/60 inline-flex items-center gap-1">
+                    <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
+                    <CheckCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 4: Leads & Followers */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-4.5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">۴. {t("metricFollowersLeads")}</span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shadow-2xs">
+                    <UserCheck className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-2xl font-bold tabular-nums text-rose-600 tracking-tight">
+                    <bdi>+{formatNumber(liveInsights?.funnel?.follows_gained || 0)}</bdi>
+                  </span>
+                </div>
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 tabular-nums">
+                  <span>{t("metricActivePosts")}</span>
+                  <span className="font-semibold text-slate-700">
+                    {formatNumber(activeCount)}{" "}
+                    <span className="text-slate-400 font-normal">
+                      ({formatNumber(cheatSheetCount)} {t("metricCheatSheets")})
+                    </span>
+                  </span>
+                </div>
+              </div>
             </div>
 
+            {/* Active 24h Stories section (Spec 021) */}
+            <StoriesSection accountUsername={currentAccount} />
+
             {/* Search, Filter Tabs & View Mode Toolbar */}
-            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-              {/* Search Input */}
-              <div className="relative flex-1">
-                <Input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("searchPlaceholder")}
-                  icon={<Search className="w-4 h-4 text-muted-foreground" />}
-                  className="h-9 text-xs"
-                />
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+              {/* Search Input & Manual Sync Button */}
+              <div className="flex items-center gap-2 flex-1">
+                <div className="relative flex-1">
+                  <Input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t("searchPlaceholder")}
+                    icon={<Search className="w-4 h-4 text-muted-foreground" />}
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="h-9 px-3 gap-1.5 text-xs font-vazir cursor-pointer bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shrink-0 shadow-2xs"
+                  title="همگام‌سازی آخرین ریلزها و پست‌ها از اینستاگرام"
+                >
+                  <RotateCw className={cn("w-3.5 h-3.5 text-indigo-600", syncing && "animate-spin")} />
+                  <span>{syncing ? "در حال دریافت..." : "همگام‌سازی دستی ریلزها"}</span>
+                </Button>
               </div>
 
               {/* View Mode & Filter Tabs */}
-              <div className="flex items-center gap-2 shrink-0 justify-between md:justify-end">
+              <div className="flex items-center gap-2 shrink-0 justify-between lg:justify-end">
                 <div className="flex items-center gap-1 bg-secondary/60 p-1 rounded-lg border border-border">
                   <button
                     type="button"
@@ -961,7 +990,7 @@ export function InflowDashboard({
               </div>
             ) : viewMode === "cards" ? (
               <div className="space-y-3">
-                {filteredPosts.map((post) => {
+                {paginatedPosts.map((post) => {
                   const isActive = post.auto_reply === 1;
                   const pbPreset = getPlaybookById(post.playbook_id);
                   const hasCheatSheet = Boolean((post.cheat_sheet || "").trim());
@@ -1118,8 +1147,8 @@ export function InflowDashboard({
                 })}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredPosts.map((post) => {
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {paginatedPosts.map((post) => {
                   const isActive = post.auto_reply === 1;
                   const pbPreset = getPlaybookById(post.playbook_id);
                   const hasCheatSheet = Boolean((post.cheat_sheet || "").trim());
@@ -1142,7 +1171,7 @@ export function InflowDashboard({
                       )}
                     >
                       {/* Cover Media Area */}
-                      <div className="aspect-[16/10] bg-slate-100 relative overflow-hidden">
+                      <div className="aspect-[4/5] bg-slate-100 relative overflow-hidden">
                         <div className="absolute inset-0 flex items-center justify-center text-slate-300">
                           {post.post_type === "reel" ? (
                             <Film className="w-8 h-8" />
@@ -1265,6 +1294,98 @@ export function InflowDashboard({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {filteredPosts.length > PAGE_SIZE && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border mt-6 bg-card/50 p-4 rounded-xl border">
+                <div className="text-xs text-muted-foreground font-vazir">
+                  نمایش{" "}
+                  <span className="font-semibold text-foreground font-mono">
+                    {(currentPage - 1) * PAGE_SIZE + 1}
+                  </span>{" "}
+                  تا{" "}
+                  <span className="font-semibold text-foreground font-mono">
+                    {Math.min(currentPage * PAGE_SIZE, filteredPosts.length)}
+                  </span>{" "}
+                  از{" "}
+                  <span className="font-semibold text-foreground font-mono">
+                    {filteredPosts.length}
+                  </span>{" "}
+                  پست و ریلز
+                </div>
+
+                <div className="flex items-center gap-1.5" dir="rtl">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs font-vazir gap-1 cursor-pointer"
+                    onClick={() => {
+                      setCurrentPage((p) => Math.max(1, p - 1));
+                      window.scrollTo({ top: 350, behavior: "smooth" });
+                    }}
+                    disabled={currentPage <= 1}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="hidden sm:inline">صفحه قبلی</span>
+                  </Button>
+
+                  <div className="flex items-center gap-1 px-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => {
+                        return (
+                          p === 1 ||
+                          p === totalPages ||
+                          Math.abs(p - currentPage) <= 1
+                        );
+                      })
+                      .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                          acc.push("...");
+                        }
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((p, idx) =>
+                        p === "..." ? (
+                          <span
+                            key={`ellipsis-${idx}`}
+                            className="px-2 text-xs text-muted-foreground select-none"
+                          >
+                            ...
+                          </span>
+                        ) : (
+                          <Button
+                            key={`page-${p}`}
+                            variant={currentPage === p ? "default" : "outline"}
+                            size="sm"
+                            className="h-8 min-w-8 p-0 text-xs font-mono cursor-pointer"
+                            onClick={() => {
+                              setCurrentPage(Number(p));
+                              window.scrollTo({ top: 350, behavior: "smooth" });
+                            }}
+                          >
+                            {p}
+                          </Button>
+                        )
+                      )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs font-vazir gap-1 cursor-pointer"
+                    onClick={() => {
+                      setCurrentPage((p) => Math.min(totalPages, p + 1));
+                      window.scrollTo({ top: 350, behavior: "smooth" });
+                    }}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <span className="hidden sm:inline">صفحه بعدی</span>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             )}
           </div>

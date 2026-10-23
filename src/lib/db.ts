@@ -121,6 +121,8 @@ export interface BackofficeAccountItem {
  */
 export function extractTimestampFromShortcode(shortcode: string): string | null {
   if (!shortcode || typeof shortcode !== "string") return null;
+  // Standard Instagram shortcodes are typically 11 characters (range 9-13)
+  if (shortcode.length < 9 || shortcode.length > 13) return null;
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   let mediaId = BigInt(0);
   for (let i = 0; i < shortcode.length; i++) {
@@ -129,8 +131,15 @@ export function extractTimestampFromShortcode(shortcode: string): string | null 
     mediaId = (mediaId * BigInt(64)) + BigInt(idx);
   }
   const tsMs = Number(mediaId >> BigInt(23)) + 1314220021000;
-  if (isNaN(tsMs) || tsMs <= 1314220021000) return null;
-  return new Date(tsMs).toISOString().replace("T", " ").slice(0, 19);
+  // Instagram epoch is 2011-08-25 (1314220021000 ms); upper bound ~year 2030 (1893456000000 ms)
+  if (isNaN(tsMs) || tsMs <= 1314220021000 || tsMs > 1893456000000) return null;
+  try {
+    const d = new Date(tsMs);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().replace("T", " ").slice(0, 19);
+  } catch {
+    return null;
+  }
 }
 
 export interface PostRow {
@@ -154,6 +163,7 @@ export interface PostRow {
   playbook_id?: string;
   cheat_sheet?: string;
   target_url?: string;
+  target_button_text?: string; // Spec 022: custom DM link button title
   smart_moderation?: number; // 0 or 1
   metrics_json?: string | null;
   app_language?: "fa" | "en" | "ar";
@@ -197,11 +207,34 @@ export interface DMAutomationRow {
   mcp_servers_config: string; // JSON array string
   require_follow: number; // 0 or 1
   follow_prompt_text: string;
-  story_handling_mode: string;
+  story_handling_mode: "auto" | "configured_only" | "ignore" | string; // account story default (Spec 021)
   app_language?: "fa" | "en" | "ar";
   activated_at: string | null;
   updated_at: string;
   created_at: string;
+}
+
+export interface StoryRow {
+  id: string;
+  account_username: string;
+  media_type: string;
+  media_url: string;
+  thumbnail_url: string;
+  permalink: string;
+  caption: string;
+  created_at: string | null;
+  expires_at: string | null;
+  auto_reply: number; // 0 or 1
+  trigger_type: "all" | "keywords" | "ai_context";
+  trigger_keywords: string;
+  reply_mode: "direct" | "ai";
+  reply_text: string;
+  target_url: string;
+  target_button_text: string; // Spec 022: custom reply link button title
+  cheat_sheet: string;
+  require_follow: number; // 0 or 1
+  emoji_reaction_action: "ignore" | "like" | "quick_reply";
+  synced_at: string;
 }
 
 export interface DMLogRow {
@@ -470,6 +503,38 @@ function migrateSchema(db: Database.Database) {
     db.exec("ALTER TABLE dm_automations ADD COLUMN app_language TEXT NOT NULL DEFAULT 'fa'");
   }
 
+  // Spec 021: per-story automation config. Rows are kept after expiry so logs can reference the story.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stories (
+      id TEXT PRIMARY KEY,
+      account_username TEXT NOT NULL,
+      media_type TEXT NOT NULL DEFAULT '',
+      media_url TEXT NOT NULL DEFAULT '',
+      thumbnail_url TEXT NOT NULL DEFAULT '',
+      permalink TEXT NOT NULL DEFAULT '',
+      caption TEXT NOT NULL DEFAULT '',
+      created_at TEXT DEFAULT NULL,
+      expires_at TEXT DEFAULT NULL,
+      auto_reply INTEGER NOT NULL DEFAULT 0,
+      trigger_type TEXT NOT NULL DEFAULT 'all',
+      trigger_keywords TEXT NOT NULL DEFAULT '',
+      reply_mode TEXT NOT NULL DEFAULT 'ai',
+      reply_text TEXT NOT NULL DEFAULT '',
+      target_url TEXT NOT NULL DEFAULT '',
+      target_button_text TEXT NOT NULL DEFAULT '',
+      cheat_sheet TEXT NOT NULL DEFAULT '',
+      require_follow INTEGER NOT NULL DEFAULT 0,
+      emoji_reaction_action TEXT NOT NULL DEFAULT 'ignore',
+      synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_stories_account ON stories(account_username, created_at DESC);
+  `);
+
+  const storyCols = (db.prepare("PRAGMA table_info(stories)").all() as { name: string }[]).map(c => c.name);
+  if (!storyCols.includes("target_button_text")) {
+    db.exec("ALTER TABLE stories ADD COLUMN target_button_text TEXT NOT NULL DEFAULT ''");
+  }
+
   const postCols = (db.prepare("PRAGMA table_info(posts)").all() as { name: string }[]).map(c => c.name);
   if (!postCols.includes("automation_enabled_at")) {
     db.exec("ALTER TABLE posts ADD COLUMN automation_enabled_at TEXT DEFAULT NULL");
@@ -485,6 +550,9 @@ function migrateSchema(db: Database.Database) {
   }
   if (!postCols.includes("target_url")) {
     db.exec("ALTER TABLE posts ADD COLUMN target_url TEXT NOT NULL DEFAULT ''");
+  }
+  if (!postCols.includes("target_button_text")) {
+    db.exec("ALTER TABLE posts ADD COLUMN target_button_text TEXT NOT NULL DEFAULT ''");
   }
   if (!postCols.includes("smart_moderation")) {
     db.exec("ALTER TABLE posts ADD COLUMN smart_moderation INTEGER NOT NULL DEFAULT 0");
@@ -1316,6 +1384,7 @@ export function deleteAccount(accountUsername: string): void {
   const tx = db.transaction(() => {
     db.prepare("DELETE FROM accounts WHERE username = ?").run(accountUsername);
     db.prepare("DELETE FROM dm_automations WHERE account_username = ?").run(accountUsername);
+    db.prepare("DELETE FROM stories WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM dm_logs WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM account_bot_bindings WHERE account_username = ?").run(accountUsername);
     db.prepare("DELETE FROM user_accounts WHERE account_username = ?").run(accountUsername);

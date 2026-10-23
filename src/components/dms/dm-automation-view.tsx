@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Loader2,
   UserCheck,
-  Film,
   Flame,
   Phone,
   Download,
@@ -605,7 +604,7 @@ export function DmAutomationView({
             }`}
           >
             <Settings2 className="w-3.5 h-3.5 text-slate-600" />
-            <span>تنظیمات استوری و دایرکت</span>
+            <span>تنظیمات دایرکت مستقیم</span>
             <span
               className={`w-2 h-2 rounded-full ${
                 isEnabled ? "bg-emerald-500" : "bg-slate-400"
@@ -740,16 +739,21 @@ export function DmAutomationView({
                                 ⏸️ ادمین
                               </span>
                             )}
-                            {conv.is_story_reply && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 font-semibold">
-                                📸 استوری
-                              </span>
-                            )}
-                            {conv.source_shortcode && !conv.is_story_reply && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold">
-                                🎬 پست
-                              </span>
-                            )}
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                                conv.is_story_reply
+                                  ? "bg-rose-50 text-rose-700"
+                                  : conv.source_shortcode
+                                  ? "bg-indigo-50 text-indigo-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {conv.is_story_reply
+                                ? "ریپلای استوری"
+                                : conv.source_shortcode
+                                ? `از کامنت پست ${conv.source_shortcode}`
+                                : "دایرکت مستقیم"}
+                            </span>
                           </div>
                         </div>
 
@@ -1166,89 +1170,31 @@ export function DmAutomationView({
          ===================================================================== */}
       {activeTab === "settings" && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100">
-          {/* Row 1: Master Autopilot Toggle */}
-          <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  isEnabled
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  پاسخگوی خودکار «ریپلای استوری‌ها» و «دایرکت‌های عمومی»
-                </h2>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  توجه: دایرکت‌های مربوط به پست‌ها همیشه از روی سناریوی همان پست پاسخ می‌گیرند. این کلید برای زمانی است که کاربری روی استوری شما ریپلای بزند یا بدون کامنت، مستقیم وارد دایرکت شود.
-                </p>
-              </div>
+          {/* Row 1: Scope explainer (story replies and post-comment DMs have their own settings) */}
+          <div className="p-6 flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 text-slate-500">
+              <Sparkles className="w-5 h-5" />
             </div>
-
-            <button
-              type="button"
-              onClick={() => handleSave({ enabled: isEnabled ? 0 : 1 })}
-              disabled={saving}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                isEnabled
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-              }`}
-            >
-              {isEnabled
-                ? "🟢 پاسخگوی استوری و دایرکت عمومی روشن است"
-                : "⚪ روشن کردن پاسخگوی استوری و دایرکت عمومی"}
-            </button>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">تنظیمات دایرکت مستقیم</h2>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                این تنظیمات فقط برای پیام‌هایی است که کاربر مستقیم و بدون کامنت یا استوری در دایرکت می‌فرستد.
+                دایرکتِ بعد از کامنت از تنظیمات همان پست، و ریپلای استوری از تنظیمات همان استوری (در صفحه پست‌ها و ریلزها) پاسخ می‌گیرد.
+              </p>
+            </div>
           </div>
 
-          {/* Row 2: Flat Switches for Story Replies & Follow Gate */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-start gap-2.5">
-                <Film className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold text-slate-900">
-                    پاسخ هوشمند به ریپلای استوری‌ها
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    پاسخگویی خودکار به مخاطبانی که روی استوری‌های شما سوال می‌پرسند یا ریپلای می‌زنند.
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
-                    config.story_handling_mode !== "ignore"
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {config.story_handling_mode !== "ignore" ? "فعال" : "غیرفعال"}
-                </span>
-                <Switch
-                  checked={config.story_handling_mode !== "ignore"}
-                  onCheckedChange={(checked) =>
-                    handleSave({
-                      story_handling_mode: checked ? "auto" : "ignore",
-                    })
-                  }
-                  className="cursor-pointer"
-                />
-              </div>
-            </div>
-
+          {/* Row 2: Follow gate */}
+          <div className="p-6 grid grid-cols-1 gap-6">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-start gap-2.5">
                 <UserCheck className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
                 <div>
                   <div className="text-xs font-bold text-slate-900">
-                    قفل فالو در دایرکت عمومی
+                    قفل فالو برای دایرکت مستقیم
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    قبل از ارسال پاسخ کامل در دایرکت، بررسی کند که کاربر پیج را فالو داشته باشد.
+                    فقط برای دایرکت مستقیم: پاسخ کامل بعد از فالو کردن پیج ارسال می‌شود. قفل فالو پست‌ها و استوری‌ها جداگانه تنظیم می‌شود.
                   </div>
                 </div>
               </div>
@@ -1281,7 +1227,7 @@ export function DmAutomationView({
               <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
                 <BookOpen className="w-4 h-4 text-indigo-600" />
                 <span>
-                  تقلب‌نامه کلی پیج (اطلاعات ثابت برند، نحوه ارسال، قیمت‌های کلی و آدرس)
+                  اطلاعات برند (در همه پاسخ‌ها استفاده می‌شود؛ تقلب‌نامه پست/استوری اولویت دارد)
                 </span>
               </div>
               {(cheatSheetSaved || saveSuccess) && (
@@ -1345,7 +1291,7 @@ export function DmAutomationView({
               >
                 {savingCheatSheet || saving
                   ? "در حال ذخیره..."
-                  : "ذخیره تنظیمات استوری و دایرکت"}
+                  : "ذخیره تنظیمات دایرکت مستقیم"}
               </button>
             </div>
           </div>

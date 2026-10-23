@@ -340,9 +340,139 @@ export interface GenerateReplyParams {
   conversationHistory?: DmHistoryExchange[];
 }
 
+const COMMON_LATIN_TO_PERSIAN_NAMES: Record<string, string> = {
+  danial: "دانیال",
+  daniall: "دانیال",
+  dani: "دانیال",
+  daniel: "دانیال",
+  mahdi: "مهدی",
+  mehdi: "مهدی",
+  ali: "علی",
+  reza: "رضا",
+  amir: "امیر",
+  mohammad: "محمد",
+  mohamad: "محمد",
+  muhammad: "محمد",
+  mamad: "محمد",
+  hossein: "حسین",
+  hosein: "حسین",
+  hassan: "حسن",
+  hasan: "حسن",
+  sara: "سارا",
+  sahar: "سحر",
+  maryam: "مریم",
+  mariam: "مریم",
+  fatemeh: "فاطمه",
+  zahra: "زهرا",
+  nima: "نیما",
+  sina: "سینا",
+  milad: "میلاد",
+  farhad: "فرهاد",
+  arman: "آرمان",
+  pouya: "پویا",
+  pooya: "پویا",
+  ashkan: "اشکان",
+  kian: "کیان",
+  omid: "امید",
+  saeed: "سعید",
+  said: "سعید",
+  alireza: "علیرضا",
+  amirreza: "امیررضا",
+  mohammadreza: "محمدرضا",
+  ehsan: "احسان",
+  yalda: "یلدا",
+  mona: "مونا",
+  aida: "آیدا",
+  ayda: "آیدا",
+  shirin: "شیرین",
+  sanaz: "ساناز",
+  pegah: "پگاه",
+  parisa: "پریسا",
+  elham: "الهام",
+  bahram: "بهرام",
+  babak: "بابک",
+  soroush: "سروش",
+  sorush: "سروش",
+  behnam: "بهنام",
+  behzad: "بهزاد",
+  peyman: "پیمان",
+  hamed: "حامد",
+  navid: "نوید",
+  saman: "سامان",
+  soheil: "سهیل",
+  shayan: "شایان",
+  erfan: "عرفان",
+  yasaman: "یاسمن",
+  tina: "تینا",
+  taraneh: "ترانه",
+  negar: "نگار",
+  niloufar: "نیلوفر",
+  niloofar: "نیلوفر",
+  roya: "رویا",
+  hoda: "هدی",
+  hasti: "هستی",
+  atena: "آتنا",
+  sepideh: "سپیده",
+  mina: "مینا",
+  mahta: "مهتا",
+  mahsa: "مهسا",
+  asal: "عسل",
+  ghazal: "غزل",
+  bahar: "بهار",
+  baran: "باران",
+  parham: "پرهام",
+  bardia: "بردیا",
+  sam: "سام",
+  aryan: "آرین",
+  arian: "آرین",
+  shahin: "شاهین",
+  shahryar: "شهریار",
+  kourosh: "کوروش",
+  cyrus: "کوروش",
+  daryoush: "داریوش",
+  farshid: "فرشید",
+  farzad: "فرزاد",
+  masoud: "مسعود",
+  mehran: "مهران",
+  mostafa: "مصطفی",
+  morteza: "مرتضی",
+  javad: "جواد",
+  saeid: "سعید",
+  vahid: "وحید",
+  hamid: "حمید",
+};
+
+export function sanitizePersianGreetingName(name?: string): string {
+  if (!name) return "";
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+
+  // If already contains Persian letters
+  const hasPersian = /[\u0600-\u06FF]/.test(trimmed);
+  if (hasPersian) {
+    const cleaned = trimmed.replace(/[^\u0600-\u06FF\s]/g, "").trim();
+    return cleaned.split(/\s+/)[0] || cleaned;
+  }
+
+  // Pure Latin / Finglish lookup
+  const normalized = trimmed.toLowerCase().replace(/[^a-z]/g, "");
+  if (COMMON_LATIN_TO_PERSIAN_NAMES[normalized]) {
+    return COMMON_LATIN_TO_PERSIAN_NAMES[normalized];
+  }
+
+  // Check first token if multiple words (e.g. "Danial Rabiee")
+  const firstWord = trimmed.split(/[\s_.-]+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+  if (COMMON_LATIN_TO_PERSIAN_NAMES[firstWord]) {
+    return COMMON_LATIN_TO_PERSIAN_NAMES[firstWord];
+  }
+
+  return "";
+}
+
 function resolveUserAddressing(username?: string, userFullName?: string): {
   cleanUsername: string;
   cleanFullName: string;
+  persianGreetingName: string;
   displayLabel: string;
   hasRealIdentity: boolean;
 } {
@@ -361,11 +491,13 @@ function resolveUserAddressing(username?: string, userFullName?: string): {
     rawName.toLowerCase() === "instagram_user" ||
     rawName.startsWith("ig_");
   const cleanFullName = isGenericName ? "" : rawName;
+  const persianGreetingName = sanitizePersianGreetingName(cleanFullName);
 
   if (cleanFullName && cleanUsername && cleanFullName.toLowerCase() !== cleanUsername.toLowerCase()) {
     return {
       cleanUsername,
       cleanFullName,
+      persianGreetingName,
       displayLabel: `${cleanFullName} (@${cleanUsername})`,
       hasRealIdentity: true,
     };
@@ -374,6 +506,7 @@ function resolveUserAddressing(username?: string, userFullName?: string): {
     return {
       cleanUsername,
       cleanFullName,
+      persianGreetingName,
       displayLabel: cleanFullName,
       hasRealIdentity: true,
     };
@@ -382,6 +515,7 @@ function resolveUserAddressing(username?: string, userFullName?: string): {
     return {
       cleanUsername,
       cleanFullName: "",
+      persianGreetingName,
       displayLabel: `@${cleanUsername}`,
       hasRealIdentity: true,
     };
@@ -389,6 +523,7 @@ function resolveUserAddressing(username?: string, userFullName?: string): {
   return {
     cleanUsername: "",
     cleanFullName: "",
+    persianGreetingName: "",
     displayLabel: "کاربر گرامی",
     hasRealIdentity: false,
   };
@@ -449,8 +584,10 @@ export async function generateContextualReplyWithAi(params: GenerateReplyParams)
       : "comment_dm";
 
   const userMetadataLines = [
-    `- نام نمایشی کاربر: ${identity.cleanFullName || "نامشخص"}`,
-    `- نام کاربری اینستاگرام: ${identity.cleanUsername ? `@${identity.cleanUsername}` : "نامشخص"}`,
+    identity.persianGreetingName
+      ? `- نام فارسی کاربر: ${identity.persianGreetingName}`
+      : `- نام کاربر: ${identity.cleanFullName || "نامشخص"}`,
+    identity.cleanUsername ? `- نام کاربری اینستاگرام: @${identity.cleanUsername}` : "",
     params.followerCount !== undefined ? `- تعداد دنبال‌کنندگان کاربر: ${params.followerCount}` : "",
     params.isFollowing !== undefined
       ? `- وضعیت فالو پیج: ${params.isFollowing ? "فالو کرده است" : "هنوز فالو نکرده است"}`
@@ -471,9 +608,9 @@ ${langDirective}
 قوانین الزامی:
 ۱. اطلاعات کاربر تریگرشده، متن کامنت ارسالی او و دستورالعمل ادمین در پنل را دقیقاً در نظر بگیرید.
 ${
-  identity.hasRealIdentity
-    ? `۲. نام مخاطب «${identity.cleanFullName || identity.cleanUsername}» است؛ در صورت تناسب می‌توانید از نامش به شکل طبیعی استفاده کنید (هرگز از عبارت مصنوعی @user استفاده نکنید).`
-    : `۲. نام دقیق کاربر مشخص نیست؛ هرگز از عبارت @user استفاده نکنید.`
+  identity.persianGreetingName
+    ? `۲. نام فارسی مخاطب «${identity.persianGreetingName}» است؛ در صورت تناسب می‌توانید از نامش به شکل طبیعی استفاده کنید (هرگز از نام انگلیسی یا عبارت @user استفاده نکنید).`
+    : `۲. هرگز نام انگلیسی، فینگلیش یا عبارت مصنوعی @user را در پاسخ فارسی نیاورید.`
 }
 ۳. پاسخ باید ۱ تا ۲ جمله کوتاه، طبیعی و کاملاً منطبق با دستورالعمل ادمین باشد.
 ۴. خروجی فقط و فقط متن نهایی پاسخ کامنت باشد؛ بدون هیچ توضیح اضافه و بدون گیومه.`;
@@ -498,11 +635,9 @@ ${langDirective}
 قوانین الزامی:
 ۱. دستورالعمل ادمین در کانفیگ پنل را با دقت کامل اجرا کنید.
 ${
-  identity.cleanFullName
-    ? `۲. نام کاربر «${identity.cleanFullName}»${identity.cleanUsername ? ` (یوزرنیم: @${identity.cleanUsername})` : ""} است؛ در ابتدای پیام با نام خودش («${identity.cleanFullName} عزیز») محترمانه و صمیمی خطابش قرار دهید.`
-    : identity.cleanUsername
-    ? `۲. نام کاربری مخاطب @${identity.cleanUsername} است؛ با لحنی صمیمی و محترمانه خطابش قرار دهید.`
-    : `۲. در ابتدای پیام بدون استفاده از کلمه @user، سلام و احوال‌پرسی صمیمی داشته باشید.`
+  identity.persianGreetingName
+    ? `۲. نام فارسی کاربر «${identity.persianGreetingName}» است؛ در ابتدای پیام با نام فارسی خودش («${identity.persianGreetingName} عزیز» یا «سلام ${identity.persianGreetingName} جان») محترمانه و صمیمی آغاز کنید.`
+    : `۲. نام کاربر به حروف لاتین/انگلیسی است؛ **اکیداً ممنوع است نام انگلیسی یا یوزرنیم کاربر را وسط یا اول متن فارسی بیاورید (مثلاً Daniall عزیز یا @user کاملاً اشتباه است)**. پیام را با یک سلام و احوال‌پرسی گرم و طبیعی به فارسی (مثل «سلام وقتتون بخیر»، «سلام و درود») آغاز کنید.`
 }
 ۳. به متن کامنت ارسالی کاربر و موضوع پست توجه کنید تا پیام کاملاً شخصی‌سازی‌شده و مرتبط باشد.
 ۴. خروجی فقط و فقط متن نهایی پیام دایرکت باشد؛ بدون توضیح اضافه و بدون گیومه.`;
@@ -549,11 +684,9 @@ ${params.instructions || "بر اساس کامنت کاربر و موضوع پس
 
     const greetingRule = hasPriorHistory
       ? `۲. قانون حیاتی تداوم گفتگو (بسیار مهم): این پیام در ادامه یک گفتگوی قبلی است و شما در پیام‌های قبلی به کاربر سلام کرده‌اید. **اکیداً ممنوع است که دوباره سلام، وقت‌بخیر، روزبخیر یا احوال‌پرسی تکراری در شروع پیام بنویسید!** مستقیماً و طبیعی در ادامه مکالمه قبلی به پیام جدید کاربر پاسخ دهید.`
-      : identity.cleanFullName
-      ? `۲. این اولین پیام گفتگو است؛ نام کاربر «${identity.cleanFullName}» است و می‌توانید در شروع گفتگو با نام خودش صمیمانه سلام کنید (هرگز از @user استفاده نکنید).`
-      : identity.cleanUsername
-      ? `۲. این اولین پیام گفتگو است؛ نام کاربری مخاطب ${identity.cleanUsername} است و می‌توانید در شروع گفتگو صمیمانه سلام کنید (هرگز از @user استفاده نکنید).`
-      : `۲. این اولین پیام گفتگو است؛ با لحنی صمیمی سلام کنید و هرگز از عبارت @user استفاده نکنید.`;
+      : identity.persianGreetingName
+      ? `۲. این اولین پیام گفتگو است؛ نام فارسی کاربر «${identity.persianGreetingName}» است و می‌توانید در شروع گفتگو با نام خودش («${identity.persianGreetingName} عزیز») صمیمانه سلام کنید (هرگز از نام انگلیسی یا عبارت @user استفاده نکنید).`
+      : `۲. این اولین پیام گفتگو است؛ با لحنی صمیمی و طبیعی سلام کنید (مثل «سلام وقتتون بخیر»). **هرگز نام انگلیسی کاربر، یوزرنیم او یا عبارت @user را در متن فارسی استفاده نکنید.**`;
 
     sys = `شما دستیار هوشمند پاسخگویی دایرکت پیج اینستاگرام ${params.accountUsername ? `@${params.accountUsername}` : ""} هستید و در حال چت با کاربر در دایرکت می‌باشید.
 ${langDirective}
@@ -592,7 +725,7 @@ ${
   if (generated && generated.length > 0) {
     return generated
       .replace(/^["'«]+|["'»]+$/g, "")
-      .replace(/@user\b/gi, identity.cleanFullName || identity.cleanUsername || "دوست")
+      .replace(/@user\b/gi, identity.persianGreetingName || "دوست")
       .trim();
   }
 

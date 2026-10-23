@@ -48,3 +48,5 @@ __pycache__/
 *.pyc
 .venv/
 session*.json
+data/*.bak
+data/media_cache/

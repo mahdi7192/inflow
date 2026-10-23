@@ -19,6 +19,9 @@ export interface WorkspaceContextType {
   t: (key: string, params?: Record<string, string | number>) => string;
   formatNumber: (num: number | string | undefined | null) => string;
 
+  // Tenancy & Account Status
+  updateAccountStatus: (status: "active" | "paused") => Promise<boolean>;
+
   // Form Dirty Tracking & Navigation Guard
   isDirty: boolean;
   setIsDirty: (dirty: boolean) => void;
@@ -48,8 +51,44 @@ export function WorkspaceProvider({
 }: WorkspaceProviderProps) {
   // Tenancy states
   const [account] = useState<string>(initialAccount);
-  const [profile] = useState<AccountRow>(initialProfile);
-  const [accounts] = useState<AccountRow[]>(initialAccounts);
+  const [profile, setProfile] = useState<AccountRow>(initialProfile);
+  const [accounts, setAccounts] = useState<AccountRow[]>(initialAccounts);
+
+  useEffect(() => {
+    setProfile(initialProfile);
+  }, [initialProfile]);
+
+  useEffect(() => {
+    setAccounts(initialAccounts);
+  }, [initialAccounts]);
+
+  const updateAccountStatus = useCallback(
+    async (nextStatus: "active" | "paused"): Promise<boolean> => {
+      try {
+        const cleanAccount = account.replace(/^@/, "");
+        const res = await fetch(`/api/accounts/${encodeURIComponent(cleanAccount)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: nextStatus }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setProfile((prev) => ({ ...prev, status: nextStatus }));
+          setAccounts((prev) =>
+            prev.map((acc) =>
+              acc.username === cleanAccount ? { ...acc, status: nextStatus } : acc
+            )
+          );
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error("Failed to update account status:", err);
+        return false;
+      }
+    },
+    [account]
+  );
 
   // Language & Direction states
   const [lang, setLangState] = useState<Lang>("fa");
@@ -120,6 +159,7 @@ export function WorkspaceProvider({
         setLang,
         t,
         formatNumber: formatNumberFn,
+        updateAccountStatus,
         isDirty,
         setIsDirty,
         dirtyCount,

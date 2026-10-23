@@ -26,3 +26,9 @@
 * `src/components/inflow-dashboard.tsx`: Main Studio workspace, Adaptive Persona Switcher, flat borderless 4-Stage ROI Funnel Ribbon, and 3-column Instagram Visual Grid Catalog.
 * `src/components/post-playbook-drawer.tsx`: 1-Click Slide-Over Playbook & Cheat Sheet Drawer.
 * `src/components/dms/dm-automation-view.tsx`: Unified 3-Tab DM & Story Studio (`💬 گفتگوهای دایرکت` 2-Column Split Messenger with 1-click per-user bot pause, `🔥 شماره‌های شکارشده` Leads CRM, and `⚙️ تنظیمات استوری و دایرکت`).
+
+## Story vs DM Separation Rule (Spec 021)
+- Story replies (`event.isStoryReply`) NEVER use generic DM rules (`dm_automations` trigger/reply/keywords). They use ONLY: the story's own row in `stories` (auto_reply, keywords, cheat_sheet, target_url, require_follow, emoji_reaction_action) or the account default `dm_automations.story_handling_mode` = `auto` | `configured_only` | `ignore`.
+- Comment-continuation DMs use post config; plain DMs use `dm_automations` ("تنظیمات دایرکت مستقیم").
+- Pure-emoji/reaction story replies never reach the LLM. Story/post cheat sheet has priority over brand cheat sheet; brand sheet is injected everywhere.
+- `stories` rows are kept after expiry; synced from `SocialApiClient.listActiveInstagramStories` (0 credits) via `src/lib/stories.ts`. API: `GET /api/accounts/[username]/stories`, `PATCH .../stories/[id]`.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, hasAccountAccess } from "@/lib/auth-guard";
 import { getDb, type AccountRow, type PostRow } from "@/lib/db";
 import { SocialApiClient } from "@/lib/social-api";
+import { syncStoriesFromApi } from "@/lib/stories";
 
 interface RouteParams {
   params: Promise<{
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     const posts = db
       .prepare(
-        "SELECT shortcode, media_id, post_type, auto_reply, playbook_id, cheat_sheet, target_url, metrics_json FROM posts WHERE account_username = ? ORDER BY COALESCE(posted_at, synced_at) DESC, id DESC LIMIT 24"
+        "SELECT shortcode, media_id, post_type, auto_reply, playbook_id, cheat_sheet, target_url, target_button_text, metrics_json FROM posts WHERE account_username = ? ORDER BY COALESCE(posted_at, synced_at) DESC, id DESC LIMIT 24"
       )
       .all(cleanUsername) as PostRow[];
 
@@ -86,6 +87,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
         if (freshSummary) summary = freshSummary;
         if (Array.isArray(freshStories)) stories = freshStories;
+        if (Array.isArray(freshStories)) {
+          syncStoriesFromApi(cleanUsername, freshStories as Array<Record<string, unknown>>);
+        }
 
         db.prepare("UPDATE accounts SET insights_json = ? WHERE username = ?").run(
           JSON.stringify({

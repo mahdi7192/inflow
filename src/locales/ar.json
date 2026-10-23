@@ -285,8 +285,11 @@
   "passwordLabel": "كلمة المرور",
   "passwordPlaceholder": "أدخل كلمة المرور",
   "personaCreator": "صانع محتوى وميديا",
+  "personaCreatorStudio": "استودیو المنشئ",
   "personaEcommerce": "متجر ومنتجات",
+  "personaEcommerceStudio": "استودیو المتجر",
   "personaServiceB2b": "خدمات واستشارات",
+  "personaServiceB2bStudio": "استودیو الخدمات",
   "platformName": "inFlow",
   "postDetailTitle": "إعدادات أتمتة المنشور",
   "postTypePost": "منشور",
@@ -405,5 +408,15 @@
   "vncModalSecurityNotice": "هذه الجلسة محمية برمز أمني لمرة واحدة وتُغلق تلقائياً بعد ١٠ دقائق.",
   "vncModalTitle": "المراقبة المباشرة لمتصفح البوت (VNC Guard)",
   "vncSessionExpired": "انتهت صلاحية جلسة المراقبة. انقر لإعادة الفتح عند الحاجة.",
-  "vncSessionExpiresIn": "الوقت المتبقي للجلسة الآمنة:"
+  "vncSessionExpiresIn": "الوقت المتبقي للجلسة الآمنة:",
+  "automationActive": "الأتمتة نشطة",
+  "automationPaused": "الأتمتة متوقفة (مؤقت)",
+  "pauseAutomationTooltip": "الأتمتة نشطة — انقر للإيقاف المؤقت التام",
+  "resumeAutomationTooltip": "الأتمتة متوقفة — انقر لاستئناف العمل",
+  "automationPausedBannerTitle": "تم إيقاف أتمتة هذا الحساب تماماً",
+  "automationPausedBannerDesc": "لن يتم إرسال أي ردود على التعليقات أو الرسائل الخاصة، ويتم تخطي الأحداث الواردة.",
+  "resumeAutomationBtn": "استئناف وتشغيل الأتمتة",
+  "pauseAutomationSuccess": "تم إيقاف الأتمتة مؤقتاً. لن يتم الرد على الرسائل أو التعليقات وسيتم تخطي الأحداث.",
+  "resumeAutomationSuccess": "تم استئناف الأتمتة بنجاح.",
+  "updateStatusError": "فشل في تحديث حالة أتمتة الحساب."
 }

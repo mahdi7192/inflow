@@ -162,6 +162,29 @@ export async function ingestNormalizedEvent(
     }
   }
 
+  // Check if account is paused - if paused, do not process comment or DM, skip completely
+  const targetUsername = accountUsername !== "unknown" ? accountUsername : event.accountUsername;
+  if (targetUsername) {
+    const cleanTargetUsername = targetUsername.replace(/^@/, "");
+    const accRow = db
+      .prepare("SELECT status FROM accounts WHERE username = ?")
+      .get(cleanTargetUsername) as { status: string } | undefined;
+    if (accRow?.status === "paused") {
+      db.prepare(`
+        UPDATE incoming_events
+        SET status = 'skipped', processed_at = ?
+        WHERE event_id = ?
+      `).run(nowTimestamp(), event.eventUid);
+
+      return {
+        processed: false,
+        skipped: true,
+        reason: "account_paused",
+        event_type: event.eventType,
+      };
+    }
+  }
+
   if (event.eventType === "comment") {
     const res = await processIncomingComment(
       {
@@ -380,6 +403,7 @@ export async function pollActiveAccountsAndPosts(options?: {
               AND p.account_username = ?
               AND a.social_account_id IS NOT NULL
               AND a.social_account_id != ''
+              AND (a.status IS NULL OR a.status != 'paused')
           `)
           .all(options.accountUsername)
       : db
@@ -390,6 +414,7 @@ export async function pollActiveAccountsAndPosts(options?: {
             WHERE p.auto_reply = 1
               AND a.social_account_id IS NOT NULL
               AND a.social_account_id != ''
+              AND (a.status IS NULL OR a.status != 'paused')
           `)
           .all()
   ) as Array<PostRow & { social_account_id: string }>;
@@ -469,6 +494,7 @@ export async function pollActiveAccountsAndPosts(options?: {
             WHERE username = ?
               AND social_account_id IS NOT NULL
               AND social_account_id != ''
+              AND (status IS NULL OR status != 'paused')
           `)
           .all(options.accountUsername)
       : db
@@ -476,12 +502,13 @@ export async function pollActiveAccountsAndPosts(options?: {
             SELECT * FROM accounts
             WHERE social_account_id IS NOT NULL
               AND social_account_id != ''
+              AND (status IS NULL OR status != 'paused')
           `)
           .all()
   ) as AccountRow[];
 
   for (const acc of connectedAccounts) {
-    if (!acc.social_account_id) continue;
+    if (!acc.social_account_id || acc.status === "paused") continue;
 
     const dmRule = db
       .prepare("SELECT * FROM dm_automations WHERE account_username = ?")
