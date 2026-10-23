@@ -4,8 +4,6 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { I18N, Lang } from "@/lib/i18n";
 import type { AccountRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
@@ -52,7 +50,7 @@ export function SidebarNav({
 
   const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
 
-  // Close account dropdown when clicking outside
+  // Close account dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -81,43 +79,49 @@ export function SidebarNav({
   return (
     <aside
       className={cn(
-        "h-full flex flex-col bg-surface-container border-e border-outline-variant/60 select-none transition-all duration-300 ease-in-out",
+        "h-full flex flex-col bg-surface-container-low border-e border-outline-variant/30 select-none transition-all duration-300 ease-in-out shrink-0",
         isRail ? "w-20" : "w-72"
       )}
     >
-      {/* Top Header: Brand Logo & Navigation Toggle (Google Drawer Header) */}
-      <div className={cn(
-        "h-16 px-4 flex items-center justify-between border-b border-outline-variant/40 shrink-0",
-        isRail ? "justify-center px-2" : ""
-      )}>
+      {/* 1. Header: Logo & Rail Toggle */}
+      <div
+        className={cn(
+          "h-16 px-4 flex items-center justify-between shrink-0",
+          isRail ? "justify-center px-2" : ""
+        )}
+      >
         {!isRail ? (
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             {onToggleRail && (
               <button
                 type="button"
                 onClick={onToggleRail}
-                className="hidden lg:flex p-2 rounded-full text-foreground/80 hover:bg-surface-container-high transition-colors cursor-pointer"
-                title="تغییر حالت سایدبار"
+                className="hidden lg:inline-flex p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+                title="تغییر ابعاد سایدبار"
                 aria-label="Toggle rail"
               >
-                <MaterialSymbol name="menu" size={22} />
+                <MaterialSymbol name="dock_to_right" size={22} rtlMirror />
               </button>
             )}
-            <Link href="/" className="flex items-center gap-2 hover:opacity-85 transition-opacity" title="مرکز انتخاب پیج‌ها">
+            <Link
+              href="/"
+              className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+              title="مرکز پیج‌ها"
+            >
               <BrandLogo size="default" />
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center">
             {onToggleRail && (
               <button
                 type="button"
                 onClick={onToggleRail}
-                className="hidden lg:flex p-2 rounded-full text-foreground/80 hover:bg-surface-container-high transition-colors cursor-pointer"
-                title="باز کردن منو"
+                className="hidden lg:inline-flex p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+                title="گسترش سایدبار"
                 aria-label="Expand sidebar"
               >
-                <MaterialSymbol name="menu_open" size={22} rtlMirror={true} />
+                <MaterialSymbol name="dock_to_right" size={22} rtlMirror className="rotate-180" />
               </button>
             )}
           </div>
@@ -128,7 +132,7 @@ export function SidebarNav({
           <button
             type="button"
             onClick={onCloseMobileDrawer}
-            className="lg:hidden p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-surface-container-high transition-colors cursor-pointer"
+            className="lg:hidden p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
             aria-label={t("closeMenu")}
           >
             <MaterialSymbol name="close" size={20} />
@@ -136,50 +140,52 @@ export function SidebarNav({
         )}
       </div>
 
-      {/* Account Switcher Section (M3 Compact/Expanded Card) */}
-      <div className={cn("p-3 shrink-0", isRail ? "px-2" : "")}>
-        <div className="relative" ref={dropdownRef}>
+      {/* 2. Account Switcher (Material You Card / Anchor) */}
+      <div className={cn("px-3 py-2 shrink-0", isRail ? "px-2" : "")} ref={dropdownRef}>
+        <div className="relative">
           {!isRail ? (
             <button
               type="button"
               onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high border border-outline-variant/60 text-xs font-medium text-foreground transition-all cursor-pointer shadow-xs active:scale-[0.99]"
+              className="w-full flex items-center justify-between p-3 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high border border-outline-variant/40 text-start transition-all cursor-pointer shadow-xs active:scale-[0.99]"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-2xs">
-                  <MaterialSymbol name="photo_camera" size={13} fill={true} />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+                  <MaterialSymbol name="photo_camera" size={18} fill />
                 </div>
-                <span className="truncate font-mono font-medium tracking-tight text-foreground">
-                  <bdi>@{currentAccount || "---"}</bdi>
-                </span>
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate font-mono font-bold text-xs text-on-surface">
+                    <bdi>@{currentAccount || "---"}</bdi>
+                  </span>
+                  <span className="text-[10px] text-on-surface-variant flex items-center gap-1.5 mt-0.5">
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full shrink-0",
+                        isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
+                      )}
+                    />
+                    <span>{isCurrentPaused ? "اتوماسیون متوقف" : "اتوماسیون فعال"}</span>
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-full ring-2 ring-surface-container-lowest",
-                    isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
-                  )}
-                  title={isCurrentPaused ? "اتوماسیون متوقف (پاز)" : "اتوماسیون فعال"}
-                />
-                <MaterialSymbol
-                  name="expand_more"
-                  size={18}
-                  className={cn(
-                    "text-muted-foreground transition-transform duration-200",
-                    accountDropdownOpen && "rotate-180"
-                  )}
-                />
-              </div>
+              <MaterialSymbol
+                name="expand_more"
+                size={20}
+                className={cn(
+                  "text-on-surface-variant transition-transform duration-200 shrink-0",
+                  accountDropdownOpen && "rotate-180"
+                )}
+              />
             </button>
           ) : (
             <button
               type="button"
               onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="w-12 h-12 mx-auto flex items-center justify-center rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high border border-outline-variant/60 transition-all cursor-pointer relative shadow-xs"
+              className="w-12 h-12 mx-auto flex items-center justify-center rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high border border-outline-variant/40 transition-all cursor-pointer relative shadow-xs"
               title={`@${currentAccount}`}
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-2xs">
-                <MaterialSymbol name="photo_camera" size={15} fill={true} />
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-2xs">
+                <MaterialSymbol name="photo_camera" size={17} fill />
               </div>
               <span
                 className={cn(
@@ -192,12 +198,14 @@ export function SidebarNav({
 
           {/* Account Dropdown Popover */}
           {accountDropdownOpen && (
-            <div className={cn(
-              "absolute top-full mt-2 rounded-3xl border border-outline-variant/70 bg-surface-container-lowest shadow-lg p-2 z-50 animate-in fade-in zoom-in-95",
-              isRail ? "start-14 w-64" : "start-0 w-full"
-            )}>
-              <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-                <span>{t("connectedAccounts") || "پیج‌های متصل"}</span>
+            <div
+              className={cn(
+                "absolute top-full mt-2 rounded-[24px] border border-outline-variant/50 bg-surface-container-lowest shadow-xl p-2 z-50 animate-in fade-in zoom-in-95",
+                isRail ? "start-14 w-64" : "start-0 w-full"
+              )}
+            >
+              <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center justify-between">
+                <span>پیج‌های متصل</span>
                 <span className="text-[10px] tabular-nums bg-surface-container px-2 py-0.5 rounded-full font-bold">
                   {accounts.length}
                 </span>
@@ -211,10 +219,10 @@ export function SidebarNav({
                       type="button"
                       onClick={() => handleSelectAccount(acc.username)}
                       className={cn(
-                        "w-full flex items-center justify-between px-3 py-2 rounded-2xl text-xs transition-all cursor-pointer text-start",
+                        "w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs transition-all cursor-pointer text-start",
                         isSelected
-                          ? "bg-primary-container text-on-primary-container font-semibold"
-                          : "text-foreground/80 hover:bg-surface-container-high"
+                          ? "bg-secondary-container text-on-secondary-container font-bold"
+                          : "text-on-surface hover:bg-surface-container-high"
                       )}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -225,28 +233,26 @@ export function SidebarNav({
                           )}
                         />
                         <span className="truncate font-mono"><bdi>@{acc.username}</bdi></span>
-                        {acc.status === "paused" && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 font-medium">
-                            متوقف
-                          </span>
-                        )}
                       </div>
                       {isSelected && (
-                        <MaterialSymbol name="check" size={18} className="text-primary shrink-0" />
+                        <MaterialSymbol name="check" size={18} className="text-secondary shrink-0" />
                       )}
                     </button>
                   );
                 })}
               </div>
-              <div className="h-px bg-outline-variant/50 my-1.5" />
+
+              <div className="h-px bg-outline-variant/30 my-1.5" />
+
               <Link
                 href="/"
                 onClick={() => setAccountDropdownOpen(false)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-foreground/80 hover:bg-surface-container-high transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
               >
-                <MaterialSymbol name="grid_view" size={18} className="text-muted-foreground" />
+                <MaterialSymbol name="grid_view" size={18} className="text-on-surface-variant" />
                 <span>همه پیج‌ها</span>
               </Link>
+
               {currentUser?.role === "superadmin" && (
                 <button
                   type="button"
@@ -254,22 +260,23 @@ export function SidebarNav({
                     setAccountDropdownOpen(false);
                     onOpenAddAccount();
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-primary font-medium hover:bg-primary-container/40 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-primary font-bold hover:bg-primary-container/40 transition-colors cursor-pointer"
                 >
                   <MaterialSymbol name="add_circle" size={18} className="text-primary" />
                   <span>{t("addAccount")}</span>
                 </button>
               )}
+
               {currentAccount && onOpenDeleteAccount && (
                 <>
-                  <div className="h-px bg-outline-variant/50 my-1.5" />
+                  <div className="h-px bg-outline-variant/30 my-1.5" />
                   <button
                     type="button"
                     onClick={() => {
                       setAccountDropdownOpen(false);
                       onOpenDeleteAccount();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-start"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-start font-medium"
                   >
                     <MaterialSymbol name="delete" size={18} className="text-destructive" />
                     <span>حذف حساب از سامانه</span>
@@ -281,9 +288,15 @@ export function SidebarNav({
         </div>
       </div>
 
-      {/* Main Navigation Items (M3 Navigation Rail or M3 Navigation Drawer) */}
-      <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
-        {/* Comment Automation Destination */}
+      {/* 3. Primary Navigation Destination Items (M3 Active Indicator Pill) */}
+      <div className="flex-1 px-3 py-3 space-y-1.5 overflow-y-auto">
+        {!isRail && (
+          <div className="px-3 pt-2 pb-1 text-[11px] font-bold text-on-surface-variant/80 uppercase tracking-wider">
+            اتوماسیون تعاملات
+          </div>
+        )}
+
+        {/* Comments Destination */}
         {!isRail ? (
           <Link
             href={`/@${currentAccount}/comments`}
@@ -292,16 +305,18 @@ export function SidebarNav({
               if (onCloseMobileDrawer) onCloseMobileDrawer();
             }}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-full text-xs font-medium transition-all cursor-pointer text-start group",
+              "w-full flex items-center gap-3.5 px-4 py-3 rounded-full text-xs transition-all cursor-pointer text-start group relative",
               activePlugin === "comments"
-                ? "bg-primary-container text-on-primary-container font-semibold shadow-xs"
-                : "text-foreground/80 hover:bg-surface-container-high"
+                ? "bg-secondary-container text-on-secondary-container font-bold shadow-xs"
+                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
             )}
           >
-            <div className={cn(
-              "w-6 h-6 flex items-center justify-center rounded-full transition-transform group-hover:scale-110",
-              activePlugin === "comments" ? "text-primary" : "text-muted-foreground"
-            )}>
+            <div
+              className={cn(
+                "w-6 h-6 flex items-center justify-center rounded-full transition-transform group-hover:scale-105 shrink-0",
+                activePlugin === "comments" ? "text-secondary" : "text-on-surface-variant"
+              )}
+            >
               <MaterialSymbol name="forum" size={20} fill={activePlugin === "comments"} />
             </div>
             <span className="flex-1 truncate">{t("navComments")}</span>
@@ -316,24 +331,28 @@ export function SidebarNav({
             title={t("navComments")}
             className="flex flex-col items-center py-2 text-center group cursor-pointer"
           >
-            <div className={cn(
-              "w-14 h-8 rounded-full flex items-center justify-center transition-all",
-              activePlugin === "comments"
-                ? "bg-primary-container text-on-primary-container"
-                : "text-muted-foreground group-hover:bg-surface-container-high"
-            )}>
+            <div
+              className={cn(
+                "w-14 h-8 rounded-full flex items-center justify-center transition-all",
+                activePlugin === "comments"
+                  ? "bg-secondary-container text-on-secondary-container"
+                  : "text-on-surface-variant group-hover:bg-surface-container-high"
+              )}
+            >
               <MaterialSymbol name="forum" size={20} fill={activePlugin === "comments"} />
             </div>
-            <span className={cn(
-              "text-[10px] mt-1 transition-colors truncate max-w-full px-1",
-              activePlugin === "comments" ? "font-bold text-primary" : "text-muted-foreground"
-            )}>
+            <span
+              className={cn(
+                "text-[10px] mt-1 transition-colors truncate max-w-full px-1",
+                activePlugin === "comments" ? "font-bold text-secondary" : "text-on-surface-variant"
+              )}
+            >
               کامنت‌ها
             </span>
           </Link>
         )}
 
-        {/* DM Automation Destination */}
+        {/* DMs Destination */}
         {!isRail ? (
           <Link
             href={`/@${currentAccount}/dms`}
@@ -341,16 +360,18 @@ export function SidebarNav({
               if (onCloseMobileDrawer) onCloseMobileDrawer();
             }}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-full text-xs font-medium transition-all cursor-pointer text-start group",
+              "w-full flex items-center gap-3.5 px-4 py-3 rounded-full text-xs transition-all cursor-pointer text-start group relative",
               activePlugin === "dms"
-                ? "bg-primary-container text-on-primary-container font-semibold shadow-xs"
-                : "text-foreground/80 hover:bg-surface-container-high"
+                ? "bg-secondary-container text-on-secondary-container font-bold shadow-xs"
+                : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
             )}
           >
-            <div className={cn(
-              "w-6 h-6 flex items-center justify-center rounded-full transition-transform group-hover:scale-110",
-              activePlugin === "dms" ? "text-primary" : "text-muted-foreground"
-            )}>
+            <div
+              className={cn(
+                "w-6 h-6 flex items-center justify-center rounded-full transition-transform group-hover:scale-105 shrink-0",
+                activePlugin === "dms" ? "text-secondary" : "text-on-surface-variant"
+              )}
+            >
               <MaterialSymbol name="chat_bubble" size={20} fill={activePlugin === "dms"} />
             </div>
             <span className="flex-1 truncate">{t("navDms")}</span>
@@ -364,69 +385,73 @@ export function SidebarNav({
             title={t("navDms")}
             className="flex flex-col items-center py-2 text-center group cursor-pointer"
           >
-            <div className={cn(
-              "w-14 h-8 rounded-full flex items-center justify-center transition-all",
-              activePlugin === "dms"
-                ? "bg-primary-container text-on-primary-container"
-                : "text-muted-foreground group-hover:bg-surface-container-high"
-            )}>
+            <div
+              className={cn(
+                "w-14 h-8 rounded-full flex items-center justify-center transition-all",
+                activePlugin === "dms"
+                  ? "bg-secondary-container text-on-secondary-container"
+                  : "text-on-surface-variant group-hover:bg-surface-container-high"
+              )}
+            >
               <MaterialSymbol name="chat_bubble" size={20} fill={activePlugin === "dms"} />
             </div>
-            <span className={cn(
-              "text-[10px] mt-1 transition-colors truncate max-w-full px-1",
-              activePlugin === "dms" ? "font-bold text-primary" : "text-muted-foreground"
-            )}>
+            <span
+              className={cn(
+                "text-[10px] mt-1 transition-colors truncate max-w-full px-1",
+                activePlugin === "dms" ? "font-bold text-secondary" : "text-on-surface-variant"
+              )}
+            >
               دایرکت
             </span>
           </Link>
         )}
 
-        <div className="h-px bg-outline-variant/40 my-3 mx-2" />
-
-        {/* Back-Office Link (Superadmin Only) */}
+        {/* Superadmin Backoffice */}
         {currentUser?.role === "superadmin" && (
-          !isRail ? (
-            <Link
-              href="/backoffice"
-              onClick={() => {
-                if (onCloseMobileDrawer) onCloseMobileDrawer();
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-full text-xs font-medium text-foreground/80 hover:bg-surface-container-high transition-all text-start group"
-            >
-              <div className="w-6 h-6 flex items-center justify-center text-muted-foreground group-hover:text-foreground">
-                <MaterialSymbol name="admin_panel_settings" size={20} />
-              </div>
-              <span className="flex-1 truncate">{t("navBackoffice")}</span>
-            </Link>
-          ) : (
-            <Link
-              href="/backoffice"
-              onClick={() => {
-                if (onCloseMobileDrawer) onCloseMobileDrawer();
-              }}
-              title={t("navBackoffice")}
-              className="flex flex-col items-center py-2 text-center group cursor-pointer"
-            >
-              <div className="w-14 h-8 rounded-full flex items-center justify-center text-muted-foreground group-hover:bg-surface-container-high transition-all">
-                <MaterialSymbol name="admin_panel_settings" size={20} />
-              </div>
-              <span className="text-[10px] mt-1 text-muted-foreground transition-colors truncate max-w-full px-1">
-                بک‌آفیس
-              </span>
-            </Link>
-          )
+          <>
+            <div className="h-px bg-outline-variant/30 my-2 mx-2" />
+            {!isRail ? (
+              <Link
+                href="/backoffice"
+                onClick={() => {
+                  if (onCloseMobileDrawer) onCloseMobileDrawer();
+                }}
+                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-full text-xs font-medium text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-start group"
+              >
+                <div className="w-6 h-6 flex items-center justify-center text-on-surface-variant group-hover:text-on-surface shrink-0">
+                  <MaterialSymbol name="admin_panel_settings" size={20} />
+                </div>
+                <span className="flex-1 truncate">{t("navBackoffice")}</span>
+              </Link>
+            ) : (
+              <Link
+                href="/backoffice"
+                onClick={() => {
+                  if (onCloseMobileDrawer) onCloseMobileDrawer();
+                }}
+                title={t("navBackoffice")}
+                className="flex flex-col items-center py-2 text-center group cursor-pointer"
+              >
+                <div className="w-14 h-8 rounded-full flex items-center justify-center text-on-surface-variant group-hover:bg-surface-container-high transition-all">
+                  <MaterialSymbol name="admin_panel_settings" size={20} />
+                </div>
+                <span className="text-[10px] mt-1 text-on-surface-variant transition-colors truncate max-w-full px-1">
+                  مدیریت
+                </span>
+              </Link>
+            )}
+          </>
         )}
       </div>
 
-      {/* Sync Button & System Actions */}
-      <div className={cn("p-3 border-t border-outline-variant/40 shrink-0 space-y-2", isRail ? "px-2" : "")}>
+      {/* 4. Action FAB / Sync Control */}
+      <div className={cn("px-3 py-3 shrink-0", isRail ? "px-2" : "")}>
         {!isRail ? (
-          <Button
-            variant="tonal"
-            size="default"
+          <button
+            type="button"
             disabled={syncing}
             onClick={onSync}
-            className="w-full justify-center gap-2 cursor-pointer rounded-full"
+            className="w-full flex items-center justify-center gap-2.5 h-11 px-4 rounded-full bg-primary text-on-primary hover:opacity-95 active:scale-[0.98] transition-all cursor-pointer font-bold text-xs shadow-sm disabled:opacity-50"
           >
             <MaterialSymbol
               name="sync"
@@ -434,13 +459,13 @@ export function SidebarNav({
               className={cn(syncing && "animate-spin")}
             />
             <span>{syncing ? t("syncing") : t("navSync")}</span>
-          </Button>
+          </button>
         ) : (
           <button
             type="button"
             disabled={syncing}
             onClick={onSync}
-            className="w-12 h-12 mx-auto flex items-center justify-center rounded-full bg-secondary-container text-on-secondary-container hover:opacity-90 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            className="w-12 h-12 mx-auto flex items-center justify-center rounded-2xl bg-primary text-on-primary hover:opacity-95 transition-all cursor-pointer shadow-sm disabled:opacity-50"
             title={t("navSync")}
           >
             <MaterialSymbol
@@ -452,23 +477,25 @@ export function SidebarNav({
         )}
       </div>
 
-      {/* Bottom User Profile & Logout Footer */}
+      {/* 5. User Profile Footer */}
       {currentUser && (
-        <div className={cn(
-          "p-3 border-t border-outline-variant/40 shrink-0 bg-surface-container-high/40",
-          isRail ? "p-2 flex flex-col items-center" : ""
-        )}>
+        <div
+          className={cn(
+            "p-3 border-t border-outline-variant/30 shrink-0 bg-surface-container/50",
+            isRail ? "p-2 flex flex-col items-center" : ""
+          )}
+        >
           {!isRail ? (
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-outline-variant/50">
+                <div className="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-outline-variant/40">
                   {(currentUser.display_name || currentUser.username).slice(0, 1)}
                 </div>
                 <div className="flex flex-col min-w-0 text-start leading-tight">
-                  <span className="text-xs font-semibold text-foreground truncate">
+                  <span className="text-xs font-bold text-on-surface truncate">
                     {currentUser.display_name || currentUser.username}
                   </span>
-                  <span className="text-[10px] text-muted-foreground truncate">
+                  <span className="text-[10px] text-on-surface-variant truncate">
                     {currentUser.role === "superadmin"
                       ? t("roleSuperadmin")
                       : t("roleTenant")}
@@ -480,9 +507,9 @@ export function SidebarNav({
                 type="button"
                 onClick={onLogout}
                 title={t("logoutButton")}
-                className="p-2 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+                className="p-2 rounded-full text-on-surface-variant hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
               >
-                <MaterialSymbol name="logout" size={18} rtlMirror={true} />
+                <MaterialSymbol name="logout" size={18} rtlMirror />
               </button>
             </div>
           ) : (
@@ -490,9 +517,9 @@ export function SidebarNav({
               type="button"
               onClick={onLogout}
               title={t("logoutButton")}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             >
-              <MaterialSymbol name="logout" size={20} rtlMirror={true} />
+              <MaterialSymbol name="logout" size={20} rtlMirror />
             </button>
           )}
         </div>

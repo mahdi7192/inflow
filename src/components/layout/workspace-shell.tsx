@@ -201,7 +201,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex h-[100dvh] max-h-[100dvh] w-full bg-surface-container-low text-foreground overflow-hidden antialiased select-none"
+      className="flex h-[100dvh] max-h-[100dvh] w-full bg-surface text-foreground overflow-hidden antialiased select-none"
       dir={dir}
     >
       {/* 1. Desktop Persistent M3 Navigation Drawer / Rail */}
@@ -258,8 +258,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* 3. Main Workspace Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden pb-16 lg:pb-0">
+      {/* 3. Main Workspace Area: Continuous Material You Canvas */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden pb-16 lg:pb-0 bg-surface">
         {/* Banner if session requires re-login */}
         {sessionStatus === "reauth_required" && (
           <SessionExpiryBanner
@@ -268,86 +268,91 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           />
         )}
 
-        {/* Google M3 Top App Bar */}
-        <header className="sticky top-0 z-30 h-16 shrink-0 border-b border-outline-variant/50 bg-surface-container-low/95 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* Google Material 3 Top App Bar with Center Search Anchor */}
+        <header className="sticky top-0 z-30 h-16 shrink-0 bg-surface/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 border-b border-outline-variant/30">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-2 rounded-full text-foreground/80 hover:bg-surface-container-high transition-colors cursor-pointer shrink-0"
+              className="lg:hidden p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer shrink-0"
               aria-label={t("openMenu")}
             >
-              <MaterialSymbol name="menu" size={22} />
+              <MaterialSymbol name="menu" size={24} />
             </button>
 
-            {/* Google M3 Search / Context Pill */}
-            <div className="hidden sm:flex items-center gap-2 max-w-sm w-full px-3.5 py-1.5 rounded-full bg-surface-container border border-outline-variant/60 text-xs text-muted-foreground focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all shadow-2xs">
-              <MaterialSymbol name="search" size={18} className="text-muted-foreground shrink-0" />
-              <input
-                type="text"
-                placeholder="جستجو در پست‌ها، کامنت‌ها و رول‌ها..."
-                className="w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-xs"
-              />
-            </div>
-
-            {/* Account & Plugin Breadcrumb */}
+            {/* Breadcrumb Context Pill */}
             <nav className="flex items-center gap-2 text-xs truncate" aria-label="Breadcrumb">
               <Link
                 href="/"
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium truncate"
+                className="text-on-surface-variant hover:text-on-surface transition-colors font-medium truncate"
               >
                 {t("allAccounts")}
               </Link>
-              <MaterialSymbol name="chevron_left" size={16} rtlMirror={true} className="text-muted-foreground/60 shrink-0" />
-              <span className="font-mono font-medium text-foreground bg-surface-container px-2.5 py-1 rounded-full border border-outline-variant/50">
+              <MaterialSymbol name="chevron_left" size={16} rtlMirror className="text-outline shrink-0" />
+              <span className="font-mono font-bold text-on-surface bg-surface-container-high px-3 py-1 rounded-full text-xs">
                 <bdi>@{account}</bdi>
               </span>
-              <MaterialSymbol name="chevron_left" size={16} rtlMirror={true} className="text-muted-foreground/60 shrink-0" />
-              <span className="text-muted-foreground font-medium truncate">
+              <MaterialSymbol name="chevron_left" size={16} rtlMirror className="text-outline shrink-0" />
+              <span className="text-on-surface-variant font-medium truncate">
                 {activePlugin === "dms" ? t("navDms") : t("navComments")}
               </span>
             </nav>
           </div>
 
-          {/* Right Header Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Unified Page Status & Automation Trigger Pill (M3 Tonal Filter Chip) */}
+          {/* Center Search Anchor (Google Expressive Pill) */}
+          <div className="hidden md:flex items-center flex-1 max-w-xl mx-4">
+            <div className="w-full h-11 px-4 rounded-full bg-surface-container-high hover:bg-surface-container-highest focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary focus-within:shadow-md transition-all flex items-center gap-3 text-xs">
+              <MaterialSymbol name="search" size={20} className="text-on-surface-variant shrink-0" />
+              <input
+                type="text"
+                placeholder="جستجو در سناریوها، کلمات کلیدی، نام پست‌ها یا دایرکت..."
+                className="w-full bg-transparent border-none outline-none text-on-surface placeholder:text-on-surface-variant/70 text-xs"
+              />
+              <span className="text-[10px] text-outline px-2 py-0.5 rounded-md bg-surface-container shrink-0">
+                ⌘K
+              </span>
+            </div>
+          </div>
+
+          {/* Right Header Actions & Indicators */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Unified Page Status Pill (M3 Filled Tonal / Assist Chip) */}
             <button
               type="button"
               onClick={() => setUnifiedModalOpen(true)}
               className={cn(
-                "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer select-none shadow-xs active:scale-[0.98]",
+                "inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-xs font-bold transition-all cursor-pointer select-none active:scale-[0.98]",
                 sessionStatus !== "active"
-                  ? "bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100 font-semibold"
+                  ? "bg-rose-100 text-rose-900 hover:bg-rose-200"
                   : profile?.status === "paused"
-                  ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 font-semibold"
+                  ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
                   : !dmAutomationEnabled
-                  ? "bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100"
-                  : "bg-surface-container-lowest text-foreground border-outline-variant hover:bg-surface-container-high"
+                  ? "bg-teal-100 text-teal-900 hover:bg-teal-200"
+                  : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
               )}
               title="مشاهده وضعیت پیج، نشست اینستاگرام و تفکیک ماژول‌ها"
             >
               {sessionStatus !== "active" ? (
                 <>
-                  <MaterialSymbol name="warning" size={16} className="text-rose-600 shrink-0" />
-                  <span className="hidden sm:inline">وضعیت پیج (ورود لازم است)</span>
+                  <MaterialSymbol name="warning" size={16} className="text-rose-600 shrink-0" fill />
+                  <span className="hidden sm:inline">اتصال نامعتبر</span>
                 </>
               ) : profile?.status === "paused" ? (
                 <>
-                  <MaterialSymbol name="pause_circle" size={16} className="text-amber-600 shrink-0" />
+                  <MaterialSymbol name="pause_circle" size={16} className="text-amber-600 shrink-0" fill />
                   <span className="hidden sm:inline">اتوماسیون متوقف</span>
                 </>
               ) : !dmAutomationEnabled ? (
                 <>
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  <span className="hidden sm:inline">فعال (دایرکت آفلاین)</span>
-                  <MaterialSymbol name="tune" size={16} className="text-muted-foreground shrink-0" />
+                  <span className="hidden sm:inline">دایرکت آفلاین</span>
+                  <MaterialSymbol name="tune" size={16} className="text-on-surface-variant shrink-0" />
                 </>
               ) : (
                 <>
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  <span className="hidden sm:inline">وضعیت اتوماسیون</span>
-                  <MaterialSymbol name="tune" size={16} className="text-muted-foreground shrink-0" />
+                  <span className="hidden sm:inline">وضعیت هوشمند</span>
+                  <MaterialSymbol name="tune" size={16} className="text-on-surface-variant shrink-0" />
                 </>
               )}
             </button>
@@ -359,25 +364,25 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* 4. Single Unified Vertical Scroll Container */}
-        <main className="flex-1 overflow-y-auto overscroll-contain min-w-0 bg-surface-container-low p-3 sm:p-5 lg:p-6">
-          <div className="w-full max-w-6xl mx-auto space-y-4">
+        {/* 4. Single Unified Vertical Scroll Container: Fluid Full Canvas */}
+        <main className="flex-1 overflow-y-auto overscroll-contain min-w-0 bg-surface px-4 sm:px-6 lg:px-8 py-6">
+          <div className="w-full max-w-[1500px] mx-auto space-y-6">
             {profile?.status === "paused" && (
-              <div className="rounded-3xl border border-amber-300 bg-amber-50/95 p-4 text-amber-900 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-                <div className="flex items-start sm:items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 text-amber-700">
-                    <MaterialSymbol name="pause_circle" size={24} />
+              <div className="rounded-[28px] border border-amber-300/60 bg-amber-50/95 dark:bg-amber-950/40 p-5 text-amber-900 dark:text-amber-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+                <div className="flex items-start sm:items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-200/70 dark:bg-amber-900/60 flex items-center justify-center shrink-0 text-amber-800 dark:text-amber-300">
+                    <MaterialSymbol name="pause_circle" size={28} fill />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs sm:text-sm font-bold text-amber-950">
+                      <p className="text-sm font-bold text-amber-950 dark:text-amber-100">
                         {t("automationPausedBannerTitle")}
                       </p>
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100">
                         PAUSED
                       </span>
                     </div>
-                    <p className="text-[11px] sm:text-xs text-amber-800/90 mt-0.5">
+                    <p className="text-xs text-amber-800/90 dark:text-amber-300/80 mt-1">
                       {t("automationPausedBannerDesc")}
                     </p>
                   </div>
@@ -386,9 +391,9 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={handleTogglePause}
                   disabled={updatingStatus}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs shrink-0 self-start sm:self-auto"
+                  className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm shrink-0 self-start sm:self-auto active:scale-95"
                 >
-                  <MaterialSymbol name="play_arrow" size={18} fill={true} />
+                  <MaterialSymbol name="play_arrow" size={20} fill />
                   <span>{t("resumeAutomationBtn")}</span>
                 </button>
               </div>
@@ -401,7 +406,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
       {/* 5. Mobile M3 Bottom Navigation Bar (<1024px) */}
       <nav
         aria-label="Mobile Navigation"
-        className="lg:hidden fixed bottom-0 start-0 end-0 h-16 bg-surface-container border-t border-outline-variant/60 flex items-center justify-around px-2 z-40 shadow-lg select-none"
+        className="lg:hidden fixed bottom-0 start-0 end-0 h-16 bg-surface-container border-t border-outline-variant/40 flex items-center justify-around px-2 z-40 shadow-lg select-none"
       >
         {/* Destination 1: Comments */}
         <Link
@@ -412,8 +417,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "w-14 h-8 rounded-full flex items-center justify-center transition-all duration-200",
               activePlugin === "comments"
-                ? "bg-primary-container text-on-primary-container shadow-2xs"
-                : "text-muted-foreground group-hover:bg-surface-container-high"
+                ? "bg-secondary-container text-on-secondary-container shadow-2xs"
+                : "text-on-surface-variant group-hover:bg-surface-container-high"
             )}
           >
             <MaterialSymbol
@@ -426,8 +431,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "text-[10px] mt-0.5 transition-colors truncate",
               activePlugin === "comments"
-                ? "font-bold text-primary"
-                : "text-muted-foreground"
+                ? "font-bold text-secondary"
+                : "text-on-surface-variant"
             )}
           >
             کامنت‌ها
@@ -443,8 +448,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "w-14 h-8 rounded-full flex items-center justify-center transition-all duration-200",
               activePlugin === "dms"
-                ? "bg-primary-container text-on-primary-container shadow-2xs"
-                : "text-muted-foreground group-hover:bg-surface-container-high"
+                ? "bg-secondary-container text-on-secondary-container shadow-2xs"
+                : "text-on-surface-variant group-hover:bg-surface-container-high"
             )}
           >
             <MaterialSymbol
@@ -457,8 +462,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "text-[10px] mt-0.5 transition-colors truncate",
               activePlugin === "dms"
-                ? "font-bold text-primary"
-                : "text-muted-foreground"
+                ? "font-bold text-secondary"
+                : "text-on-surface-variant"
             )}
           >
             دایرکت
@@ -471,10 +476,10 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           onClick={() => setUnifiedModalOpen(true)}
           className="flex-1 flex flex-col items-center justify-center py-1 group cursor-pointer"
         >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center text-muted-foreground group-hover:bg-surface-container-high transition-all">
+          <div className="w-14 h-8 rounded-full flex items-center justify-center text-on-surface-variant group-hover:bg-surface-container-high transition-all">
             <MaterialSymbol name="tune" size={20} />
           </div>
-          <span className="text-[10px] mt-0.5 text-muted-foreground transition-colors truncate">
+          <span className="text-[10px] mt-0.5 text-on-surface-variant transition-colors truncate">
             وضعیت
           </span>
         </button>
@@ -485,10 +490,10 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileDrawerOpen(true)}
           className="flex-1 flex flex-col items-center justify-center py-1 group cursor-pointer"
         >
-          <div className="w-14 h-8 rounded-full flex items-center justify-center text-muted-foreground group-hover:bg-surface-container-high transition-all">
+          <div className="w-14 h-8 rounded-full flex items-center justify-center text-on-surface-variant group-hover:bg-surface-container-high transition-all">
             <MaterialSymbol name="menu" size={20} />
           </div>
-          <span className="text-[10px] mt-0.5 text-muted-foreground transition-colors truncate">
+          <span className="text-[10px] mt-0.5 text-on-surface-variant transition-colors truncate">
             منو
           </span>
         </button>

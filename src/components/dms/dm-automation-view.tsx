@@ -556,20 +556,24 @@ export function DmAutomationView({
           </p>
         </div>
 
-        {/* 3-Tab Segmented Control */}
-        <div className="inline-flex items-center bg-slate-200/75 p-1 rounded-xl max-w-full overflow-x-auto self-start lg:self-auto shrink-0">
+        {/* Material 3 Segmented Filter Chips */}
+        <div className="inline-flex items-center gap-1.5 bg-surface-container-high p-1.5 rounded-full max-w-full overflow-x-auto self-start lg:self-auto shrink-0 border border-outline-variant/30">
           <button
             type="button"
             onClick={() => setActiveTab("inbox")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
               activeTab === "inbox"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+                ? "bg-primary text-on-primary shadow-xs"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
+            )}
           >
-            <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+            <MessageSquare className="w-3.5 h-3.5" />
             <span>گفتگوهای دایرکت</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 text-[11px] tabular-nums">
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[11px] tabular-nums font-bold",
+              activeTab === "inbox" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface-variant"
+            )}>
               {formatNumber(conversationList.length)}
             </span>
           </button>
@@ -577,20 +581,24 @@ export function DmAutomationView({
           <button
             type="button"
             onClick={() => setActiveTab("leads")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
               activeTab === "leads"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+                ? "bg-rose-600 text-white shadow-xs"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
+            )}
           >
-            <Flame className="w-3.5 h-3.5 text-rose-500" />
+            <Flame className="w-3.5 h-3.5" />
             <span>شماره‌های شکارشده</span>
             <span
-              className={`px-1.5 py-0.2 rounded-md text-[11px] tabular-nums ${
-                leads.length > 0
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[11px] tabular-nums font-bold",
+                activeTab === "leads"
+                  ? "bg-white/20 text-white"
+                  : leads.length > 0
                   ? "bg-rose-100 text-rose-700"
-                  : "bg-slate-100 text-slate-600"
-              }`}
+                  : "bg-surface-container text-on-surface-variant"
+              )}
             >
               {formatNumber(leads.length)}
             </span>
@@ -599,17 +607,18 @@ export function DmAutomationView({
           <button
             type="button"
             onClick={() => setActiveTab("settings")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
               activeTab === "settings"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+                ? "bg-primary text-on-primary shadow-xs"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
+            )}
           >
-            <Settings2 className="w-3.5 h-3.5 text-slate-600" />
+            <Settings2 className="w-3.5 h-3.5" />
             <span>تنظیمات دایرکت مستقیم</span>
             <span
               className={`w-2 h-2 rounded-full ${
-                isEnabled ? "bg-emerald-500" : "bg-slate-400"
+                isEnabled ? "bg-emerald-400" : "bg-outline"
               }`}
             />
           </button>
@@ -617,11 +626,12 @@ export function DmAutomationView({
           <button
             type="button"
             onClick={() => setActiveTab("test")}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
               activeTab === "test"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+                ? "bg-secondary text-on-secondary shadow-xs"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
+            )}
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>تست و شبیه‌ساز چت</span>
@@ -630,12 +640,12 @@ export function DmAutomationView({
       </div>
 
       {/* =====================================================================
-          TAB 1: 2-COLUMN SPLIT MESSENGER INBOX (Telegram Web / Intercom Style)
+          TAB 1: 2-COLUMN SPLIT MESSENGER INBOX (M3 Dual Pane Canvas)
          ===================================================================== */}
       {activeTab === "inbox" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
+        <div className="bg-surface-container-lowest rounded-[28px] border border-outline-variant/40 shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
           {/* RIGHT PANE: Thread List */}
-          <div className={cn("lg:col-span-4 border-b lg:border-b-0 lg:border-l border-slate-100 flex flex-col bg-white", showMobileChat ? "hidden lg:flex" : "flex")}>
+          <div className={cn("lg:col-span-4 border-b lg:border-b-0 lg:border-l border-outline-variant/30 flex flex-col bg-surface-container-lowest", showMobileChat ? "hidden lg:flex" : "flex")}>
             {/* Search & Filter Header */}
             <div className="p-3.5 border-b border-slate-100 space-y-2.5">
               <div className="flex items-center gap-2">

@@ -706,39 +706,39 @@ export function InflowDashboard({
               )}
             </div>
 
-            {/* 4-Stage True Revenue & Engagement Funnel: 4 Standalone M3 Cards */}
+            {/* Material You 4-Stage Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Card 1: Total Views */}
-              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">۱. {t("metricTotalViews")}</span>
-                  <div className="w-9 h-9 rounded-2xl bg-surface-container-high flex items-center justify-center text-muted-foreground shadow-2xs">
-                    <MaterialSymbol name="visibility" size={18} />
+                  <span className="text-xs font-bold text-on-surface-variant">۱. {t("metricTotalViews")}</span>
+                  <div className="w-10 h-10 rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface shadow-2xs">
+                    <MaterialSymbol name="visibility" size={20} fill />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-foreground tracking-tight">
+                  <span className="text-3xl font-extrabold tabular-nums text-on-surface tracking-tight">
                     {formatNumber(liveInsights?.funnel?.views || 0)}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricReach")}</span>
-                  <span className="font-semibold text-foreground">
+                  <span className="font-bold text-on-surface">
                     {formatNumber(liveInsights?.funnel?.reach || 0)}
                   </span>
                 </div>
               </div>
 
               {/* Card 2: Comments & Replies */}
-              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">۲. {t("metricComments")}</span>
-                  <div className="w-9 h-9 rounded-2xl bg-sky-500/15 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-2xs">
-                    <MaterialSymbol name="chat_bubble" size={18} />
+                  <span className="text-xs font-bold text-on-surface-variant">۲. {t("metricComments")}</span>
+                  <div className="w-10 h-10 rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-2xs">
+                    <MaterialSymbol name="chat_bubble" size={20} fill />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-foreground tracking-tight">
+                  <span className="text-3xl font-extrabold tabular-nums text-on-surface tracking-tight">
                     {formatNumber(
                       liveInsights?.funnel?.total_comments ??
                         posts.reduce(
@@ -749,30 +749,30 @@ export function InflowDashboard({
                     )}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricPublicReplies")}</span>
-                  <span className="font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/40">
+                  <span className="font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 px-2.5 py-0.5 rounded-full">
                     {formatNumber(liveInsights?.funnel?.comment_replies_sent || 0)}
                   </span>
                 </div>
               </div>
 
               {/* Card 3: Smart DMs */}
-              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">۳. {t("metricSmartDms")}</span>
-                  <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs">
-                    <MaterialSymbol name="send" size={18} />
+                  <span className="text-xs font-bold text-on-surface-variant">۳. {t("metricSmartDms")}</span>
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs">
+                    <MaterialSymbol name="send" size={20} fill />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400 tracking-tight">
+                  <span className="text-3xl font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400 tracking-tight">
                     {formatNumber(liveInsights?.funnel?.total_dms_sent || 0)}
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricRead")}</span>
-                  <span className="font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 inline-flex items-center gap-1">
+                  <span className="font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
                     <span>{formatNumber(liveInsights?.funnel?.dms_read || 0)}</span>
                     <MaterialSymbol name="done_all" size={14} className="text-primary shrink-0" />
                   </span>
@@ -780,23 +780,23 @@ export function InflowDashboard({
               </div>
 
               {/* Card 4: Leads & Followers */}
-              <div className="rounded-3xl border border-outline-variant bg-surface p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between space-y-3">
+              <div className="rounded-[28px] border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">۴. {t("metricFollowersLeads")}</span>
-                  <div className="w-9 h-9 rounded-2xl bg-rose-500/15 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs">
-                    <MaterialSymbol name="person_check" size={18} />
+                  <span className="text-xs font-bold text-on-surface-variant">۴. {t("metricFollowersLeads")}</span>
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs">
+                    <MaterialSymbol name="person_check" size={20} fill />
                   </div>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold tabular-nums text-rose-600 dark:text-rose-400 tracking-tight">
+                  <span className="text-3xl font-extrabold tabular-nums text-rose-600 dark:text-rose-400 tracking-tight">
                     <bdi>+{formatNumber(liveInsights?.funnel?.follows_gained || 0)}</bdi>
                   </span>
                 </div>
-                <div className="pt-2.5 border-t border-outline-variant/60 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
+                <div className="pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant tabular-nums">
                   <span>{t("metricActivePosts")}</span>
-                  <span className="font-semibold text-foreground">
+                  <span className="font-bold text-on-surface">
                     {formatNumber(activeCount)}{" "}
-                    <span className="text-muted-foreground font-normal">
+                    <span className="text-on-surface-variant font-normal">
                       ({formatNumber(cheatSheetCount)} {t("metricCheatSheets")})
                     </span>
                   </span>
@@ -965,10 +965,10 @@ export function InflowDashboard({
                       key={post.id}
                       onClick={() => setDrawerShortcode(post.shortcode)}
                       className={cn(
-                        "group rounded-3xl border p-4.5 transition-all duration-150 cursor-pointer flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center",
+                        "group rounded-[28px] border p-5 transition-all duration-200 cursor-pointer flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-surface-container-lowest shadow-xs hover:shadow-md",
                         isActive
-                          ? "border-emerald-500/30 bg-surface shadow-2xs hover:border-emerald-500/50 hover:shadow-xs"
-                          : "border-outline-variant/80 bg-surface hover:border-outline hover:shadow-2xs"
+                          ? "border-emerald-500/40 hover:border-emerald-500/70"
+                          : "border-outline-variant/40 hover:border-primary/40"
                       )}
                     >
                       <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
@@ -1110,10 +1110,10 @@ export function InflowDashboard({
                       key={post.id}
                       onClick={() => setDrawerShortcode(post.shortcode)}
                       className={cn(
-                        "group rounded-3xl border bg-surface overflow-hidden transition-all cursor-pointer flex flex-col justify-between shadow-2xs hover:shadow-xs",
+                        "group rounded-[28px] border bg-surface-container-lowest overflow-hidden transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs hover:shadow-md",
                         isActive
-                          ? "border-emerald-500/40 hover:border-emerald-500/60"
-                          : "border-outline-variant/80 hover:border-outline"
+                          ? "border-emerald-500/40 hover:border-emerald-500/70"
+                          : "border-outline-variant/40 hover:border-primary/40"
                       )}
                     >
                       {/* Cover Media Area */}
