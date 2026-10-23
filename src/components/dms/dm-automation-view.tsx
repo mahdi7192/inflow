@@ -647,42 +647,6 @@ export function DmAutomationView({
                 </button>
               </div>
 
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setInboxFilter("all")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                    inboxFilter === "all"
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                  }`}
-                >
-                  همه ({formatNumber(conversationList.length)})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInboxFilter("story")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                    inboxFilter === "story"
-                      ? "bg-rose-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                  }`}
-                >
-                  📸 ریپلای استوری
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInboxFilter("paused")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                    inboxFilter === "paused"
-                      ? "bg-amber-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                  }`}
-                >
-                  ⏸️ در دست ادمین ({formatNumber(pausedCount)})
-                </button>
-              </div>
             </div>
 
             {/* Scrollable Conversation Rows */}
@@ -1178,8 +1142,7 @@ export function DmAutomationView({
             <div>
               <h2 className="text-sm font-bold text-slate-900">تنظیمات دایرکت مستقیم</h2>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                این تنظیمات فقط برای پیام‌هایی است که کاربر مستقیم و بدون کامنت یا استوری در دایرکت می‌فرستد.
-                دایرکتِ بعد از کامنت از تنظیمات همان پست، و ریپلای استوری از تنظیمات همان استوری (در صفحه پست‌ها و ریلزها) پاسخ می‌گیرد.
+                این تنظیمات برای پاسخ خودکار به پیام‌های دایرکت پیج است.
               </p>
             </div>
           </div>
