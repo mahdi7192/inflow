@@ -34,8 +34,8 @@ export function extractPage(html: string): ExtractedPage {
   const main = body.match(/<main\b[\s\S]*?<\/main>/i) || body.match(/<article\b[\s\S]*?<\/article>/i);
   if (main && main[0].length > 400) body = main[0];
   body = body
-    .replace(/<(script|style|noscript|svg|iframe|template|form|nav|footer|header|aside|select|button)\b[\s\S]*?<\/\1>/gi, " ")
-    .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section)[^>]*>/gi, "\n")
+    .replace(/<(script|style|noscript|svg|iframe|template|nav|footer|header|aside)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section|\/option|\/button)[^>]*>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
   let text = decodeEntities(body)
     .split("\n")
@@ -43,7 +43,7 @@ export function extractPage(html: string): ExtractedPage {
     .filter((l) => l.length > 1)
     .join("\n");
   if (metaDesc && !text.includes(metaDesc.slice(0, 40))) text = `${metaDesc}\n${text}`;
-  return { title, text: text.slice(0, 12000), links, canonical, noindex };
+  return { title, text: text.slice(0, 25000), links, canonical, noindex };
 }
 
 export function summarize(text: string, max = 280): string {
