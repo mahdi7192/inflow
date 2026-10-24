@@ -14,8 +14,196 @@ import { DeleteAccountModal } from "@/components/modals/delete-account-modal";
 import { WorkspaceProvider, useRequiredWorkspace } from "./workspace-context";
 import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import type { AccountRow } from "@/lib/db";
+import { M3Switch } from "@/components/material/m3";
+import type { AccountRow, SessionStatus } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
+
+type ConnectionHealth = "active" | "expired" | "invalid";
+
+function getConnectionHealth(status: SessionStatus): ConnectionHealth {
+  if (status === "active") return "active";
+  if (status === "reauth_required" || status === "paused") return "expired";
+  return "invalid";
+}
+
+const HEALTH_BADGE: Record<ConnectionHealth, { label: string; icon: string; className: string }> = {
+  active: {
+    label: "اتصال فعال",
+    icon: "check_circle",
+    className: "bg-secondary-container text-on-secondary-container",
+  },
+  expired: {
+    label: "نشست منقضی",
+    icon: "schedule",
+    className: "bg-tertiary-container text-on-tertiary-container",
+  },
+  invalid: {
+    label: "اتصال نامعتبر",
+    icon: "error",
+    className: "bg-error-container text-on-error-container",
+  },
+};
+
+/* -------------------------------------------------------------------------- */
+/* Account switcher (M3 menu anchored to a top-app-bar button)                 */
+/* -------------------------------------------------------------------------- */
+
+function AccountSwitcherMenu({
+  account,
+  accounts,
+  profile,
+  canAddAccount,
+  onSelectAccount,
+  onOpenAddAccount,
+  onOpenDeleteAccount,
+}: {
+  account: string;
+  accounts: AccountRow[];
+  profile: AccountRow | null;
+  canAddAccount: boolean;
+  onSelectAccount: (username: string) => void;
+  onOpenAddAccount: () => void;
+  onOpenDeleteAccount: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const run = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="تغییر پیج فعال"
+        className="h-10 ps-1 pe-3 inline-flex items-center gap-2 rounded-full bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors cursor-pointer"
+      >
+        <span className="w-8 h-8 rounded-full overflow-hidden bg-primary-container text-on-primary-container flex items-center justify-center title-small uppercase shrink-0">
+          {profile?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            account.slice(0, 1)
+          )}
+        </span>
+        <span className="hidden md:inline label-large max-w-[10rem] truncate" dir="ltr">
+          <bdi>@{account}</bdi>
+        </span>
+        <MaterialSymbol
+          name="arrow_drop_down"
+          size={20}
+          className={cn("shrink-0 transition-transform", open && "rotate-180")}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="پیج‌های متصل"
+          className="absolute top-full mt-2 start-0 w-72 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-surface-container-low text-on-surface elevation-2 py-2 z-50 animate-in fade-in zoom-in-95 duration-150"
+        >
+          <div className="px-4 py-2 flex items-center justify-between label-medium text-on-surface-variant">
+            <span>پیج‌های متصل</span>
+            <span className="label-small tabular-nums px-2 py-0.5 rounded-full bg-surface-container-high">
+              {accounts.length}
+            </span>
+          </div>
+
+          <div className="max-h-64 overflow-y-auto">
+            {accounts.map((acc) => {
+              const selected = acc.username === account;
+              return (
+                <button
+                  key={acc.username}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selected}
+                  onClick={() => run(() => onSelectAccount(acc.username))}
+                  className={cn(
+                    "w-full h-12 px-4 flex items-center justify-between gap-3 text-start transition-colors cursor-pointer",
+                    selected
+                      ? "bg-secondary-container text-on-secondary-container"
+                      : "hover:bg-on-surface/8"
+                  )}
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full shrink-0",
+                        acc.status === "paused" ? "bg-outline" : "bg-primary"
+                      )}
+                    />
+                    <span className="body-medium truncate" dir="ltr">
+                      <bdi>@{acc.username}</bdi>
+                    </span>
+                  </span>
+                  {selected && <MaterialSymbol name="check" size={20} className="shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <md-divider className="my-2" />
+
+          <Link
+            href="/"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="w-full h-12 px-4 flex items-center gap-3 body-medium hover:bg-on-surface/8 transition-colors cursor-pointer"
+          >
+            <MaterialSymbol name="grid_view" size={20} className="text-on-surface-variant" />
+            <span>همه پیج‌ها</span>
+          </Link>
+
+          {canAddAccount && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => run(onOpenAddAccount)}
+              className="w-full h-12 px-4 flex items-center gap-3 body-medium text-primary hover:bg-primary/8 transition-colors cursor-pointer text-start"
+            >
+              <MaterialSymbol name="add" size={20} />
+              <span>افزودن پیج</span>
+            </button>
+          )}
+
+          <md-divider className="my-2" />
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => run(onOpenDeleteAccount)}
+            className="w-full h-12 px-4 flex items-center gap-3 body-medium text-destructive hover:bg-destructive/8 transition-colors cursor-pointer text-start"
+          >
+            <MaterialSymbol name="delete" size={20} />
+            <span>حذف حساب از سامانه</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface WorkspaceShellProps {
   children: React.ReactNode;
@@ -100,6 +288,9 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
   // Session status from active profile
   const sessionStatus = profile?.session_status || "unauthenticated";
+  const connectionHealth = getConnectionHealth(sessionStatus);
+  const healthBadge = HEALTH_BADGE[connectionHealth];
+  const automationRunning = (profile?.status || "active") !== "paused";
 
   // Fetch DM automation status on account change
   useEffect(() => {
@@ -222,14 +413,13 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex flex-col h-[100dvh] max-h-[100dvh] w-full bg-[#f8fafd] dark:bg-[#131314] text-[#1f1f1f] dark:text-[#e2e2e6] overflow-hidden antialiased"
+      className="flex flex-col h-[100dvh] max-h-[100dvh] w-full bg-surface text-on-surface overflow-hidden antialiased"
       dir={dir}
     >
-      {/* 1. Google Drive Unified Top App Bar */}
-      <header className="h-16 shrink-0 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 z-30">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-          <button
-            type="button"
+      {/* 1. M3 Top App Bar (sits on `surface`; controls use surface-container-high) */}
+      <header className="h-16 shrink-0 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 bg-surface z-30">
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0 shrink-0">
+          <md-icon-button
             onClick={() => {
               if (typeof window !== "undefined" && window.innerWidth >= 1024) {
                 toggleRail();
@@ -237,98 +427,118 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
                 setMobileDrawerOpen(true);
               }
             }}
-            className="p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
-            aria-label={t("openMenu")}
+            aria-label="منو"
           >
             <MaterialSymbol name="menu" size={24} />
-          </button>
+          </md-icon-button>
 
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+          <Link href="/" className="hidden sm:flex items-center gap-2 shrink-0">
             <BrandLogo size="default" showText={false} />
-            <span className="font-bold text-lg tracking-tight text-[#1f1f1f] dark:text-[#e2e2e6]">
-              in<span className="text-[#0b57d0] dark:text-[#a8c7fa]">Flow</span>
+            <span className="title-large text-on-surface">
+              in<span className="text-primary">Flow</span>
             </span>
           </Link>
+
+          <AccountSwitcherMenu
+            account={account}
+            accounts={accounts}
+            profile={profile}
+            canAddAccount={currentUser?.role === "superadmin"}
+            onSelectAccount={handleSelectAccount}
+            onOpenAddAccount={() => setLoginModalOpen(true)}
+            onOpenDeleteAccount={() => setDeleteAccountOpen(true)}
+          />
         </div>
 
-        {/* Google Drive Central Search Bar (Pill shaped, soft gray background, seamless focus) */}
-        <div className="flex items-center flex-1 max-w-xl mx-2 sm:mx-4">
-          <div className="w-full h-10 sm:h-11 px-4 rounded-full bg-[#edf2fa] dark:bg-[#282a2d] hover:bg-[#e9eef6] dark:hover:bg-[#333538] focus-within:bg-white dark:focus-within:bg-[#1e1f20] focus-within:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-all flex items-center gap-3 text-xs">
-            <MaterialSymbol name="search" size={20} className="text-[#444746] dark:text-neutral-400 shrink-0" />
+        {/* Search bar (M3 search: surface-container-high, elevates on focus) */}
+        <div className="hidden md:flex items-center flex-1 max-w-xl">
+          <div className="w-full h-12 px-4 rounded-full bg-surface-container-high focus-within:bg-surface-container-lowest focus-within:elevation-2 transition-all flex items-center gap-3">
+            <MaterialSymbol name="search" size={22} className="text-on-surface-variant shrink-0" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="جستجو در سناریوها، کلمات کلیدی، نام پست‌ها..."
-              className="w-full bg-transparent border-none outline-none text-[#1f1f1f] dark:text-white placeholder:text-[#444746]/70 dark:placeholder:text-neutral-400 text-xs font-sans"
+              className="w-full bg-transparent border-none outline-none text-on-surface placeholder:text-on-surface-variant/70 body-medium"
             />
             {searchQuery ? (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="p-1 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer shrink-0"
-              >
-                <MaterialSymbol name="close" size={16} />
-              </button>
+              <md-icon-button onClick={() => setSearchQuery("")} aria-label="پاک کردن جستجو">
+                <MaterialSymbol name="close" size={20} />
+              </md-icon-button>
             ) : (
-              <span dir="ltr" className="hidden sm:inline text-[11px] font-mono text-[#74777f] px-2 py-0.5 rounded-md bg-[#e0e3e8]/50 dark:bg-neutral-800 shrink-0">
+              <span dir="ltr" className="label-small text-on-surface-variant px-2 py-0.5 rounded-md bg-surface-container-highest shrink-0">
                 ⌘K
               </span>
             )}
           </div>
         </div>
 
-        {/* Top Actions: Theme Switcher, Status Pill, Language */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Trailing actions: connection health, master pause, theme, language */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <button
             type="button"
-            onClick={toggleTheme}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-[#edf2fa] dark:bg-neutral-800 text-[#444746] hover:bg-[#e3e8f0] dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer shrink-0"
-            title={theme === "dark" ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
+            onClick={() =>
+              connectionHealth === "active" ? setUnifiedModalOpen(true) : setLoginModalOpen(true)
+            }
+            className={cn(
+              "h-8 ps-2 pe-3 inline-flex items-center gap-1.5 rounded-lg label-large transition-[filter] hover:brightness-95 cursor-pointer",
+              healthBadge.className
+            )}
+            title={
+              connectionHealth === "active"
+                ? "مشاهده وضعیت پیج و نشست اینستاگرام"
+                : "اتصال مجدد به اینستاگرام"
+            }
+            aria-label={`وضعیت اتصال اینستاگرام: ${healthBadge.label}`}
           >
-            <MaterialSymbol name={theme === "dark" ? "light_mode" : "dark_mode"} size={18} />
+            <MaterialSymbol name={healthBadge.icon} size={18} fill className="shrink-0" />
+            <span className="hidden sm:inline">{healthBadge.label}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setUnifiedModalOpen(true)}
+          <div
             className={cn(
-              "inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-[0.98]",
-              sessionStatus !== "active"
-                ? "bg-rose-100 text-rose-900 hover:bg-rose-200"
-                : profile?.status === "paused"
-                ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
-                : !dmAutomationEnabled
-                ? "bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300"
-                : "bg-[#edf2fa] dark:bg-neutral-800 text-[#1f1f1f] dark:text-[#e2e2e6] hover:bg-[#e3e8f0]"
+              "h-10 ps-3 pe-2 inline-flex items-center gap-2 rounded-full transition-colors",
+              automationRunning
+                ? "bg-surface-container-high"
+                : "bg-tertiary-container text-on-tertiary-container"
             )}
-            title="مشاهده وضعیت پیج، نشست اینستاگرام و تفکیک ماژول‌ها"
           >
-            {sessionStatus !== "active" ? (
-              <>
-                <MaterialSymbol name="warning" size={16} className="text-rose-600 shrink-0" fill />
-                <span className="hidden sm:inline">اتصال نامعتبر</span>
-              </>
-            ) : profile?.status === "paused" ? (
-              <>
-                <MaterialSymbol name="pause_circle" size={16} className="text-amber-600 shrink-0" fill />
-                <span className="hidden sm:inline">اتوماسیون متوقف</span>
-              </>
-            ) : !dmAutomationEnabled ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-neutral-400 shrink-0" />
-                <span className="hidden sm:inline">دایرکت آفلاین</span>
-                <MaterialSymbol name="tune" size={16} className="text-[#444746] dark:text-neutral-400 shrink-0" />
-              </>
+            {updatingStatus ? (
+              <md-circular-progress indeterminate className="[--md-circular-progress-size:20px] shrink-0" />
             ) : (
-              <>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                <span className="hidden sm:inline">وضعیت هوشمند</span>
-                <MaterialSymbol name="tune" size={16} className="text-[#444746] dark:text-neutral-400 shrink-0" />
-              </>
+              <MaterialSymbol
+                name={automationRunning ? "bolt" : "pause_circle"}
+                size={20}
+                fill
+                className={cn("shrink-0", automationRunning && "text-primary")}
+              />
             )}
-          </button>
+            <span className="hidden lg:inline label-large" aria-live="polite">
+              {updatingStatus
+                ? "در حال اعمال..."
+                : automationRunning
+                ? "اتوماسیون فعال"
+                : "اتوماسیون متوقف"}
+            </span>
+            <M3Switch
+              selected={automationRunning}
+              onChange={(next) => {
+                if (next !== automationRunning) handleTogglePause();
+              }}
+              disabled={updatingStatus}
+              ariaLabel={`توقف/ادامه اتوماسیون @${account}`}
+            />
+          </div>
+
+          <md-icon-button
+            onClick={toggleTheme}
+            className="hidden sm:inline-flex"
+            title={theme === "dark" ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
+            aria-label={theme === "dark" ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
+          >
+            <MaterialSymbol name={theme === "dark" ? "light_mode" : "dark_mode"} size={22} />
+          </md-icon-button>
 
           <LanguageDropdown
             currentLang={lang}
@@ -337,64 +547,74 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* 2. Google Drive Workspace Body: Clean Sidebar + Floating Main Pane Container */}
+      {/* Compact-width search (the top-app-bar search is md+ only) */}
+      <div className="md:hidden shrink-0 px-3 pb-2">
+        <div className="w-full h-11 px-4 rounded-full bg-surface-container-high focus-within:bg-surface-container-lowest focus-within:elevation-2 transition-all flex items-center gap-3">
+          <MaterialSymbol name="search" size={20} className="text-on-surface-variant shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="جستجو..."
+            className="w-full bg-transparent border-none outline-none text-on-surface placeholder:text-on-surface-variant/70 body-medium"
+          />
+          {searchQuery && (
+            <md-icon-button onClick={() => setSearchQuery("")} aria-label="پاک کردن جستجو">
+              <MaterialSymbol name="close" size={20} />
+            </md-icon-button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Workspace body: navigation rail + floating main pane */}
       <div className="flex-1 flex min-w-0 overflow-hidden">
-        {/* Desktop Sidebar (No border, transparent on canvas) */}
+        {/* Desktop navigation rail (compact 80dp ⇄ expanded 280dp) */}
         <div className="hidden lg:block shrink-0 h-full select-none">
           <SidebarNav
+            variant="rail"
+            expanded={!isRail}
             currentAccount={account}
-            accounts={accounts}
-            onSelectAccount={handleSelectAccount}
-            onOpenAddAccount={() => setLoginModalOpen(true)}
             onSync={handleSync}
             syncing={syncing}
             currentUser={currentUser}
             onLogout={handleLogout}
             lang={lang}
             activePlugin={activePlugin}
-            onOpenDeleteAccount={() => setDeleteAccountOpen(true)}
-            isRail={isRail}
-            onToggleRail={toggleRail}
           />
         </div>
 
-        {/* Mobile Slide-Over Drawer */}
+        {/* Mobile modal navigation drawer */}
         {mobileDrawerOpen && (
           <div className="lg:hidden fixed inset-0 z-50 flex overflow-hidden">
             <div
-              className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in"
+              className="fixed inset-0 bg-black/32 animate-in fade-in duration-200"
               onClick={() => setMobileDrawerOpen(false)}
+              aria-hidden="true"
             />
-            <div className="relative w-72 max-w-[85vw] h-full bg-[#f8fafd] dark:bg-[#131314] z-10 shadow-2xl animate-in slide-in-from-start duration-200 flex flex-col overflow-hidden rounded-e-[28px]">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="منوی ناوبری"
+              className="relative w-[360px] max-w-[85vw] h-full bg-surface-container-low z-10 elevation-1 animate-in slide-in-from-start duration-300 ease-[cubic-bezier(0.2,0,0,1)] flex flex-col overflow-hidden rounded-e-[16px]"
+            >
               <SidebarNav
+                variant="drawer"
                 currentAccount={account}
-                accounts={accounts}
-                onSelectAccount={(usr) => {
-                  handleSelectAccount(usr);
-                  setMobileDrawerOpen(false);
-                }}
-                onOpenAddAccount={() => {
-                  setMobileDrawerOpen(false);
-                  setLoginModalOpen(true);
-                }}
                 onSync={handleSync}
                 syncing={syncing}
                 currentUser={currentUser}
                 onLogout={handleLogout}
                 lang={lang}
-                onCloseMobileDrawer={() => setMobileDrawerOpen(false)}
                 activePlugin={activePlugin}
-                onOpenDeleteAccount={() => {
-                  setMobileDrawerOpen(false);
-                  setDeleteAccountOpen(true);
-                }}
+                onNavigate={() => setMobileDrawerOpen(false)}
+                onClose={() => setMobileDrawerOpen(false)}
               />
             </div>
           </div>
         )}
 
-        {/* 3. Google Drive Iconic Floating White Main Container (rounded-[24px] floating pane on all 4 sides) */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 sm:m-3 lg:m-4 mb-18 sm:mb-3 lg:mb-4 mt-0 sm:mt-1 rounded-[20px] sm:rounded-[24px] bg-white dark:bg-[#1e1f20] shadow-[0_1px_3px_0_rgba(60,64,67,0.1),0_1px_2px_0_rgba(60,64,67,0.06)] dark:shadow-none transition-all">
+        {/* 3. Floating main pane (surface-container-lowest on the `surface` canvas) */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden m-2 sm:m-3 lg:m-4 mb-18 sm:mb-3 lg:mb-4 mt-0 sm:mt-1 rounded-[20px] sm:rounded-[24px] bg-surface-container-lowest shadow-[0_1px_3px_0_rgba(60,64,67,0.1),0_1px_2px_0_rgba(60,64,67,0.06)] dark:bg-surface-container-low dark:shadow-none transition-all">
           {/* Banner if session requires re-login */}
           {sessionStatus === "reauth_required" && (
             <SessionExpiryBanner
@@ -446,7 +666,7 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
       {/* 4. Mobile Bottom Navigation Bar (<1024px) */}
       <nav
         aria-label="Mobile Navigation"
-        className="lg:hidden fixed bottom-0 start-0 end-0 h-16 bg-[#f8fafd] dark:bg-[#131314] border-t border-[#e0e3e8]/70 dark:border-neutral-800 flex items-center justify-around px-2 z-40 select-none"
+        className="lg:hidden fixed bottom-0 start-0 end-0 h-16 bg-surface-container flex items-center justify-around px-2 z-40 select-none"
       >
         <Link
           href={`/@${account}/comments`}
@@ -456,8 +676,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "w-12 h-8 rounded-full flex items-center justify-center transition-colors",
               activePlugin === "comments"
-                ? "bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                : "text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6]"
+                ? "bg-secondary-container text-on-secondary-container"
+                : "text-on-surface-variant group-hover:bg-on-surface/8"
             )}
           >
             <MaterialSymbol
@@ -470,8 +690,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "text-[10px] mt-0.5 transition-colors truncate",
               activePlugin === "comments"
-                ? "font-bold text-[#001d35] dark:text-[#c2e7ff]"
-                : "text-[#444746] dark:text-neutral-400"
+                ? "font-bold text-on-surface"
+                : "text-on-surface-variant"
             )}
           >
             کامنت‌ها
@@ -486,8 +706,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "w-12 h-8 rounded-full flex items-center justify-center transition-colors",
               activePlugin === "dms"
-                ? "bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                : "text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6]"
+                ? "bg-secondary-container text-on-secondary-container"
+                : "text-on-surface-variant group-hover:bg-on-surface/8"
             )}
           >
             <MaterialSymbol
@@ -500,8 +720,8 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
             className={cn(
               "text-[10px] mt-0.5 transition-colors truncate",
               activePlugin === "dms"
-                ? "font-bold text-[#001d35] dark:text-[#c2e7ff]"
-                : "text-[#444746] dark:text-neutral-400"
+                ? "font-bold text-on-surface"
+                : "text-on-surface-variant"
             )}
           >
             دایرکت
@@ -513,10 +733,10 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           onClick={() => setUnifiedModalOpen(true)}
           className="flex-1 flex flex-col items-center justify-center py-1 group cursor-pointer"
         >
-          <div className="w-12 h-8 rounded-full flex items-center justify-center text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800 transition-colors">
+          <div className="w-12 h-8 rounded-full flex items-center justify-center text-on-surface-variant group-hover:bg-on-surface/8 transition-colors">
             <MaterialSymbol name="tune" size={20} />
           </div>
-          <span className="text-[10px] mt-0.5 text-[#444746] dark:text-neutral-400 transition-colors truncate">
+          <span className="text-[10px] mt-0.5 text-on-surface-variant transition-colors truncate">
             وضعیت
           </span>
         </button>
@@ -526,10 +746,10 @@ function WorkspaceShellInner({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileDrawerOpen(true)}
           className="flex-1 flex flex-col items-center justify-center py-1 group cursor-pointer"
         >
-          <div className="w-12 h-8 rounded-full flex items-center justify-center text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800 transition-colors">
+          <div className="w-12 h-8 rounded-full flex items-center justify-center text-on-surface-variant group-hover:bg-on-surface/8 transition-colors">
             <MaterialSymbol name="menu" size={20} />
           </div>
-          <span className="text-[10px] mt-0.5 text-[#444746] dark:text-neutral-400 transition-colors truncate">
+          <span className="text-[10px] mt-0.5 text-on-surface-variant transition-colors truncate">
             منو
           </span>
         </button>

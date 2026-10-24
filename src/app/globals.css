@@ -91,6 +91,8 @@
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
   --color-muted: var(--surface-container-high);
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
@@ -157,6 +159,8 @@
   --accent-foreground: #1A1C1E;
   --destructive: #BA1A1A;
   --destructive-foreground: #FFFFFF;
+  --error-container: #FFDAD6;
+  --on-error-container: #410002;
 
   /* M3 Clean Hairline Outlines */
   --outline: #73777F;
@@ -204,10 +208,82 @@
 
   --muted: #1D2024;
   --muted-foreground: #8E918F;
+  --destructive: #FFB4AB;
+  --destructive-foreground: #690005;
+  --error-container: #93000A;
+  --on-error-container: #FFDAD6;
+  --outline: #8E918F;
+  --outline-variant: #44474E;
   --border: #2D3136;
+  --border-subtle: #1D2024;
   --input: #44474E;
   --ring: #A8C7FA;
 }
+
+/* ============================================================================
+   Material Web (@material/web) System Token Bridge — resolved per theme scope
+   ============================================================================ */
+:root,
+.dark {
+  --md-sys-color-primary: var(--primary);
+  --md-sys-color-on-primary: var(--primary-foreground);
+  --md-sys-color-primary-container: var(--primary-container);
+  --md-sys-color-on-primary-container: var(--on-primary-container);
+  --md-sys-color-secondary: var(--secondary);
+  --md-sys-color-on-secondary: var(--secondary-foreground);
+  --md-sys-color-secondary-container: var(--secondary-container);
+  --md-sys-color-on-secondary-container: var(--on-secondary-container);
+  --md-sys-color-tertiary-container: var(--tertiary-container);
+  --md-sys-color-on-tertiary-container: var(--on-tertiary-container);
+  --md-sys-color-error: var(--destructive);
+  --md-sys-color-on-error: var(--destructive-foreground);
+  --md-sys-color-error-container: var(--error-container);
+  --md-sys-color-on-error-container: var(--on-error-container);
+  --md-sys-color-background: var(--background);
+  --md-sys-color-on-background: var(--foreground);
+  --md-sys-color-surface: var(--surface);
+  --md-sys-color-surface-dim: var(--surface-dim);
+  --md-sys-color-surface-bright: var(--surface-bright);
+  --md-sys-color-on-surface: var(--on-surface);
+  --md-sys-color-on-surface-variant: var(--on-surface-variant);
+  --md-sys-color-surface-container-lowest: var(--surface-container-lowest);
+  --md-sys-color-surface-container-low: var(--surface-container-low);
+  --md-sys-color-surface-container: var(--surface-container);
+  --md-sys-color-surface-container-high: var(--surface-container-high);
+  --md-sys-color-surface-container-highest: var(--surface-container-highest);
+  --md-sys-color-outline: var(--outline);
+  --md-sys-color-outline-variant: var(--outline-variant);
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-ref-typeface-brand: 'Estedad', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --md-ref-typeface-plain: 'Estedad', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+}
+
+/* ============================================================================
+   M3 Type Scale (Estedad, tuned for Persian glyph height)
+   ============================================================================ */
+@utility display-small { font-size: 36px; line-height: 44px; font-weight: 500; letter-spacing: 0; }
+@utility headline-large { font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: 0; }
+@utility headline-medium { font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: 0; }
+@utility headline-small { font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: 0; }
+@utility title-large { font-size: 22px; line-height: 30px; font-weight: 600; letter-spacing: 0; }
+@utility title-medium { font-size: 16px; line-height: 26px; font-weight: 600; letter-spacing: 0.01em; }
+@utility title-small { font-size: 14px; line-height: 22px; font-weight: 600; letter-spacing: 0.006em; }
+@utility body-large { font-size: 16px; line-height: 26px; font-weight: 400; letter-spacing: 0.01em; }
+@utility body-medium { font-size: 14px; line-height: 22px; font-weight: 400; letter-spacing: 0.016em; }
+@utility body-small { font-size: 12px; line-height: 18px; font-weight: 400; letter-spacing: 0.025em; }
+@utility label-large { font-size: 14px; line-height: 20px; font-weight: 600; letter-spacing: 0.006em; }
+@utility label-medium { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.03em; }
+@utility label-small { font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: 0.03em; }
+
+/* M3 elevation levels */
+@utility elevation-1 { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15); }
+@utility elevation-2 { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15); }
+@utility elevation-3 { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 4px 8px 3px rgb(0 0 0 / 0.15); }
 
 @layer base {
   * {
@@ -225,8 +301,38 @@
   button,
   input,
   textarea,
-  select {
+  select,
+  md-filled-button,
+  md-outlined-button,
+  md-text-button,
+  md-outlined-text-field,
+  md-filled-text-field,
+  md-filter-chip,
+  md-assist-chip,
+  md-primary-tab,
+  md-fab {
     font-family: 'Estedad', var(--font-sans), sans-serif;
+  }
+  textarea {
+    resize: none !important;
+  }
+  md-outlined-text-field {
+    --md-outlined-text-field-container-shape: 12px;
+    --md-outlined-text-field-outline-width: 1px;
+    width: 100%;
+  }
+  md-switch {
+    flex-shrink: 0;
+  }
+  md-tabs {
+    --md-primary-tab-container-color: transparent;
+    --md-divider-color: var(--outline-variant);
+  }
+  md-filter-chip {
+    --md-filter-chip-container-shape: 8px;
+  }
+  md-fab {
+    --md-fab-container-shape: 16px;
   }
   body {
     background-color: var(--background);
@@ -255,9 +361,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: var(--outline-variant);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: var(--outline);
 }

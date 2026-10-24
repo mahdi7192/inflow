@@ -52,11 +52,19 @@ export function formatNumber(
   num: number | string | undefined | null,
   lang: Lang = "fa"
 ): string {
-  if (num === undefined || num === null) return "0";
+  if (num === undefined || num === null) return lang === "fa" ? "۰" : "0";
   const n = typeof num === "string" ? Number(num) : num;
   if (isNaN(n)) return String(num);
-  const locale = lang === "fa" ? "fa-IR" : lang === "ar" ? "ar-EG" : "en-US";
-  return n.toLocaleString(locale);
+  const formatted = n.toLocaleString("en-US");
+  if (lang === "fa") {
+    const farsiDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
+    return formatted.replace(/\d/g, (d) => farsiDigits[parseInt(d, 10)]);
+  }
+  if (lang === "ar") {
+    const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+    return formatted.replace(/\d/g, (d) => arabicDigits[parseInt(d, 10)]);
+  }
+  return formatted;
 }
 
 /**

@@ -1,472 +1,210 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import { MaterialSymbol } from "@/components/ui/material-symbol";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { I18N, Lang } from "@/lib/i18n";
-import type { AccountRow } from "@/lib/db";
 import type { SafeUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+export type NavDestinationId = "comments" | "dms" | "backoffice";
+
 export interface SidebarNavProps {
+  /** `rail`: docked desktop navigation rail. `drawer`: modal navigation drawer (mobile). */
+  variant: "rail" | "drawer";
+  /** Rail only: expanded (labelled, 280px) vs compact (80px). */
+  expanded?: boolean;
   currentAccount: string;
-  accounts: AccountRow[];
-  onSelectAccount: (username: string) => void;
-  onOpenAddAccount: () => void;
   onSync: () => Promise<void>;
   syncing: boolean;
   currentUser?: SafeUser | null;
   onLogout: () => void;
   lang: Lang;
-  onCloseMobileDrawer?: () => void;
   activePlugin?: "comments" | "dms";
-  isCatalogActive?: boolean;
-  onNavigateCatalog?: () => void;
-  onOpenDeleteAccount?: () => void;
-  isRail?: boolean;
-  onToggleRail?: () => void;
+  onNavigate?: () => void;
+  onClose?: () => void;
+}
+
+interface Destination {
+  id: NavDestinationId;
+  href: string;
+  icon: string;
+  label: string;
+  shortLabel: string;
+  /** Which engine powers the destination — shown under the label when expanded. */
+  engineHint: string;
 }
 
 export function SidebarNav({
+  variant,
+  expanded = false,
   currentAccount,
-  accounts,
-  onSelectAccount,
-  onOpenAddAccount,
   onSync,
   syncing,
   currentUser,
   onLogout,
   lang,
-  onCloseMobileDrawer,
   activePlugin = "comments",
-  onNavigateCatalog,
-  onOpenDeleteAccount,
-  isRail = false,
-  onToggleRail,
+  onNavigate,
+  onClose,
 }: SidebarNavProps) {
-  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
   const t = (key: string) => I18N[lang]?.[key] || I18N.fa[key] || key;
+  const isCompact = variant === "rail" && !expanded;
 
-  // Close account dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setAccountDropdownOpen(false);
-      }
-    }
-    if (accountDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [accountDropdownOpen]);
+  const destinations: Destination[] = [
+    {
+      id: "comments",
+      href: `/@${currentAccount}/comments`,
+      icon: "forum",
+      label: t("navComments"),
+      shortLabel: "پست‌ها",
+      engineHint: "قوانین قطعی پست، ریلز و استوری",
+    },
+    {
+      id: "dms",
+      href: `/@${currentAccount}/dms`,
+      icon: "neurology",
+      label: t("navDms"),
+      shortLabel: "دستیار AI",
+      engineHint: "دستیار ایجنتیک دایرکت (RAG)",
+    },
+  ];
+  if (currentUser?.role === "superadmin") {
+    destinations.push({
+      id: "backoffice",
+      href: "/backoffice",
+      icon: "admin_panel_settings",
+      label: t("navBackoffice"),
+      shortLabel: "مدیریت",
+      engineHint: "مدیریت کاربران و پیج‌ها",
+    });
+  }
 
-  const handleSelectAccount = (username: string) => {
-    onSelectAccount(username);
-    setAccountDropdownOpen(false);
-  };
-
-  const currentAccObj = accounts.find((a) => a.username === currentAccount);
-  const isCurrentPaused = currentAccObj?.status === "paused";
+  const syncLabel = syncing ? t("syncing") : "همگام‌سازی پیج";
 
   return (
     <aside
       className={cn(
-        "h-full flex flex-col bg-transparent select-none transition-all duration-300 ease-in-out shrink-0",
-        isRail ? "w-20" : "w-64 xl:w-72"
+        "h-full flex flex-col select-none shrink-0 transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
+        variant === "drawer" ? "w-full" : isCompact ? "w-20" : "w-[280px]"
       )}
     >
-      {/* Mobile Drawer Header (Only visible inside mobile drawer) */}
-      {onCloseMobileDrawer && (
-        <div className="h-16 px-4 flex items-center justify-between shrink-0 border-b border-neutral-200/50 dark:border-neutral-800">
-          <Link
-            href="/"
-            onClick={onCloseMobileDrawer}
-            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
-            title="مرکز پیج‌ها"
-          >
+      {/* Modal drawer headline */}
+      {variant === "drawer" && (
+        <div className="h-16 ps-6 pe-3 flex items-center justify-between shrink-0">
+          <Link href="/" onClick={onClose} className="flex items-center gap-2" title="مرکز پیج‌ها">
             <BrandLogo size="default" />
-            <span className="font-bold text-lg tracking-tight text-[#1f1f1f] dark:text-[#e2e2e6]">
-              in<span className="text-[#0b57d0] dark:text-[#a8c7fa]">Flow</span>
+            <span className="title-medium text-on-surface">
+              in<span className="text-primary">Flow</span>
             </span>
           </Link>
-          <button
-            type="button"
-            onClick={onCloseMobileDrawer}
-            className="p-2 rounded-full text-[#444746] hover:bg-[#e9eef6] dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-            aria-label={t("closeMenu")}
-          >
-            <MaterialSymbol name="close" size={22} />
-          </button>
+          <md-icon-button onClick={onClose} aria-label={t("closeMenu")}>
+            <MaterialSymbol name="close" size={24} />
+          </md-icon-button>
         </div>
       )}
 
-      {/* 2. Google Drive Iconic "+ New" Elevated Action Button */}
-      <div className={cn("px-4 py-2 shrink-0", isRail ? "px-2 flex justify-center" : "", !onCloseMobileDrawer ? "pt-1" : "")}>
-        {!isRail ? (
-          <button
-            type="button"
-            disabled={syncing}
-            onClick={onSync}
-            className="w-full h-12 px-4 rounded-xl bg-white dark:bg-[#282a2d] hover:bg-[#edf2fa] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] border border-neutral-200/70 dark:border-neutral-700/60 shadow-[0_1px_3px_0_rgba(60,64,67,0.08)] hover:shadow-[0_2px_6px_0_rgba(60,64,67,0.12)] transition-all flex items-center gap-3 text-xs font-bold cursor-pointer select-none active:scale-[0.98] disabled:opacity-60"
-          >
-            <MaterialSymbol
-              name="sync"
-              size={20}
-              className={cn("text-[#0b57d0] dark:text-[#a8c7fa] shrink-0", syncing && "animate-spin")}
-            />
-            <span className="truncate">{syncing ? t("syncing") : "همگام‌سازی پیج"}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={syncing}
-            onClick={onSync}
-            className="w-11 h-11 rounded-xl bg-white dark:bg-[#282a2d] hover:bg-[#edf2fa] dark:hover:bg-[#333538] text-[#1f1f1f] dark:text-[#e2e2e6] border border-neutral-200/70 dark:border-neutral-700/60 shadow-[0_1px_3px_0_rgba(60,64,67,0.08)] hover:shadow-md transition-all flex items-center justify-center cursor-pointer select-none active:scale-95 disabled:opacity-60"
-            title="همگام‌سازی پیج"
-          >
-            <MaterialSymbol
-              name="sync"
-              size={20}
-              className={cn("text-[#0b57d0] dark:text-[#a8c7fa]", syncing && "animate-spin")}
-            />
-          </button>
-        )}
+      {/* FAB: sync page (M3 rail places the FAB above destinations) */}
+      <div className={cn("shrink-0 pt-2 pb-4", isCompact ? "flex justify-center" : "px-3")}>
+        <md-fab
+          variant="primary"
+          size="medium"
+          lowered
+          label={isCompact ? undefined : syncLabel}
+          aria-label={syncLabel}
+          title={syncLabel}
+          onClick={syncing ? undefined : onSync}
+          className={cn(syncing && "opacity-60 pointer-events-none")}
+        >
+          <MaterialSymbol name="sync" size={24} slot="icon" className={cn(syncing && "animate-spin")} />
+        </md-fab>
       </div>
 
-      {/* 3. Account Switcher (Google Drive Folder Pill Style) */}
-      <div className={cn("px-3 py-1.5 shrink-0", isRail ? "px-2" : "")} ref={dropdownRef}>
-        <div className="relative">
-          {!isRail ? (
-            <button
-              type="button"
-              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-full hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 text-start transition-colors cursor-pointer"
+      {/* Destinations */}
+      <nav
+        className={cn("flex-1 overflow-y-auto", isCompact ? "px-0 space-y-3" : "px-3 space-y-1")}
+        aria-label="ناوبری اصلی"
+      >
+        {!isCompact && (
+          <div className="px-4 pb-2 title-small text-on-surface-variant">{`@${currentAccount}`}</div>
+        )}
+        {destinations.map((d) => {
+          const active = d.id === activePlugin;
+          return isCompact ? (
+            <Link
+              key={d.id}
+              href={d.href}
+              onClick={onNavigate}
+              title={d.label}
+              aria-current={active ? "page" : undefined}
+              className="group flex flex-col items-center gap-1 cursor-pointer"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-2xs">
-                  <MaterialSymbol name="photo_camera" size={15} fill />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="truncate font-mono font-bold text-xs text-[#1f1f1f] dark:text-[#e2e2e6]">
-                    <bdi>@{currentAccount || "---"}</bdi>
-                  </span>
-                  <span className="text-[10px] text-[#444746] dark:text-neutral-400 flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "w-1.5 h-1.5 rounded-full shrink-0",
-                        isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
-                      )}
-                    />
-                    <span>{isCurrentPaused ? "متوقف" : "متصل"}</span>
-                  </span>
-                </div>
-              </div>
-              <MaterialSymbol
-                name="arrow_drop_down"
-                size={22}
-                className={cn(
-                  "text-[#444746] dark:text-neutral-400 transition-transform duration-200 shrink-0",
-                  accountDropdownOpen && "rotate-180"
-                )}
-              />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="w-10 h-10 mx-auto flex items-center justify-center rounded-full hover:bg-[#e9eef6] dark:hover:bg-neutral-800 transition-colors cursor-pointer relative"
-              title={`@${currentAccount}`}
-            >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white">
-                <MaterialSymbol name="photo_camera" size={15} fill />
-              </div>
               <span
                 className={cn(
-                  "absolute bottom-0 end-0 w-2 h-2 rounded-full ring-2 ring-white dark:ring-neutral-900",
-                  isCurrentPaused ? "bg-amber-500" : "bg-emerald-500"
+                  "relative w-14 h-8 rounded-full flex items-center justify-center m3-active-indicator",
+                  active
+                    ? "bg-secondary-container text-on-secondary-container"
+                    : "text-on-surface-variant group-hover:bg-on-surface/8"
                 )}
-              />
-            </button>
-          )}
-
-          {/* Account Dropdown Popover */}
-          {accountDropdownOpen && (
-            <div
+              >
+                <MaterialSymbol name={d.icon} size={24} fill={active} />
+              </span>
+              <span className={cn("label-medium", active ? "text-on-surface" : "text-on-surface-variant")}>
+                {d.shortLabel}
+              </span>
+            </Link>
+          ) : (
+            <Link
+              key={d.id}
+              href={d.href}
+              onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "absolute top-full mt-1.5 rounded-2xl bg-white dark:bg-[#1e1f20] shadow-[0_4px_16px_rgba(0,0,0,0.14)] border border-[#e0e3e8]/70 dark:border-neutral-800 p-2 z-50 animate-in fade-in zoom-in-95",
-                isRail ? "start-12 w-64" : "start-0 w-full"
+                "w-full min-h-14 ps-4 pe-6 py-2 rounded-full flex items-center gap-3 m3-active-indicator cursor-pointer",
+                active
+                  ? "bg-secondary-container text-on-secondary-container"
+                  : "text-on-surface-variant hover:bg-on-surface/8"
               )}
             >
-              <div className="px-3 py-1.5 text-[11px] font-bold text-[#444746] dark:text-neutral-400 uppercase tracking-wider flex items-center justify-between">
-                <span>پیج‌های متصل</span>
-                <span className="text-[10px] tabular-nums bg-[#e9eef6] dark:bg-neutral-800 px-2 py-0.5 rounded-full font-bold">
-                  {accounts.length}
+              <MaterialSymbol name={d.icon} size={24} fill={active} className="shrink-0" />
+              <span className="flex flex-col min-w-0">
+                <span className={cn("label-large truncate", active ? "text-on-secondary-container" : "text-on-surface")}>
+                  {d.label}
                 </span>
-              </div>
-              <div className="max-h-56 overflow-y-auto space-y-1 p-0.5">
-                {accounts.map((acc) => {
-                  const isSelected = acc.username === currentAccount;
-                  return (
-                    <button
-                      key={acc.username}
-                      type="button"
-                      onClick={() => handleSelectAccount(acc.username)}
-                      className={cn(
-                        "w-full flex items-center justify-between px-3 py-2 rounded-full text-xs transition-colors cursor-pointer text-start",
-                        isSelected
-                          ? "bg-[#c2e7ff] text-[#001d35] font-bold dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                          : "text-[#1f1f1f] dark:text-neutral-200 hover:bg-[#e9eef6] dark:hover:bg-neutral-800"
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className={cn(
-                            "w-2 h-2 rounded-full shrink-0",
-                            acc.status === "paused" ? "bg-amber-500" : "bg-emerald-500"
-                          )}
-                        />
-                        <span className="truncate font-mono"><bdi>@{acc.username}</bdi></span>
-                      </div>
-                      {isSelected && (
-                        <MaterialSymbol name="check" size={18} className="text-[#001d35] dark:text-[#c2e7ff] shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="h-px bg-[#e0e3e8]/70 dark:bg-neutral-800 my-1.5" />
-
-              <Link
-                href="/"
-                onClick={() => setAccountDropdownOpen(false)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-xs text-[#1f1f1f] dark:text-neutral-200 hover:bg-[#e9eef6] dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                <MaterialSymbol name="grid_view" size={18} className="text-[#444746] dark:text-neutral-400" />
-                <span>همه پیج‌ها</span>
-              </Link>
-
-              {currentUser?.role === "superadmin" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccountDropdownOpen(false);
-                    onOpenAddAccount();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-xs text-[#0b57d0] dark:text-[#a8c7fa] font-bold hover:bg-[#c2e7ff]/40 transition-colors cursor-pointer"
-                >
-                  <MaterialSymbol name="add" size={18} />
-                  <span>{t("addAccount")}</span>
-                </button>
-              )}
-
-              {currentAccount && onOpenDeleteAccount && (
-                <>
-                  <div className="h-px bg-[#e0e3e8]/70 dark:bg-neutral-800 my-1.5" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAccountDropdownOpen(false);
-                      onOpenDeleteAccount();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-full text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-start font-medium"
-                  >
-                    <MaterialSymbol name="delete" size={18} />
-                    <span>حذف حساب از سامانه</span>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 4. Google Drive Navigation Links (Rounded-full Horizontal Pills) */}
-      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto" aria-label="سایدبار اصلی">
-        {/* Comments Destination */}
-        {!isRail ? (
-          <Link
-            href={`/@${currentAccount}/comments`}
-            onClick={() => {
-              if (onNavigateCatalog) onNavigateCatalog();
-              if (onCloseMobileDrawer) onCloseMobileDrawer();
-            }}
-            className={cn(
-              "w-full h-11 px-4 rounded-full flex items-center gap-3.5 text-xs transition-colors cursor-pointer text-start",
-              activePlugin === "comments"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                : "text-[#444746] dark:text-neutral-300 hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 font-medium"
-            )}
-          >
-            <MaterialSymbol
-              name="forum"
-              size={20}
-              fill={activePlugin === "comments"}
-              className={activePlugin === "comments" ? "text-[#001d35] dark:text-[#c2e7ff]" : "text-[#444746] dark:text-neutral-400"}
-            />
-            <span className="flex-1 truncate">{t("navComments")}</span>
-          </Link>
-        ) : (
-          <Link
-            href={`/@${currentAccount}/comments`}
-            onClick={() => {
-              if (onNavigateCatalog) onNavigateCatalog();
-              if (onCloseMobileDrawer) onCloseMobileDrawer();
-            }}
-            title={t("navComments")}
-            className="flex flex-col items-center py-2 text-center group cursor-pointer"
-          >
-            <div
-              className={cn(
-                "w-12 h-8 rounded-full flex items-center justify-center transition-colors",
-                activePlugin === "comments"
-                  ? "bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                  : "text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800"
-              )}
-            >
-              <MaterialSymbol name="forum" size={20} fill={activePlugin === "comments"} />
-            </div>
-            <span className="text-[10px] mt-1 transition-colors truncate max-w-full px-1">
-              کامنت‌ها
-            </span>
-          </Link>
-        )}
-
-        {/* DMs Destination */}
-        {!isRail ? (
-          <Link
-            href={`/@${currentAccount}/dms`}
-            onClick={() => {
-              if (onCloseMobileDrawer) onCloseMobileDrawer();
-            }}
-            className={cn(
-              "w-full h-11 px-4 rounded-full flex items-center gap-3.5 text-xs transition-colors cursor-pointer text-start",
-              activePlugin === "dms"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                : "text-[#444746] dark:text-neutral-300 hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 font-medium"
-            )}
-          >
-            <MaterialSymbol
-              name="chat_bubble"
-              size={20}
-              fill={activePlugin === "dms"}
-              className={activePlugin === "dms" ? "text-[#001d35] dark:text-[#c2e7ff]" : "text-[#444746] dark:text-neutral-400"}
-            />
-            <span className="flex-1 truncate">{t("navDms")}</span>
-          </Link>
-        ) : (
-          <Link
-            href={`/@${currentAccount}/dms`}
-            onClick={() => {
-              if (onCloseMobileDrawer) onCloseMobileDrawer();
-            }}
-            title={t("navDms")}
-            className="flex flex-col items-center py-2 text-center group cursor-pointer"
-          >
-            <div
-              className={cn(
-                "w-12 h-8 rounded-full flex items-center justify-center transition-colors",
-                activePlugin === "dms"
-                  ? "bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff]"
-                  : "text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800"
-              )}
-            >
-              <MaterialSymbol name="chat_bubble" size={20} fill={activePlugin === "dms"} />
-            </div>
-            <span className="text-[10px] mt-1 transition-colors truncate max-w-full px-1">
-              دایرکت
-            </span>
-          </Link>
-        )}
-
-        {/* Superadmin Backoffice */}
-        {currentUser?.role === "superadmin" && (
-          <>
-            <div className="h-px bg-[#e0e3e8]/70 dark:bg-neutral-800 my-2 mx-2" />
-            {!isRail ? (
-              <Link
-                href="/backoffice"
-                onClick={() => {
-                  if (onCloseMobileDrawer) onCloseMobileDrawer();
-                }}
-                className="w-full h-11 px-4 rounded-full flex items-center gap-3.5 text-xs text-[#444746] dark:text-neutral-300 hover:bg-[#e9eef6]/70 dark:hover:bg-neutral-800 transition-colors text-start"
-              >
-                <MaterialSymbol name="admin_panel_settings" size={20} className="text-[#444746] dark:text-neutral-400" />
-                <span className="flex-1 truncate">{t("navBackoffice")}</span>
-              </Link>
-            ) : (
-              <Link
-                href="/backoffice"
-                onClick={() => {
-                  if (onCloseMobileDrawer) onCloseMobileDrawer();
-                }}
-                title={t("navBackoffice")}
-                className="flex flex-col items-center py-2 text-center group cursor-pointer"
-              >
-                <div className="w-12 h-8 rounded-full flex items-center justify-center text-[#444746] dark:text-neutral-400 group-hover:bg-[#e9eef6] dark:group-hover:bg-neutral-800">
-                  <MaterialSymbol name="admin_panel_settings" size={20} />
-                </div>
-                <span className="text-[10px] mt-1 transition-colors truncate max-w-full px-1">
-                  مدیریت
-                </span>
-              </Link>
-            )}
-          </>
-        )}
+                <span className="label-small font-normal truncate opacity-80">{d.engineHint}</span>
+              </span>
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* 5. Clean User Profile Footer (No harsh borders) */}
+      {/* Footer: signed-in user + sign out */}
       {currentUser && (
-        <div
-          className={cn(
-            "p-3 shrink-0",
-            isRail ? "p-2 flex flex-col items-center" : ""
-          )}
-        >
-          {!isRail ? (
-            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-full hover:bg-[#e9eef6]/50 dark:hover:bg-neutral-800/50 transition-colors">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#c2e7ff] text-[#001d35] dark:bg-[#004a77] dark:text-[#c2e7ff] flex items-center justify-center font-bold text-xs shrink-0 uppercase">
+        <div className={cn("shrink-0 p-3", isCompact && "flex justify-center")}>
+          {isCompact ? (
+            <md-icon-button onClick={onLogout} title={t("logoutButton")} aria-label={t("logoutButton")}>
+              <MaterialSymbol name="logout" size={24} />
+            </md-icon-button>
+          ) : (
+            <div className="flex items-center justify-between gap-2 ps-3 pe-1 py-2 rounded-2xl bg-surface-container">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center title-small uppercase shrink-0">
                   {(currentUser.display_name || currentUser.username).slice(0, 1)}
-                </div>
-                <div className="flex flex-col min-w-0 text-start leading-tight">
-                  <span className="text-xs font-bold text-[#1f1f1f] dark:text-[#e2e2e6] truncate">
+                </span>
+                <span className="flex flex-col min-w-0">
+                  <span className="label-large text-on-surface truncate">
                     {currentUser.display_name || currentUser.username}
                   </span>
-                  <span className="text-[10px] text-[#444746] dark:text-neutral-400 truncate">
-                    {currentUser.role === "superadmin"
-                      ? t("roleSuperadmin")
-                      : t("roleTenant")}
+                  <span className="label-small font-normal text-on-surface-variant truncate">
+                    {currentUser.role === "superadmin" ? t("roleSuperadmin") : t("roleTenant")}
                   </span>
-                </div>
+                </span>
               </div>
-
-              <button
-                type="button"
-                onClick={onLogout}
-                title={t("logoutButton")}
-                className="p-1.5 rounded-full text-[#444746] hover:text-rose-600 hover:bg-rose-50 dark:text-neutral-400 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0"
-              >
-                <MaterialSymbol name="logout" size={18} rtlMirror />
-              </button>
+              <md-icon-button onClick={onLogout} title={t("logoutButton")} aria-label={t("logoutButton")}>
+                <MaterialSymbol name="logout" size={22} />
+              </md-icon-button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onLogout}
-              title={t("logoutButton")}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#444746] hover:text-rose-600 hover:bg-rose-50 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-            >
-              <MaterialSymbol name="logout" size={20} rtlMirror />
-            </button>
           )}
         </div>
       )}

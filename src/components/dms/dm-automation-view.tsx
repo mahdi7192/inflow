@@ -4,29 +4,8 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { DMAutomationRow, DMLogRow } from "@/lib/db";
 import { Lang, formatNumber as formatNumberI18n } from "@/lib/i18n";
 import { useWorkspace } from "@/components/layout/workspace-context";
-import {
-  Send,
-  Sparkles,
-  MessageSquare,
-  CheckCircle2,
-  Loader2,
-  UserCheck,
-  Flame,
-  Phone,
-  Download,
-  PauseCircle,
-  PlayCircle,
-  BookOpen,
-  CheckCheck,
-  Trash2,
-  Search,
-  RefreshCw,
-  Copy,
-  Check,
-  Settings2,
-  ArrowRight,
-} from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { MaterialSymbol } from "@/components/ui/material-symbol";
+import { M3Switch, M3Tabs, type M3TabItem } from "@/components/material/m3";
 import { DmSettingsPanel } from "@/components/dms/dm-settings-panel";
 import { DmTestChatPanel } from "@/components/dms/dm-test-chat-panel";
 import { cn } from "@/lib/utils";
@@ -514,7 +493,7 @@ export function DmAutomationView({
       l.updated_at,
     ]);
     const csvContent =
-      "\uFEFF" +
+      "﻿" +
       [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -528,9 +507,9 @@ export function DmAutomationView({
 
   if (!config) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">در حال بارگذاری صندوق دایرکت...</span>
+      <div className="flex items-center justify-center py-20 text-on-surface-variant gap-3">
+        <md-circular-progress indeterminate className="[--md-circular-progress-size:24px]" />
+        <span className="body-medium">در حال بارگذاری صندوق دایرکت...</span>
       </div>
     );
   }
@@ -538,151 +517,119 @@ export function DmAutomationView({
   const isEnabled = config.enabled === 1;
   const pausedCount = conversationList.filter((c) => c.bot_paused).length;
 
+  const countBadge = (n: number, tone: "neutral" | "error" = "neutral") => (
+    <span
+      className={cn(
+        "min-w-5 h-5 px-1.5 rounded-full inline-flex items-center justify-center label-small tabular-nums",
+        tone === "error" && n > 0
+          ? "bg-error-container text-on-error-container"
+          : "bg-surface-container-highest text-on-surface-variant"
+      )}
+    >
+      {formatNumber(n)}
+    </span>
+  );
+
+  const studioTabs: M3TabItem<StudioDmTab>[] = [
+    {
+      id: "inbox",
+      label: "گفتگوهای دایرکت",
+      icon: <MaterialSymbol name="forum" size={20} />,
+      badge: countBadge(conversationList.length),
+    },
+    {
+      id: "leads",
+      label: "شماره‌های شکارشده",
+      icon: <MaterialSymbol name="local_fire_department" size={20} />,
+      badge: countBadge(leads.length, "error"),
+    },
+    {
+      id: "settings",
+      label: "دستیار هوشمند دایرکت",
+      icon: <MaterialSymbol name="smart_toy" size={20} />,
+      badge: (
+        <span
+          className={cn("w-2 h-2 rounded-full", isEnabled ? "bg-primary" : "bg-outline")}
+          aria-label={isEnabled ? "فعال" : "غیرفعال"}
+        />
+      ),
+    },
+    {
+      id: "test",
+      label: "تست و شبیه‌ساز چت",
+      icon: <MaterialSymbol name="science" size={20} />,
+    },
+  ];
+
   return (
-    <div className="w-full space-y-5 pb-10">
-      {/* Unified Studio Header & Segmented Switcher (Single Flat Bar — No Nested Cards) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-            <span>صندوق دایرکت، استوری و مشتریان</span>
-            {pausedCount > 0 && (
-              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 tabular-nums">
-                {formatNumber(pausedCount)} چت در دست ادمین
-              </span>
-            )}
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            مکالمات پست‌ها به صورت خودکار ادامه می‌یابند. در اینجا گفتگوها را ببینید، ربات را برای هر کاربر متوقف کنید یا شماره‌های تماس را بردارید.
-          </p>
-        </div>
-
-        {/* Material 3 Segmented Filter Chips */}
-        <div className="inline-flex items-center gap-1.5 bg-surface-container-high p-1.5 rounded-full max-w-full overflow-x-auto self-start lg:self-auto shrink-0 border border-outline-variant/30">
-          <button
-            type="button"
-            onClick={() => setActiveTab("inbox")}
-            className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
-              activeTab === "inbox"
-                ? "bg-primary text-on-primary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
-            )}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>گفتگوهای دایرکت</span>
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[11px] tabular-nums font-bold",
-              activeTab === "inbox" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface-variant"
-            )}>
-              {formatNumber(conversationList.length)}
+    <div dir="rtl" className="w-full space-y-4 pb-10 text-on-surface">
+      {/* Studio header */}
+      <header className="space-y-1 px-1">
+        <h1 className="headline-small text-on-surface flex flex-wrap items-center gap-2.5">
+          <span>صندوق دایرکت، استوری و مشتریان</span>
+          {pausedCount > 0 && (
+            <span className="inline-flex items-center gap-1 label-medium px-2.5 py-1 rounded-lg bg-tertiary-container text-on-tertiary-container tabular-nums">
+              <MaterialSymbol name="support_agent" size={16} />
+              {formatNumber(pausedCount)} چت در دست ادمین
             </span>
-          </button>
+          )}
+        </h1>
+        <p className="body-medium text-on-surface-variant">
+          مکالمات پست‌ها به صورت خودکار ادامه می‌یابند. در اینجا گفتگوها را ببینید، ربات را برای هر کاربر متوقف کنید یا شماره‌های تماس را بردارید.
+        </p>
+      </header>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("leads")}
-            className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
-              activeTab === "leads"
-                ? "bg-rose-600 text-white shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
-            )}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span>شماره‌های شکارشده</span>
-            <span
-              className={cn(
-                "px-2 py-0.5 rounded-full text-[11px] tabular-nums font-bold",
-                activeTab === "leads"
-                  ? "bg-white/20 text-white"
-                  : leads.length > 0
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-surface-container text-on-surface-variant"
-              )}
-            >
-              {formatNumber(leads.length)}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("settings")}
-            className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
-              activeTab === "settings"
-                ? "bg-primary text-on-primary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
-            )}
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span>تنظیمات دایرکت مستقیم</span>
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isEnabled ? "bg-emerald-400" : "bg-outline"
-              }`}
-            />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("test")}
-            className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer",
-              activeTab === "test"
-                ? "bg-secondary text-on-secondary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"
-            )}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>تست و شبیه‌ساز چت</span>
-          </button>
-        </div>
-      </div>
+      {/* M3 primary tabs */}
+      <M3Tabs
+        tabs={studioTabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="بخش‌های استودیوی دایرکت"
+        className="rounded-2xl overflow-hidden bg-surface max-w-full overflow-x-auto"
+      />
 
       {/* =====================================================================
           TAB 1: 2-COLUMN SPLIT MESSENGER INBOX (M3 Dual Pane Canvas)
          ===================================================================== */}
       {activeTab === "inbox" && (
-        <div className="bg-surface-container-lowest rounded-[28px] border border-outline-variant/40 shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
-          {/* RIGHT PANE: Thread List */}
-          <div className={cn("lg:col-span-4 border-b lg:border-b-0 lg:border-l border-outline-variant/30 flex flex-col bg-surface-container-lowest", showMobileChat ? "hidden lg:flex" : "flex")}>
-            {/* Search & Filter Header */}
-            <div className="p-3.5 border-b border-slate-100 space-y-2.5">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="جستجوی کاربر یا متن پیام..."
-                    className="w-full rounded-xl bg-slate-100/80 pr-8 pl-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRefreshAll}
-                  disabled={refreshing}
-                  title="بروزرسانی گفتگوها"
-                  className="p-2 rounded-xl bg-slate-100/80 hover:bg-slate-200/70 text-slate-600 transition-colors cursor-pointer"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
-                  />
-                </button>
-              </div>
-
+        <div className="bg-surface rounded-3xl border border-outline-variant overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
+          {/* START PANE: Thread List */}
+          <div
+            className={cn(
+              "lg:col-span-4 border-b lg:border-b-0 lg:border-e border-outline-variant flex-col bg-surface-container-low",
+              showMobileChat ? "hidden lg:flex" : "flex"
+            )}
+          >
+            {/* M3 search bar */}
+            <div className="p-3 flex items-center gap-1.5">
+              <label className="relative flex-1 flex items-center h-12 rounded-full bg-surface-container-high text-on-surface-variant focus-within:ring-2 focus-within:ring-primary transition-shadow">
+                <MaterialSymbol name="search" size={22} className="absolute start-3.5 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="جستجوی کاربر یا متن پیام..."
+                  aria-label="جستجوی گفتگوها"
+                  className="w-full h-full bg-transparent ps-12 pe-4 body-medium text-on-surface placeholder:text-on-surface-variant outline-none"
+                />
+              </label>
+              <md-icon-button
+                onClick={handleRefreshAll}
+                disabled={refreshing}
+                title="بروزرسانی گفتگوها"
+                aria-label="بروزرسانی گفتگوها"
+              >
+                <MaterialSymbol name="refresh" size={22} className={cn(refreshing && "animate-spin")} />
+              </md-icon-button>
             </div>
 
             {/* Scrollable Conversation Rows */}
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-[500px]">
+            <div className="flex-1 overflow-y-auto max-h-[500px] px-2 pb-2 space-y-0.5">
               {filteredConversations.length === 0 ? (
-                <div className="p-8 text-center space-y-2 text-slate-400">
-                  <MessageSquare className="w-6 h-6 mx-auto opacity-60" />
-                  <div className="text-xs font-semibold text-slate-600">
-                    گفتگویی در این بخش وجود ندارد
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                <div className="p-8 text-center space-y-2 text-on-surface-variant">
+                  <MaterialSymbol name="forum" size={32} className="opacity-60" />
+                  <div className="title-small text-on-surface">گفتگویی در این بخش وجود ندارد</div>
+                  <p className="body-small leading-relaxed">
                     به محض اینکه کاربری در دایرکت پیام بدهد یا استوری شما را ریپلای کند، مکالمه‌اش در این ستون ظاهر می‌شود.
                   </p>
                 </div>
@@ -699,21 +646,22 @@ export function DmAutomationView({
                         setSelectedSender(conv.sender_username);
                         setShowMobileChat(true);
                       }}
+                      aria-current={isSelected ? "true" : undefined}
                       className={cn(
-                        "w-full text-right px-4 py-3.5 flex items-start gap-3 transition-all cursor-pointer border-r-4",
+                        "relative w-full text-start px-3 py-3 flex items-start gap-3 rounded-2xl transition-colors cursor-pointer",
                         isSelected
-                          ? "bg-primary/10 border-r-primary text-on-surface"
-                          : "border-r-transparent hover:bg-surface-container-high/50 bg-transparent text-on-surface-variant"
+                          ? "bg-secondary-container text-on-secondary-container"
+                          : "text-on-surface hover:bg-on-surface/5"
                       )}
                     >
                       <div
                         className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center font-mono text-xs font-bold shrink-0 shadow-2xs",
+                          "w-10 h-10 rounded-full flex items-center justify-center font-mono label-large shrink-0",
                           conv.bot_paused
-                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                            ? "bg-tertiary-container text-on-tertiary-container"
                             : isSelected
                             ? "bg-primary text-on-primary"
-                            : "bg-surface-container-high text-on-surface"
+                            : "bg-primary-container text-on-primary-container"
                         )}
                       >
                         {conv.sender_username.slice(0, 1).toUpperCase()}
@@ -721,26 +669,24 @@ export function DmAutomationView({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className={cn(
-                            "font-mono text-xs truncate",
-                            isSelected ? "font-bold text-on-surface" : "font-medium text-on-surface"
-                          )}>
+                          <span className="font-mono label-large truncate">
                             <bdi>@{conv.sender_username}</bdi>
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
                             {conv.bot_paused && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200">
-                                ⏸️ ادمین
+                              <span className="inline-flex items-center gap-0.5 label-small px-1.5 py-0.5 rounded-md bg-tertiary-container text-on-tertiary-container">
+                                <MaterialSymbol name="pause" size={12} />
+                                ادمین
                               </span>
                             )}
                             <span
                               className={cn(
-                                "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                                "label-small px-2 py-0.5 rounded-md",
                                 conv.is_story_reply
-                                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                                  ? "bg-error-container text-on-error-container"
                                   : conv.source_shortcode
-                                  ? "bg-primary/10 text-primary"
-                                  : "bg-surface-container text-on-surface-variant"
+                                  ? "bg-primary-container text-on-primary-container"
+                                  : "bg-surface-container-highest text-on-surface-variant"
                               )}
                             >
                               {conv.is_story_reply
@@ -752,13 +698,13 @@ export function DmAutomationView({
                           </div>
                         </div>
 
-                        <p className="text-xs text-on-surface-variant truncate mt-1">
+                        <p className="body-small text-on-surface-variant truncate mt-1">
                           {conv.last_incoming || "—"}
                         </p>
 
                         {conv.last_reply && (
-                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 truncate mt-0.5 flex items-center gap-1">
-                            <CheckCheck className="w-3.5 h-3.5 shrink-0" />
+                          <p className="body-small text-primary truncate mt-0.5 flex items-center gap-1">
+                            <MaterialSymbol name="done_all" size={14} className="shrink-0" />
                             <span className="truncate">{conv.last_reply}</span>
                           </p>
                         )}
@@ -770,129 +716,118 @@ export function DmAutomationView({
             </div>
           </div>
 
-          {/* LEFT PANE: Active Conversation Stream & 1-Click Bot Pause */}
-          <div className={cn("lg:col-span-8 flex flex-col bg-slate-50/40", !showMobileChat ? "hidden lg:flex" : "flex")}>
+          {/* END PANE: Active Conversation Stream & 1-Click Bot Pause */}
+          <div className={cn("lg:col-span-8 flex-col bg-surface", !showMobileChat ? "hidden lg:flex" : "flex")}>
             {!activeConversation ? (
               <div className="flex-1 flex flex-col items-center justify-center p-10 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
-                  <MessageSquare className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-2xl bg-surface-container-high text-on-surface-variant flex items-center justify-center">
+                  <MaterialSymbol name="forum" size={28} />
                 </div>
-                <div className="text-sm font-bold text-slate-700">
+                <div className="title-medium text-on-surface">
                   هنوز مکالمه‌ای در صندوق دایرکت ثبت نشده است
                 </div>
-                <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+                <p className="body-small text-on-surface-variant max-w-md leading-relaxed">
                   وقتی مخاطبان زیر پست‌های شما کامنت بگذارند یا در دایرکت و استوری پیام بدهند، تمام پیام‌ها و پاسخ‌های هوش مصنوعی به شکل چت زنده در این صفحه نمایش داده می‌شود.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("settings")}
-                  className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <Settings2 className="w-3.5 h-3.5" />
-                  <span>بررسی تنظیمات پاسخگوی خودکار استوری و دایرکت</span>
-                </button>
+                <md-filled-tonal-button onClick={() => setActiveTab("settings")} className="mt-1">
+                  <MaterialSymbol name="smart_toy" size={18} slot="icon" />
+                  بررسی تنظیمات دستیار هوشمند دایرکت
+                </md-filled-tonal-button>
               </div>
             ) : (
               <>
                 {/* Conversation Top Bar */}
-                <div className="bg-white border-b border-slate-100 px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 sm:gap-3">
-                    <button
-                      type="button"
+                <div className="bg-surface-container-low border-b border-outline-variant px-3 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <md-icon-button
                       onClick={() => setShowMobileChat(false)}
-                      className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+                      className="lg:hidden shrink-0"
                       title="بازگشت به لیست گفتگوها"
+                      aria-label="بازگشت به لیست گفتگوها"
                     >
-                      <ArrowRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
-                    </button>
-                    <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                      <MaterialSymbol name="arrow_forward" size={22} />
+                    </md-icon-button>
+                    <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container font-mono label-large flex items-center justify-center shrink-0">
                       {activeConversation.sender_username.slice(0, 1).toUpperCase()}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold text-slate-900">
+                        <span className="font-mono title-small text-on-surface truncate">
                           <bdi>@{activeConversation.sender_username}</bdi>
                         </span>
                         {activeConversation.read_at && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                            <CheckCheck className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1 label-small px-2 py-0.5 rounded-md bg-secondary-container text-on-secondary-container">
+                            <MaterialSymbol name="done_all" size={14} />
                             سین شده
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                        {activeConversation.is_story_reply ? (
-                          <span className="text-rose-600 font-medium">
-                            📸 شروع مکالمه از ریپلای استوری
-                          </span>
-                        ) : activeConversation.source_shortcode ? (
-                          <span className="text-indigo-600 font-medium">
-                            🎬 ادامه خودکار سناریوی پست
-                          </span>
-                        ) : (
-                          <span>💬 پیام مستقیم در دایرکت</span>
-                        )}
+                      <div className="body-small text-on-surface-variant flex items-center gap-1 mt-0.5">
+                        <MaterialSymbol
+                          name={
+                            activeConversation.is_story_reply
+                              ? "amp_stories"
+                              : activeConversation.source_shortcode
+                              ? "movie"
+                              : "chat"
+                          }
+                          size={14}
+                        />
+                        <span>
+                          {activeConversation.is_story_reply
+                            ? "شروع مکالمه از ریپلای استوری"
+                            : activeConversation.source_shortcode
+                            ? "ادامه خودکار سناریوی پست"
+                            : "پیام مستقیم در دایرکت"}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   {/* 1-Click Human Takeover Switch */}
-                  <button
-                    type="button"
-                    disabled={togglingUser === activeConversation.sender_username}
-                    onClick={() =>
-                      handleToggleBotPause(
-                        activeConversation.sender_username,
-                        activeConversation.bot_paused
-                      )
-                    }
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      activeConversation.bot_paused
-                        ? "bg-amber-500 hover:bg-amber-600 text-white shadow-xs"
-                        : "bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800"
-                    }`}
-                  >
+                  <div className="flex items-center gap-3 rounded-full bg-surface-container-high ps-4 pe-2 py-1.5">
+                    <span className="flex flex-col">
+                      <span className="label-large text-on-surface">
+                        {activeConversation.bot_paused ? "ربات متوقف است" : "پاسخ خودکار ربات"}
+                      </span>
+                      <span className="label-small text-on-surface-variant">
+                        {activeConversation.bot_paused ? "پاسخ‌ها توسط ادمین" : "خاموش کنید تا خودتان پاسخ دهید"}
+                      </span>
+                    </span>
                     {togglingUser === activeConversation.sender_username ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : activeConversation.bot_paused ? (
-                      <>
-                        <PlayCircle className="w-4 h-4" />
-                        <span>ربات برای این کاربر متوقف است (فعال‌سازی مجدد)</span>
-                      </>
+                      <md-circular-progress indeterminate className="[--md-circular-progress-size:24px] mx-3" />
                     ) : (
-                      <>
-                        <PauseCircle className="w-4 h-4 text-amber-600" />
-                        <span>توقف ربات برای این کاربر (پاسخ توسط خودم)</span>
-                      </>
+                      <M3Switch
+                        selected={!activeConversation.bot_paused}
+                        onChange={() =>
+                          handleToggleBotPause(
+                            activeConversation.sender_username,
+                            activeConversation.bot_paused
+                          )
+                        }
+                        ariaLabel="پاسخ خودکار ربات برای این کاربر"
+                      />
                     )}
-                  </button>
+                  </div>
                 </div>
 
                 {/* Chat Messages Stream */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-4 max-h-[420px]">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 max-h-[420px] bg-surface">
                   {activeConversation.messages.length === 0 ? (
                     <div className="space-y-3">
                       {activeConversation.last_incoming && (
                         <div className="flex justify-start">
-                          <div className="max-w-[78%] rounded-2xl rounded-tr-sm bg-white border border-slate-200/80 px-4 py-2.5 text-xs text-slate-800 shadow-2xs">
-                            <div className="font-semibold text-[10px] text-slate-400 mb-1">
-                              پیام مشتری
-                            </div>
-                            <p className="leading-relaxed">
-                              {activeConversation.last_incoming}
-                            </p>
+                          <div className="max-w-[78%] rounded-[20px] rounded-ss-sm bg-surface-container-high px-4 py-2.5 body-small text-on-surface">
+                            <div className="label-small text-on-surface-variant mb-1">پیام مشتری</div>
+                            <p className="leading-relaxed">{activeConversation.last_incoming}</p>
                           </div>
                         </div>
                       )}
                       {activeConversation.last_reply && (
                         <div className="flex justify-end">
-                          <div className="max-w-[78%] rounded-2xl rounded-tl-sm bg-indigo-600 text-white px-4 py-2.5 text-xs shadow-2xs">
-                            <div className="font-semibold text-[10px] text-indigo-200 mb-1">
-                              پاسخ هوشمند پیج
-                            </div>
-                            <p className="leading-relaxed">
-                              {activeConversation.last_reply}
-                            </p>
+                          <div className="max-w-[78%] rounded-[20px] rounded-se-sm bg-primary-container text-on-primary-container px-4 py-2.5 body-small">
+                            <div className="label-small text-on-primary-container/80 mb-1">پاسخ هوشمند پیج</div>
+                            <p className="leading-relaxed">{activeConversation.last_reply}</p>
                           </div>
                         </div>
                       )}
@@ -903,18 +838,17 @@ export function DmAutomationView({
                         {/* Customer Incoming Bubble */}
                         {msg.incoming_text && (
                           <div className="flex justify-start">
-                            <div className="max-w-[78%] rounded-[20px] rounded-tr-xs bg-surface-container-high border border-outline-variant/30 px-4 py-2.5 text-xs text-on-surface shadow-2xs">
-                              <div className="flex items-center gap-2 text-[10px] text-on-surface-variant mb-1">
+                            <div className="max-w-[78%] rounded-[20px] rounded-ss-sm bg-surface-container-high px-4 py-2.5 body-small text-on-surface">
+                              <div className="flex items-center gap-1.5 label-small text-on-surface-variant mb-1">
                                 <span>مشتری</span>
                                 {msg.is_story_reply === 1 && (
-                                  <span className="text-rose-600 font-semibold">
-                                    • 📸 ریپلای روی استوری
+                                  <span className="inline-flex items-center gap-0.5 text-on-error-container">
+                                    <MaterialSymbol name="amp_stories" size={12} />
+                                    ریپلای روی استوری
                                   </span>
                                 )}
                               </div>
-                              <p className="leading-relaxed whitespace-pre-wrap">
-                                {msg.incoming_text}
-                              </p>
+                              <p className="leading-relaxed whitespace-pre-wrap">{msg.incoming_text}</p>
                             </div>
                           </div>
                         )}
@@ -924,32 +858,34 @@ export function DmAutomationView({
                           <div className="flex justify-end">
                             <div
                               className={cn(
-                                "max-w-[78%] rounded-[20px] rounded-tl-xs px-4.5 py-3 text-xs shadow-2xs",
+                                "max-w-[78%] rounded-[20px] rounded-se-sm px-4 py-2.5 body-small",
                                 msg.reply_status === "pending_follow"
-                                  ? "bg-amber-600 text-white"
-                                  : "bg-primary text-on-primary"
+                                  ? "bg-tertiary-container text-on-tertiary-container"
+                                  : "bg-primary-container text-on-primary-container"
                               )}
                             >
-                              <div className="flex items-center justify-between gap-3 text-[10px] opacity-85 mb-1">
-                                <span>
+                              <div className="flex items-center justify-between gap-3 label-small opacity-85 mb-1">
+                                <span className="inline-flex items-center gap-1">
+                                  <MaterialSymbol
+                                    name={msg.reply_status === "pending_follow" ? "lock" : "smart_toy"}
+                                    size={12}
+                                  />
                                   {msg.reply_status === "pending_follow"
-                                    ? "🔒 پیام دعوت به فالو"
-                                    : "🤖 پاسخ خودکار استودیو"}
+                                    ? "پیام دعوت به فالو"
+                                    : "پاسخ خودکار استودیو"}
                                 </span>
-                                <span className="inline-flex items-center gap-1 font-medium">
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>ارسال شد</span>
+                                <span className="inline-flex items-center gap-0.5">
+                                  <MaterialSymbol name="check" size={14} />
+                                  ارسال شد
                                 </span>
                               </div>
-                              <p className="leading-relaxed whitespace-pre-wrap font-medium">
-                                {msg.reply_text}
-                              </p>
+                              <p className="leading-relaxed whitespace-pre-wrap">{msg.reply_text}</p>
                             </div>
                           </div>
                         ) : (
                           msg.reply_status === "skipped" && (
                             <div className="flex justify-end">
-                              <div className="rounded-full bg-surface-container-high text-on-surface-variant px-3 py-1.5 text-[11px]">
+                              <div className="rounded-full bg-surface-container-high text-on-surface-variant px-3 py-1.5 label-small">
                                 بدون پاسخ خودکار (رد شده طبق قوانین)
                               </div>
                             </div>
@@ -960,13 +896,13 @@ export function DmAutomationView({
                   )}
                 </div>
 
-                {/* Manual Direct Reply Input Bar (M3 Tonal Surface) */}
+                {/* Manual Direct Reply Composer */}
                 <form
                   onSubmit={handleSendManualReply}
-                  className="bg-surface-container-lowest border-t border-outline-variant/30 p-4 space-y-2 shrink-0"
+                  className="bg-surface-container-low border-t border-outline-variant p-3 sm:p-4 space-y-2 shrink-0"
                 >
                   {manualNotice && (
-                    <div className="text-[11px] font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">
+                    <div role="status" className="body-small text-on-secondary-container bg-secondary-container px-3 py-1.5 rounded-lg">
                       {manualNotice}
                     </div>
                   )}
@@ -976,20 +912,21 @@ export function DmAutomationView({
                       value={manualReplyText}
                       onChange={(e) => setManualReplyText(e.target.value)}
                       placeholder={`ارسال پیام مستقیم به @${activeConversation.sender_username} (با ارسال پیام، ربات برای این کاربر متوقف می‌شود)...`}
-                      className="flex-1 rounded-full bg-surface-container-high px-4 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary outline-none transition-all"
+                      aria-label="متن پیام دستی"
+                      className="flex-1 min-w-0 h-12 rounded-full bg-surface-container-high px-5 body-medium text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-primary transition-shadow"
                     />
-                    <button
+                    <md-filled-button
                       type="submit"
                       disabled={sendingManual || !manualReplyText.trim()}
-                      className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full bg-primary hover:opacity-95 disabled:opacity-40 text-on-primary text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs"
+                      className="shrink-0"
                     >
                       {sendingManual ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <md-circular-progress indeterminate slot="icon" className="[--md-circular-progress-size:18px]" />
                       ) : (
-                        <Send className="w-4 h-4" />
+                        <MaterialSymbol name="send" size={18} slot="icon" />
                       )}
-                      <span>ارسال</span>
-                    </button>
+                      ارسال
+                    </md-filled-button>
                   </div>
                 </form>
               </>
@@ -1002,106 +939,92 @@ export function DmAutomationView({
           TAB 2: CAPTURED LEADS & PHONE NUMBERS CRM (Single Clean Surface)
          ===================================================================== */}
       {activeTab === "leads" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Flame className="w-4 h-4 text-rose-500" />
-                <span>مشتریان داغ و شماره‌های موبایل شکارشده</span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 tabular-nums font-bold">
-                  {formatNumber(leads.length)} مورد
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                شماره‌های موبایل ارسالی در دایرکت یا کامنت به صورت خودکار استخراج و در این لیست ذخیره می‌شوند.
-              </p>
+        <div className="bg-surface rounded-3xl border border-outline-variant overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <MaterialSymbol name="local_fire_department" size={24} className="text-on-error-container shrink-0 mt-0.5" />
+              <div>
+                <h2 className="title-medium text-on-surface flex flex-wrap items-center gap-2">
+                  <span>مشتریان داغ و شماره‌های موبایل شکارشده</span>
+                  <span className="label-medium px-2 py-0.5 rounded-md bg-error-container text-on-error-container tabular-nums">
+                    {formatNumber(leads.length)} مورد
+                  </span>
+                </h2>
+                <p className="body-small text-on-surface-variant mt-0.5">
+                  شماره‌های موبایل ارسالی در دایرکت یا کامنت به صورت خودکار استخراج و در این لیست ذخیره می‌شوند.
+                </p>
+              </div>
             </div>
 
             {leads.length > 0 && (
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shrink-0"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>دانلود فایل اکسل شماره‌ها (CSV)</span>
-              </button>
+              <md-filled-tonal-button onClick={handleExportCsv} className="shrink-0">
+                <MaterialSymbol name="download" size={18} slot="icon" />
+                دانلود فایل اکسل شماره‌ها (CSV)
+              </md-filled-tonal-button>
             )}
           </div>
 
           {leads.length === 0 ? (
             <div className="p-12 text-center space-y-2">
-              <Phone className="w-7 h-7 text-slate-300 mx-auto" />
-              <div className="text-sm font-bold text-slate-700">
+              <MaterialSymbol name="call" size={32} className="text-on-surface-variant opacity-60" />
+              <div className="title-small text-on-surface">
                 هنوز شماره تماسی از مشتریان دریافت نشده است
               </div>
-              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              <p className="body-small text-on-surface-variant max-w-md mx-auto leading-relaxed">
                 به محض اینکه کاربری در دایرکت یا کامنت شماره موبایل خود را بفرستد، شماره او به همراه نام کاربری و پست مبدا در این جدول آماده تماس خواهد بود.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold">
+              <table className="w-full text-start body-small">
+                <thead className="bg-surface-container-high text-on-surface-variant label-medium">
                   <tr>
-                    <th className="py-3 px-4">مشتری</th>
-                    <th className="py-3 px-4">شماره تماس</th>
-                    <th className="py-3 px-4">پست مبدا</th>
-                    <th className="py-3 px-4">پیام مشتری</th>
-                    <th className="py-3 px-4">وضعیت پیگیری</th>
+                    <th className="py-3 px-4 text-start">مشتری</th>
+                    <th className="py-3 px-4 text-start">شماره تماس</th>
+                    <th className="py-3 px-4 text-start">پست مبدا</th>
+                    <th className="py-3 px-4 text-start">پیام مشتری</th>
+                    <th className="py-3 px-4 text-start">وضعیت پیگیری</th>
                     <th className="py-3 px-4 text-center">عملیات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-outline-variant">
                   {leads.map((lead) => (
-                    <tr
-                      key={lead.id}
-                      className="hover:bg-slate-50/60 transition-colors"
-                    >
+                    <tr key={lead.id} className="hover:bg-on-surface/5 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">
-                          <bdi className="font-mono text-indigo-700">
-                            @{lead.sender_username}
-                          </bdi>
-                        </div>
+                        <bdi className="font-mono label-large text-primary">@{lead.sender_username}</bdi>
                         {lead.sender_full_name && (
-                          <div className="text-[11px] text-slate-500">
-                            {lead.sender_full_name}
-                          </div>
+                          <div className="body-small text-on-surface-variant">{lead.sender_full_name}</div>
                         )}
                       </td>
                       <td className="py-3 px-4">
                         <button
                           type="button"
                           onClick={() => handleCopyPhone(lead.phone_number)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold tabular-nums transition-colors cursor-pointer"
+                          className="relative inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-secondary-container text-on-secondary-container label-large tabular-nums cursor-pointer"
                           title="کپی شماره"
                         >
-                          <Phone className="w-3 h-3" />
+                          <md-ripple />
+                          <MaterialSymbol name="call" size={16} />
                           <span dir="ltr">{lead.phone_number}</span>
-                          {copiedPhone === lead.phone_number ? (
-                            <Check className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3 h-3 opacity-60" />
-                          )}
+                          <MaterialSymbol
+                            name={copiedPhone === lead.phone_number ? "check" : "content_copy"}
+                            size={16}
+                            className={cn(copiedPhone !== lead.phone_number && "opacity-60")}
+                          />
                         </button>
                       </td>
                       <td className="py-3 px-4">
                         {lead.source_shortcode ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-semibold">
-                            🎬 پست پیج
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-container text-on-primary-container label-small">
+                            <MaterialSymbol name="movie" size={14} />
+                            پست پیج
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-[11px]">
-                            دایرکت / استوری
-                          </span>
+                          <span className="text-on-surface-variant label-small">دایرکت / استوری</span>
                         )}
                       </td>
                       <td className="py-3 px-4 max-w-xs">
-                        <div
-                          className="truncate text-slate-700"
-                          title={lead.last_message}
-                        >
+                        <div className="truncate text-on-surface" title={lead.last_message}>
                           {lead.last_message}
                         </div>
                       </td>
@@ -1111,19 +1034,18 @@ export function DmAutomationView({
                           onChange={(e) =>
                             handleLeadStatusChange(
                               lead.id,
-                              e.target.value as
-                                | "new"
-                                | "contacted"
-                                | "converted"
+                              e.target.value as "new" | "contacted" | "converted"
                             )
                           }
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold outline-none cursor-pointer ${
+                          aria-label="وضعیت پیگیری"
+                          className={cn(
+                            "h-8 px-2.5 rounded-lg label-medium outline-none cursor-pointer border border-outline-variant focus:ring-2 focus:ring-primary",
                             lead.status === "converted"
-                              ? "bg-emerald-50 text-emerald-800"
+                              ? "bg-primary-container text-on-primary-container"
                               : lead.status === "contacted"
-                                ? "bg-amber-50 text-amber-800"
-                                : "bg-rose-50 text-rose-800"
-                          }`}
+                              ? "bg-tertiary-container text-on-tertiary-container"
+                              : "bg-error-container text-on-error-container"
+                          )}
                         >
                           <option value="new">🔥 جدید (منتظر تماس)</option>
                           <option value="contacted">📞 تماس گرفته شد</option>
@@ -1132,24 +1054,21 @@ export function DmAutomationView({
                       </td>
                       <td className="py-3 px-4 text-center">
                         <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
+                          <md-text-button
                             onClick={() => {
                               setSelectedSender(lead.sender_username);
                               setActiveTab("inbox");
                             }}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition-colors cursor-pointer"
                           >
                             مشاهده چت
-                          </button>
-                          <button
-                            type="button"
+                          </md-text-button>
+                          <md-icon-button
                             onClick={() => handleDeleteLead(lead.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="حذف"
+                            aria-label="حذف"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                            <MaterialSymbol name="delete" size={20} />
+                          </md-icon-button>
                         </div>
                       </td>
                     </tr>
@@ -1162,7 +1081,7 @@ export function DmAutomationView({
       )}
 
       {/* =====================================================================
-          TAB 3: STORY REPLIES & GENERAL DM AUTOPILOT SETTINGS (Single Surface)
+          TAB 3: AGENTIC AI DM ASSISTANT SETTINGS
          ===================================================================== */}
       {activeTab === "settings" && (
         <DmSettingsPanel
